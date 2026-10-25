@@ -1,11 +1,17 @@
 import urllib.request
 import urllib.parse
+import urllib.error
 import json
 import time
-from typing import List, Dict, Optional
+import logging
+import threading
+from collections import deque
+from typing import List, Dict, Optional, Any, Tuple
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 USER_AGENT = settings.USER_AGENT
 
@@ -25,8 +31,112 @@ _TVMAZE_CACHE_TTL = 3600 * 12  # 12 hours
 import concurrent.futures
 
 class TVMazeService:
-    @staticmethod
-    def get_show_akas(show_id: int) -> List[dict]:
+    # Rate limiting & sliding window pacing state (TVMaze public limit: 20 req / 10s per IP)
+    _rate_limit_lock = threading.Lock()
+    _request_timestamps = deque()
+    _blocked_until: float = 0.0  # Unix timestamp until which TVMaze calls are paused (circuit breaker)
+
+    @classmethod
+    def _handle_429(cls, headers: Any, url: str) -> None:
+        """Handle 429 Too Many Requests by activating an immediate global circuit breaker."""
+        now = time.time()
+        wait_s = 15.0
+        try:
+            if headers:
+                retry_after = headers.get("Retry-After")
+                if retry_after:
+                    wait_s = float(retry_after) + 1.5
+        except Exception:
+            pass
+
+        with cls._rate_limit_lock:
+            cls._blocked_until = now + wait_s
+
+        logger.error(f"TVMaze 429 rate limit reached for '{url}'. Global circuit breaker active for {wait_s:.1f}s. Halting requests.")
+
+    @classmethod
+    def _rate_limit_tvmaze(cls) -> bool:
+        """Enforce respectful sliding window pacing (max 18 req / 10s) and honor circuit breaker."""
+        with cls._rate_limit_lock:
+            now = time.time()
+
+            # 1. Check circuit breaker / active rate limit (set by real 429)
+            if cls._blocked_until > now:
+                wait_time = cls._blocked_until - now
+                if wait_time <= 1.0:
+                    time.sleep(wait_time)
+                    now = time.time()
+                else:
+                    logger.info(f"TVMaze circuit breaker holding requests (blocked for {wait_time:.1f}s remaining)")
+                    return False
+
+            # 2. Sliding window: clean timestamps older than 10.0 seconds
+            while cls._request_timestamps and cls._request_timestamps[0] <= now - 10.0:
+                cls._request_timestamps.popleft()
+
+            # 3. Controlled cap: max 18 requests per 10 seconds (TVMaze allows 20)
+            if len(cls._request_timestamps) >= 18:
+                sleep_needed = 10.0 - (now - cls._request_timestamps[0]) + 0.1
+                if sleep_needed > 0:
+                    if sleep_needed <= 3.5:
+                        logger.info(f"TVMaze sliding window rate pacing (18/10s), waiting {sleep_needed:.2f}s...")
+                        time.sleep(sleep_needed)
+                        now = time.time()
+                        while cls._request_timestamps and cls._request_timestamps[0] <= now - 10.0:
+                            cls._request_timestamps.popleft()
+                    else:
+                        # Heavy burst - gracefully drop without falsely tripping the global circuit breaker
+                        return False
+
+            # 4. Enforce minimum spacing of 0.06 seconds between consecutive requests
+            if cls._request_timestamps:
+                elapsed = now - cls._request_timestamps[-1]
+                if elapsed < 0.06:
+                    time.sleep(0.06 - elapsed)
+                    now = time.time()
+
+            cls._request_timestamps.append(now)
+            return True
+
+    @classmethod
+    def _tvmaze_request(cls, url: str, timeout: int = 5) -> Optional[Any]:
+        """Central HTTP request runner with rate limiting, Retry-After header tracking, and 429 backoff."""
+        if not cls._rate_limit_tvmaze():
+            return None
+
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                if res.status == 200:
+                    return json.loads(res.read().decode('utf-8'))
+                elif res.status == 429:
+                    cls._handle_429(res.headers, url)
+                    return None
+        except urllib.error.HTTPError as he:
+            if he.code == 429:
+                cls._handle_429(he.headers, url)
+                return None
+            logger.warning(f"TVMaze HTTP {he.code} for '{url}': {he}")
+            return None
+        except Exception as e:
+            logger.warning(f"TVMaze request error for '{url}': {e}")
+            return None
+        return None
+
+    @classmethod
+    def get_rate_limit_status(cls, category: str = "series") -> Optional[dict]:
+        """Provides status for search router and frontend warning banner if TVMaze is limited."""
+        now = time.time()
+        if cls._blocked_until > now:
+            return {
+                "category": category,
+                "reason": "burst_limit",
+                "reset_at": cls._blocked_until
+            }
+        return None
+
+    @classmethod
+    def get_show_akas(cls, show_id: int) -> List[dict]:
         now = time.time()
         if show_id in _TVMAZE_AKAS_CACHE:
             ts, cached_akas = _TVMAZE_AKAS_CACHE[show_id]
@@ -34,15 +144,10 @@ class TVMazeService:
                 return cached_akas
         
         url = f"https://api.tvmaze.com/shows/{show_id}/akas"
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=3) as res:
-                if res.status == 200:
-                    data = json.loads(res.read().decode('utf-8')) or []
-                    _TVMAZE_AKAS_CACHE[show_id] = (now, data)
-                    return data
-        except Exception:
-            pass
+        data = cls._tvmaze_request(url, timeout=3)
+        if data and isinstance(data, list):
+            _TVMAZE_AKAS_CACHE[show_id] = (now, data)
+            return data
         _TVMAZE_AKAS_CACHE[show_id] = (now, [])
         return []
 
@@ -81,32 +186,16 @@ class TVMazeService:
             # Latin America or any other region with Spanish language active
             return latam_title or spain_title or original_name
 
-    @staticmethod
-    def search_shows(query: str, is_anime: bool = False, lang: str = 'es', country_code: str = 'AR') -> List[SearchResultItem]:
+    @classmethod
+    def search_shows(cls, query: str, is_anime: bool = False, lang: str = 'es', country_code: str = 'AR') -> List[SearchResultItem]:
         if not query:
             return []
         
         encoded_query = urllib.parse.quote(query)
         url = f"https://api.tvmaze.com/search/shows?q={encoded_query}"
         
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": USER_AGENT}
-        )
-        
         results = []
-        data = None
-        for attempt in range(2):
-            try:
-                with urllib.request.urlopen(req, timeout=4) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        break
-            except Exception as e:
-                if attempt == 0:
-                    time.sleep(0.5)
-                else:
-                    print(f"TVMaze Search API Error: {e}")
+        data = cls._tvmaze_request(url, timeout=5)
 
         if data:
             valid_shows = []
@@ -161,8 +250,8 @@ class TVMazeService:
 
         return results
 
-    @staticmethod
-    def get_all_episodes(series_id: str) -> List[dict]:
+    @classmethod
+    def get_all_episodes(cls, series_id: str) -> List[dict]:
         real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
         now = time.time()
         if real_id in _TVMAZE_EPISODES_CACHE:
@@ -171,48 +260,42 @@ class TVMazeService:
                 return cached_eps
 
         url = f"https://api.tvmaze.com/shows/{real_id}/episodes?specials=1"
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        
+        data = cls._tvmaze_request(url, timeout=6)
         episodes = []
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for ep in data:
-                        img = ep.get("image")
-                        ep_type = ep.get("type", "regular")
-                        is_significant = (ep_type == "significant_special")
-                        is_extra = (ep_type == "insignificant_special")
-                        raw_season = ep.get("season")
-                        
-                        # For extras (insignificant specials), assign season_number = 0
-                        # For significant specials, keep their natural broadcast season (or 0 if none)
-                        if is_extra:
-                            season_num = 0
-                        else:
-                            season_num = raw_season if raw_season is not None else 1
+        if data and isinstance(data, list):
+            for ep in data:
+                img = ep.get("image") or {}
+                ep_type = ep.get("type", "regular")
+                is_significant = (ep_type == "significant_special")
+                is_extra = (ep_type == "insignificant_special")
+                raw_season = ep.get("season")
+                
+                # For extras (insignificant specials), assign season_number = 0
+                # For significant specials, keep their natural broadcast season (or 0 if none)
+                if is_extra:
+                    season_num = 0
+                else:
+                    season_num = raw_season if raw_season is not None else 1
 
-                        episodes.append({
-                            "id": ep.get("id"),
-                            "name": ep.get("name"),
-                            "episode_number": ep.get("number"),
-                            "season_number": season_num,
-                            "still_path": img.get("original") if img else None,
-                            "overview": ep.get("summary", ""),
-                            "air_date": ep.get("airdate"),
-                            "airtime": ep.get("airtime"),
-                            "airstamp": ep.get("airstamp"),
-                            "ep_type": ep_type,
-                            "is_significant_special": is_significant,
-                            "is_extra": is_extra
-                        })
-                    _TVMAZE_EPISODES_CACHE[real_id] = (now, episodes)
-        except Exception as e:
-            print(f"TVMaze get_all_episodes error: {e}")
+                episodes.append({
+                    "id": ep.get("id"),
+                    "name": ep.get("name"),
+                    "episode_number": ep.get("number"),
+                    "season_number": season_num,
+                    "still_path": img.get("original") if isinstance(img, dict) else None,
+                    "overview": ep.get("summary", ""),
+                    "air_date": ep.get("airdate"),
+                    "airtime": ep.get("airtime"),
+                    "airstamp": ep.get("airstamp"),
+                    "ep_type": ep_type,
+                    "is_significant_special": is_significant,
+                    "is_extra": is_extra
+                })
+            _TVMAZE_EPISODES_CACHE[real_id] = (now, episodes)
         return episodes
 
-    @staticmethod
-    def get_series_detail(series_id: str, lang: str = 'es', country_code: str = 'AR') -> dict:
+    @classmethod
+    def get_series_detail(cls, series_id: str, lang: str = 'es', country_code: str = 'AR') -> Optional[dict]:
         real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
         cache_key = f"{real_id}_{lang}_{country_code}"
         now = time.time()
@@ -222,115 +305,99 @@ class TVMazeService:
                 return cached_detail
 
         url = f"https://api.tvmaze.com/shows/{real_id}"
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    seasons = []
-                    # Fetch episodes first to know the real episode count per season (uses cache)
-                    all_eps = TVMazeService.get_all_episodes(series_id)
-                    eps_per_season = {}
-                    extras_count = 0
-                    for ep in all_eps:
-                        if ep.get("is_extra") or ep.get("season_number") == 0:
-                            extras_count += 1
-                        else:
-                            s_num = ep.get("season_number")
-                            if s_num is not None and s_num > 0:
-                                eps_per_season[s_num] = eps_per_season.get(s_num, 0) + 1
+        data = cls._tvmaze_request(url, timeout=5)
+        if data and isinstance(data, dict):
+            seasons = []
+            # Fetch episodes first to know the real episode count per season (uses cache)
+            all_eps = cls.get_all_episodes(series_id)
+            eps_per_season = {}
+            extras_count = 0
+            for ep in all_eps:
+                if ep.get("is_extra") or ep.get("season_number") == 0:
+                    extras_count += 1
+                else:
+                    s_num = ep.get("season_number")
+                    if s_num is not None and s_num > 0:
+                        eps_per_season[s_num] = eps_per_season.get(s_num, 0) + 1
 
-                    try:
-                        with urllib.request.urlopen(f"https://api.tvmaze.com/shows/{real_id}/seasons", timeout=5) as s_response:
-                            if s_response.status == 200:
-                                seasons_data = json.loads(s_response.read().decode())
-                                for s in seasons_data:
-                                    num = s.get("number")
-                                    if num is not None and num > 0:
-                                        real_count = eps_per_season.get(num, 0)
-                                        order_count = s.get("episodeOrder")
-                                        # Only include seasons that have episodes or a defined episode order
-                                        if real_count > 0 or order_count is not None:
-                                            seasons.append({
-                                                "id": s.get("id"),
-                                                "season_number": num,
-                                                "episode_count": real_count if real_count > 0 else (order_count or 1)
-                                            })
-                    except Exception:
-                        pass
-                    
-                    if not seasons and eps_per_season:
-                        for num, count in sorted(eps_per_season.items()):
+            seasons_data = cls._tvmaze_request(f"https://api.tvmaze.com/shows/{real_id}/seasons", timeout=5)
+            if seasons_data and isinstance(seasons_data, list):
+                for s in seasons_data:
+                    num = s.get("number")
+                    if num is not None and num > 0:
+                        real_count = eps_per_season.get(num, 0)
+                        order_count = s.get("episodeOrder")
+                        # Only include seasons that have episodes or a defined episode order
+                        if real_count > 0 or order_count is not None:
                             seasons.append({
-                                "id": num,
+                                "id": s.get("id"),
                                 "season_number": num,
-                                "episode_count": count
+                                "episode_count": real_count if real_count > 0 else (order_count or 1)
                             })
+            
+            if not seasons and eps_per_season:
+                for num, count in sorted(eps_per_season.items()):
+                    seasons.append({
+                        "id": num,
+                        "season_number": num,
+                        "episode_count": count
+                    })
 
-                    # If there are insignificant specials / extras, append the Extras season (season_number: 0) at the end
-                    if extras_count > 0:
-                        seasons.append({
-                            "id": "extras",
-                            "season_number": 0,
-                            "is_extras": True,
-                            "episode_count": extras_count
-                        })
-                    
-                    raw_name = data.get("name")
-                    show_int_id = int(real_id) if real_id.isdigit() else 0
-                    localized_series_name = TVMazeService.get_localized_title(show_int_id, raw_name, lang, country_code) if show_int_id else raw_name
+            # If there are insignificant specials / extras, append the Extras season (season_number: 0) at the end
+            if extras_count > 0:
+                seasons.append({
+                    "id": "extras",
+                    "season_number": 0,
+                    "is_extras": True,
+                    "episode_count": extras_count
+                })
+            
+            raw_name = data.get("name")
+            show_int_id = int(real_id) if real_id.isdigit() else 0
+            localized_series_name = cls.get_localized_title(show_int_id, raw_name, lang, country_code) if show_int_id else raw_name
 
-                    result = {
-                        "id": series_id,
-                        "name": localized_series_name,
-                        "status": data.get("status"),
-                        "number_of_seasons": len(seasons),
-                        "seasons": seasons,
-                        "overview": data.get("summary", ""),
-                        "first_air_date": data.get("premiered"),
-                        "image_url": data.get("image", {}).get("original") if data.get("image") else None
-                    }
-                    _TVMAZE_SERIES_CACHE[cache_key] = (now, result)
-                    return result
-        except Exception as e:
-            print(f"TVMaze get_series_detail error: {e}")
+            result = {
+                "id": series_id,
+                "name": localized_series_name,
+                "status": data.get("status"),
+                "number_of_seasons": len(seasons),
+                "seasons": seasons,
+                "overview": data.get("summary", ""),
+                "first_air_date": data.get("premiered"),
+                "image_url": data.get("image", {}).get("original") if data.get("image") else None
+            }
+            _TVMAZE_SERIES_CACHE[cache_key] = (now, result)
+            return result
         return None
 
-    @staticmethod
-    def get_season_episodes(series_id: str, season_number: int) -> List[dict]:
-        all_eps = TVMazeService.get_all_episodes(series_id)
+    @classmethod
+    def get_season_episodes(cls, series_id: str, season_number: int) -> List[dict]:
+        all_eps = cls.get_all_episodes(series_id)
         return [ep for ep in all_eps if ep.get("season_number") == season_number]
 
-
-    @staticmethod
-    def get_episode_detail(series_id: str, season_number: int, episode_number: int) -> dict:
+    @classmethod
+    def get_episode_detail(cls, series_id: str, season_number: int, episode_number: int) -> Optional[dict]:
         real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
         url = f"https://api.tvmaze.com/shows/{real_id}/episodebynumber?season={season_number}&number={episode_number}"
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    ep = json.loads(response.read().decode())
-                    img = ep.get("image")
-                    return {
-                        "id": ep.get("id"),
-                        "name": ep.get("name"),
-                        "episode_number": ep.get("number"),
-                        "season_number": ep.get("season"),
-                        "still_path": img.get("original") if img else None,
-                        "overview": ep.get("summary", ""),
-                        "air_date": ep.get("airdate")
-                    }
-        except Exception:
-            pass
+        data = cls._tvmaze_request(url, timeout=5)
+        if data and isinstance(data, dict):
+            img = data.get("image") or {}
+            return {
+                "id": data.get("id"),
+                "name": data.get("name"),
+                "episode_number": data.get("number"),
+                "season_number": data.get("season"),
+                "still_path": img.get("original") if isinstance(img, dict) else None,
+                "overview": data.get("summary", ""),
+                "air_date": data.get("airdate")
+            }
         return None
 
 
     _schedule_cache = {}
 
-    @staticmethod
-    def get_new_shows() -> List[SearchResultItem]:
+    @classmethod
+    def get_new_shows(cls) -> List[SearchResultItem]:
         import json, urllib.request, datetime, time
         import concurrent.futures
         
@@ -350,23 +417,17 @@ class TVMazeService:
             urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=US")
 
         def fetch_url(u):
-            try:
-                req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=4) as response:
-                    if response.status == 200:
-                        return json.loads(response.read().decode())
-            except Exception:
-                pass
-            return []
+            data = cls._tvmaze_request(u, timeout=4)
+            return data if isinstance(data, list) else []
 
         all_episodes = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for items in executor.map(fetch_url, urls):
                 all_episodes.extend(items)
 
         shows_map = {}
         for ep in all_episodes:
-            show = ep.get("_embedded", {}).get("show")
+            show = ep.get("show") or ep.get("_embedded", {}).get("show")
             if not show or not show.get("id"):
                 continue
 
@@ -429,8 +490,8 @@ class TVMazeService:
         TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results
 
-    @staticmethod
-    def get_new_anime() -> List[SearchResultItem]:
+    @classmethod
+    def get_new_anime(cls) -> List[SearchResultItem]:
         import json, urllib.request, datetime, time
         import concurrent.futures
 
@@ -451,23 +512,17 @@ class TVMazeService:
             urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=JP")
 
         def fetch_url(u):
-            try:
-                req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=4) as response:
-                    if response.status == 200:
-                        return json.loads(response.read().decode())
-            except Exception:
-                pass
-            return []
+            data = cls._tvmaze_request(u, timeout=4)
+            return data if isinstance(data, list) else []
 
         all_episodes = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for items in executor.map(fetch_url, urls):
                 all_episodes.extend(items)
 
         anime_map = {}
         for ep in all_episodes:
-            show = ep.get("_embedded", {}).get("show")
+            show = ep.get("show") or ep.get("_embedded", {}).get("show")
             if not show or not show.get("id"):
                 continue
 
@@ -545,8 +600,8 @@ class TVMazeService:
         TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results
 
-    @staticmethod
-    def get_trending_series() -> List[SearchResultItem]:
+    @classmethod
+    def get_trending_series(cls) -> List[SearchResultItem]:
         cache_key = "tvmaze_trending_series_wiki_v4"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
@@ -605,7 +660,7 @@ class TVMazeService:
 
                 # Keep max_workers low (3) to respect TVMaze public rate limit (max 20 req/10s)
                 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
-                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:25]))
+                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:15]))
 
                 for show in matched_shows:
                     if show and show.image_url and show.title:
@@ -626,18 +681,16 @@ class TVMazeService:
                 schedule_shows: List[dict] = []
                 for days_back in [0, 1, 2, 3]:
                     d_str = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
-                    for sched_url in [f"https://api.tvmaze.com/schedule/web?date={d_str}", f"https://api.tvmaze.com/schedule?date={d_str}&country=US"]:
-                        try:
-                            s_req = urllib.request.Request(sched_url, headers={"User-Agent": USER_AGENT})
-                            with urllib.request.urlopen(s_req, timeout=3.5) as s_resp:
-                                if s_resp.status == 200:
-                                    s_data = json.loads(s_resp.read().decode())
-                                    for ep in s_data:
-                                        sh = ep.get("_embedded", {}).get("show")
-                                        if sh and sh.get("id") and sh.get("type") != "Animation":
-                                            schedule_shows.append(sh)
-                        except Exception:
-                            continue
+                    for sched_url in [
+                        f"https://api.tvmaze.com/schedule/web?date={d_str}",
+                        f"https://api.tvmaze.com/schedule?date={d_str}&country=US"
+                    ]:
+                        s_data = cls._tvmaze_request(sched_url, timeout=3.5)
+                        if s_data and isinstance(s_data, list):
+                            for ep in s_data:
+                                sh = ep.get("show") or ep.get("_embedded", {}).get("show")
+                                if sh and sh.get("id") and sh.get("type") != "Animation":
+                                    schedule_shows.append(sh)
                     if len(schedule_shows) >= 30:
                         break
 
@@ -669,42 +722,40 @@ class TVMazeService:
         if len(results) < 20:
             try:
                 url = "https://api.tvmaze.com/shows"
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        series_list = []
-                        for show in data:
-                            network = show.get("network") if isinstance(show.get("network"), dict) else {}
-                            web_channel = show.get("webChannel") if isinstance(show.get("webChannel"), dict) else {}
-                            net_country = (network.get("country") or {}).get("code") if isinstance(network.get("country"), dict) else None
-                            web_country = (web_channel.get("country") or {}).get("code") if isinstance(web_channel.get("country"), dict) else None
-                            country_code = net_country or web_country
-                            genres = show.get("genres") or []
-                            is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
-                            if not is_anime:
-                                series_list.append(show)
+                data = cls._tvmaze_request(url, timeout=5)
+                if data and isinstance(data, list):
+                    series_list = []
+                    for show in data:
+                        network = show.get("network") if isinstance(show.get("network"), dict) else {}
+                        web_channel = show.get("webChannel") if isinstance(show.get("webChannel"), dict) else {}
+                        net_country = (network.get("country") or {}).get("code") if isinstance(network.get("country"), dict) else None
+                        web_country = (web_channel.get("country") or {}).get("code") if isinstance(web_channel.get("country"), dict) else None
+                        country_code = net_country or web_country
+                        genres = show.get("genres") or []
+                        is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                        if not is_anime:
+                            series_list.append(show)
 
-                        sorted_shows = sorted(series_list, key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)
-                        for show in sorted_shows:
-                            image_data = show.get("image")
-                            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
-                            ext_id = f"tvm_{show.get('id')}"
-                            norm = (show.get("name") or "").lower().strip()
-                            if ext_id not in seen_ids and norm not in seen_titles and image_url:
-                                seen_ids.add(ext_id)
-                                seen_titles.add(norm)
-                                results.append(SearchResultItem(
-                                    external_id=ext_id,
-                                    title=show.get("name"),
-                                    image_url=image_url,
-                                    description=show.get("summary", ""),
-                                    item_type="series",
-                                    release_date=show.get("premiered"),
-                                    popularity=show.get("weight", 0)
-                                ))
-                            if len(results) >= 20:
-                                break
+                    sorted_shows = sorted(series_list, key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)
+                    for show in sorted_shows:
+                        image_data = show.get("image")
+                        image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                        ext_id = f"tvm_{show.get('id')}"
+                        norm = (show.get("name") or "").lower().strip()
+                        if ext_id not in seen_ids and norm not in seen_titles and image_url:
+                            seen_ids.add(ext_id)
+                            seen_titles.add(norm)
+                            results.append(SearchResultItem(
+                                external_id=ext_id,
+                                title=show.get("name"),
+                                image_url=image_url,
+                                description=show.get("summary", ""),
+                                item_type="series",
+                                release_date=show.get("premiered"),
+                                popularity=show.get("weight", 0)
+                            ))
+                        if len(results) >= 20:
+                            break
             except Exception as e:
                 print(f"Error in TVMaze fallback trending series: {e}")
 
@@ -712,8 +763,8 @@ class TVMazeService:
             TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results
 
-    @staticmethod
-    def get_trending_anime() -> List[SearchResultItem]:
+    @classmethod
+    def get_trending_anime(cls) -> List[SearchResultItem]:
         cache_key = "tvmaze_trending_anime_anilist_v3"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
@@ -777,23 +828,21 @@ class TVMazeService:
             ]
             for u in urls:
                 try:
-                    req_s = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
-                    with urllib.request.urlopen(req_s, timeout=4) as response_s:
-                        if response_s.status == 200:
-                            sdata = json.loads(response_s.read().decode())
-                            for item in sdata:
-                                show = item.get("_embedded", {}).get("show") if "_embedded" in item else item.get("show") or item
-                                if not show or not isinstance(show, dict) or not show.get("id"):
-                                    continue
-                                network = show.get("network") or {}
-                                web_channel = show.get("webChannel") or {}
-                                country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
-                                genres = show.get("genres") or []
-                                is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
-                                if is_anime:
-                                    sid = show.get("id")
-                                    if sid not in anime_map or show.get("weight", 0) > anime_map[sid].get("weight", 0):
-                                        anime_map[sid] = show
+                    sdata = cls._tvmaze_request(u, timeout=4)
+                    if sdata and isinstance(sdata, list):
+                        for item in sdata:
+                            show = item.get("_embedded", {}).get("show") if "_embedded" in item else item.get("show") or item
+                            if not show or not isinstance(show, dict) or not show.get("id"):
+                                continue
+                            network = show.get("network") or {}
+                            web_channel = show.get("webChannel") or {}
+                            country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
+                            genres = show.get("genres") or []
+                            is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                            if is_anime:
+                                sid = show.get("id")
+                                if sid not in anime_map or show.get("weight", 0) > anime_map[sid].get("weight", 0):
+                                    anime_map[sid] = show
                 except Exception:
                     continue
 
@@ -834,35 +883,33 @@ class TVMazeService:
         if len(results) < 12:
             try:
                 url_fb = "https://api.tvmaze.com/shows"
-                req_fb = urllib.request.Request(url_fb, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req_fb, timeout=5) as response_fb:
-                    if response_fb.status == 200:
-                        fb_shows = json.loads(response_fb.read().decode())
-                        for show in sorted(fb_shows, key=anime_sort_key, reverse=True):
-                            network = show.get("network") or {}
-                            web_channel = show.get("webChannel") or {}
-                            country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
-                            genres = show.get("genres") or []
-                            is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
-                            if is_anime:
-                                sid = f"tvm_{show.get('id')}"
-                                norm = (show.get("name") or "").lower().strip()
-                                image_data = show.get("image")
-                                image_url = image_data.get("original") or image_data.get("medium") if image_data else None
-                                if image_url and sid not in seen_ids and norm not in seen_titles:
-                                    seen_ids.add(sid)
-                                    seen_titles.add(norm)
-                                    results.append(SearchResultItem(
-                                        external_id=sid,
-                                        title=show.get("name"),
-                                        image_url=image_url,
-                                        description=show.get("summary", ""),
-                                        item_type="anime",
-                                        release_date=show.get("premiered"),
-                                        popularity=show.get("weight", 0)
-                                    ))
-                                if len(results) >= 24:
-                                    break
+                fb_shows = cls._tvmaze_request(url_fb, timeout=5)
+                if fb_shows and isinstance(fb_shows, list):
+                    for show in sorted(fb_shows, key=anime_sort_key, reverse=True):
+                        network = show.get("network") or {}
+                        web_channel = show.get("webChannel") or {}
+                        country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
+                        genres = show.get("genres") or []
+                        is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                        if is_anime:
+                            sid = f"tvm_{show.get('id')}"
+                            norm = (show.get("name") or "").lower().strip()
+                            image_data = show.get("image")
+                            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                            if image_url and sid not in seen_ids and norm not in seen_titles:
+                                seen_ids.add(sid)
+                                seen_titles.add(norm)
+                                results.append(SearchResultItem(
+                                    external_id=sid,
+                                    title=show.get("name"),
+                                    image_url=image_url,
+                                    description=show.get("summary", ""),
+                                    item_type="anime",
+                                    release_date=show.get("premiered"),
+                                    popularity=show.get("weight", 0)
+                                ))
+                            if len(results) >= 24:
+                                break
             except Exception as e:
                 print(f"Error in TVMaze fallback anime: {e}")
 

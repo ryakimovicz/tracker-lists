@@ -43,6 +43,10 @@ def check_category_rate_limit_status(category: str) -> Optional[dict]:
         trakt_status = TraktService.get_rate_limit_status()
         if trakt_status:
             return trakt_status
+    elif category in ("series", "anime"):
+        tvm_status = TVMazeService.get_rate_limit_status(category)
+        if tvm_status:
+            return tvm_status
 
     svc_map = {
         "comic": "metron",
@@ -495,7 +499,15 @@ def get_all_episodes(
             response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
         if str(series_id).startswith("anime_"):
             return AnilistService.get_anime_episodes(series_id)
-        return TVMazeService.get_all_episodes(series_id)
+        episodes = TVMazeService.get_all_episodes(series_id)
+        if not episodes:
+            st_post = check_category_rate_limit_status(cat)
+            if st_post:
+                response.headers["X-Category-Rate-Limited"] = st_post["category"]
+                response.headers["X-Category-Rate-Limit-Reset"] = str(int(st_post["reset_at"]))
+                response.headers["X-Category-Rate-Limit-Reason"] = st_post["reason"]
+                response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+        return episodes
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -527,7 +539,15 @@ def get_series_detail(
             if not detail:
                 raise HTTPException(status_code=404, detail="Anime not found")
             return detail
-        return TVMazeService.get_series_detail(series_id, lang=client_lang, country_code=client_country)
+        detail = TVMazeService.get_series_detail(series_id, lang=client_lang, country_code=client_country)
+        if not detail:
+            st_post = check_category_rate_limit_status(cat)
+            if st_post:
+                response.headers["X-Category-Rate-Limited"] = st_post["category"]
+                response.headers["X-Category-Rate-Limit-Reset"] = str(int(st_post["reset_at"]))
+                response.headers["X-Category-Rate-Limit-Reason"] = st_post["reason"]
+                response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+        return detail
     except HTTPException:
         raise
     except Exception as e:
