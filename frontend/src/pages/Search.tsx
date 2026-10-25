@@ -236,21 +236,28 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
         onMouseEnter={() => prefetchMediaDetails(item)}
       >
         {/* Title */}
-        <div 
-          className="card-item-title" 
-          style={{ 
-            padding: '0.5rem 0.75rem', 
-            fontSize: '0.85rem', 
-            fontWeight: 600, 
-            borderBottom: '1px solid var(--border-color)', 
-            whiteSpace: 'nowrap', 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis' 
-          }} 
-          title={item.title}
-        >
-          {item.title}
-        </div>
+        {(() => {
+          const displayTitle = item.item_type === 'comic' 
+            ? item.title.replace(/\s*#\d+\s*$/, '') 
+            : item.title;
+          return (
+            <div 
+              className="card-item-title" 
+              style={{ 
+                padding: '0.5rem 0.75rem', 
+                fontSize: '0.85rem', 
+                fontWeight: 600, 
+                borderBottom: '1px solid var(--border-color)', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis' 
+              }} 
+              title={displayTitle}
+            >
+              {displayTitle}
+            </div>
+          );
+        })()}
 
         {/* Poster Thumbnail */}
         <div className="card-media-cover" style={{ width: '100%', height: '240px', background: 'var(--bg-tertiary)', position: 'relative' }}>
@@ -286,7 +293,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
 
         {/* Body Content / Subtitle */}
         <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
-          {item.item_type === 'comic' && item.badge && item.badge !== 'series' ? (
+          {item.item_type === 'comic' && item.badge && item.badge !== 'series' && subTab !== 'trending' ? (
             <>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {formatComicBadgeText(item.badge, language === 'es')}

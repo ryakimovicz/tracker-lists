@@ -624,9 +624,15 @@ class MetronService:
                 if not store_date or store_date > today_str:
                     continue
 
-                title = iss.get("issue") or f"Issue #{iss.get('number')}"
+                s_info = iss.get("series") or {}
+                s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
+                s_year = s_info.get("year_began")
+                clean_title = f"{s_name} ({s_year})" if (s_year and f"({s_year})" not in s_name) else s_name
+                if not clean_title:
+                    clean_title = re.sub(r"\s*#\d+\s*$", "", iss.get("issue") or "")
+
                 desc = f"Published: {store_date}."
-                if not is_safe_media_item(title, desc):
+                if not is_safe_media_item(clean_title, desc):
                     continue
 
                 cv_id = iss.get("cv_id")
@@ -638,7 +644,7 @@ class MetronService:
 
                 item = SearchResultItem(
                     external_id=ext_id,
-                    title=title,
+                    title=clean_title,
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
@@ -658,120 +664,297 @@ class MetronService:
 
     @classmethod
     def get_trending_comics(cls) -> List[SearchResultItem]:
-        cache_key = "metron_trending_comics_v3"
+        cache_key = "metron_trending_comics_wiki_v1"
         now_ts = time.time()
         if cache_key in _TRENDING_COMICS_CACHE:
             ts, data = _TRENDING_COMICS_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_EXPLORE:
                 return data
 
-        today = datetime.date.today()
-        today_str = today.isoformat()
-        current_year = today.year
-        cutoff_date = f"{current_year - 2}-01-01"
+        # Wikimedia pageviews across diverse, iconic, and modern comics from all eras
+        today_utc = datetime.datetime.now(datetime.timezone.utc)
+        end_dt = today_utc - datetime.timedelta(days=2)
+        start_dt = end_dt - datetime.timedelta(days=7)
+        start_str = start_dt.strftime("%Y%m%d")
+        end_str = end_dt.strftime("%Y%m%d")
 
-        # Query recent series debuts from 2024 up to today (never in the future)
-        res = _metron_request("issue/", {
-            "store_date_range_after": cutoff_date,
-            "store_date_range_before": today_str,
-            "number": "1",
-            "limit": 80
-        })
-
-        # Fetch series counts in bulk by year to cover recent debuts without N individual requests
-        series_counts: Dict[int, int] = {}
-        for y in [current_year, current_year - 1]:
-            series_data = _metron_request("series/", {"year_began": y, "limit": 100})
-            if series_data and series_data.get("results"):
-                for s in series_data["results"]:
-                    sid = s.get("id")
-                    ic = s.get("issue_count")
-                    if sid and ic is not None:
-                        series_counts[sid] = ic
-
-        flagship_keywords = [
-            "batman", "spider-man", "spiderman", "x-men", "superman", "transformers",
-            "ultimates", "daredevil", "wolverine", "avengers", "turtles", "wonder woman",
-            "nightwing", "saga", "flash", "green lantern", "fantastic four", "hulk", "venom",
-            "iron man", "deadpool", "ghost rider", "star wars", "conan", "godzilla"
+        candidates = [
+            {
+                "name": "Absolute Superman",
+                "wiki": "Superman",
+                "title": "Absolute Superman (2025)",
+                "year": "2025",
+                "img": "https://static.metron.cloud/media/issue/2024/11/06/absolute-superman-1.jpg",
+                "desc": "The Man of Steel in DC's new Absolute Universe.",
+                "ext_id": "metron_series_8400"
+            },
+            {
+                "name": "Teenage Mutant Ninja Turtles",
+                "wiki": "Teenage_Mutant_Ninja_Turtles",
+                "title": "Teenage Mutant Ninja Turtles (2024)",
+                "year": "2024",
+                "img": "https://static.metron.cloud/media/issue/2024/07/26/tmnt-1.jpg",
+                "desc": "The legendary Ninja Turtles in their acclaimed modern run.",
+                "ext_id": "metron_series_7881"
+            },
+            {
+                "name": "Absolute Batman",
+                "wiki": "Absolute_Batman",
+                "title": "Absolute Batman (2024)",
+                "year": "2024",
+                "img": "https://static.metron.cloud/media/issue/2024/07/26/absolute-batman-1.jpg",
+                "desc": "DC's Absolute Universe reimagining of Batman by Scott Snyder.",
+                "ext_id": "metron_series_8350"
+            },
+            {
+                "name": "Watchmen",
+                "wiki": "Watchmen",
+                "title": "Watchmen (1986)",
+                "year": "1986",
+                "img": "https://static.metron.cloud/media/issue/2019/08/19/watchmen-1.jpg",
+                "desc": "Alan Moore and Dave Gibbons' groundbreaking graphic novel masterpiece.",
+                "ext_id": "metron_series_537"
+            },
+            {
+                "name": "X-Men",
+                "wiki": "X-Men",
+                "title": "X-Men (2024)",
+                "year": "2024",
+                "img": "https://static.metron.cloud/media/issue/2024/07/10/x-men-1.jpg",
+                "desc": "Marvel's flagship mutant ongoing series in the From the Ashes era.",
+                "ext_id": "metron_series_7700"
+            },
+            {
+                "name": "V for Vendetta",
+                "wiki": "V_for_Vendetta",
+                "title": "V for Vendetta (1988)",
+                "year": "1988",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/v-for-vendetta-1.jpg",
+                "desc": "Alan Moore and David Lloyd's iconic dystopian graphic novel.",
+                "ext_id": "metron_series_5676"
+            },
+            {
+                "name": "Hellboy",
+                "wiki": "Hellboy",
+                "title": "Hellboy: Seed of Destruction (1994)",
+                "year": "1994",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/hellboy-1.jpg",
+                "desc": "Mike Mignola's supernatural detective masterpiece.",
+                "ext_id": "metron_series_52"
+            },
+            {
+                "name": "Maus",
+                "wiki": "Maus",
+                "title": "Maus: A Survivor's Tale (1986)",
+                "year": "1986",
+                "img": "https://static.metron.cloud/media/issue/2026/03/16/large-6702113.jpg",
+                "desc": "Art Spiegelman's Pulitzer Prize-winning graphic novel.",
+                "ext_id": "metron_series_15420"
+            },
+            {
+                "name": "Invincible",
+                "wiki": "Invincible_(comics)",
+                "title": "Invincible (2003)",
+                "year": "2003",
+                "img": "https://static.metron.cloud/media/issue/2021/04/10/invincible-1.jpg",
+                "desc": "Robert Kirkman's beloved superhero comic epic.",
+                "ext_id": "metron_series_2186"
+            },
+            {
+                "name": "The Sandman",
+                "wiki": "The_Sandman_(comic_book)",
+                "title": "Sandman (1989)",
+                "year": "1989",
+                "img": "https://static.metron.cloud/media/issue/2022/04/07/the-sandman-1.jpg",
+                "desc": "Neil Gaiman's acclaimed dark fantasy comic book series.",
+                "ext_id": "metron_series_3315"
+            },
+            {
+                "name": "The Dark Knight Returns",
+                "wiki": "The_Dark_Knight_Returns",
+                "title": "Batman: The Dark Knight (1986)",
+                "year": "1986",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-the-dark-knight-1.jpg",
+                "desc": "Frank Miller's seminal dark vision of an aging Bruce Wayne.",
+                "ext_id": "metron_series_6891"
+            },
+            {
+                "name": "The Walking Dead",
+                "wiki": "The_Walking_Dead_(comic_book)",
+                "title": "The Walking Dead (2003)",
+                "year": "2003",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/the-walking-dead-1.jpg",
+                "desc": "Robert Kirkman and Charlie Adlard's global zombie phenomenon.",
+                "ext_id": "metron_series_376"
+            },
+            {
+                "name": "Batman: The Killing Joke",
+                "wiki": "Batman:_The_Killing_Joke",
+                "title": "Batman: The Killing Joke (1988)",
+                "year": "1988",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-the-killing-joke-1.jpg",
+                "desc": "The origin of the Joker by Alan Moore and Brian Bolland.",
+                "ext_id": "metron_series_761"
+            },
+            {
+                "name": "Scott Pilgrim",
+                "wiki": "Scott_Pilgrim",
+                "title": "Scott Pilgrim EX (2026)",
+                "year": "2026",
+                "img": "https://static.metron.cloud/media/issue/2026/04/10/scott-pilgrim.jpg",
+                "desc": "Bryan Lee O'Malley's iconic graphic novel saga.",
+                "ext_id": "metron_series_17521"
+            },
+            {
+                "name": "Persepolis",
+                "wiki": "Persepolis_(comics)",
+                "title": "Persepolis GN (2003)",
+                "year": "2003",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/persepolis.jpg",
+                "desc": "Marjane Satrapi's autobiographical graphic novel.",
+                "ext_id": "metron_series_820"
+            },
+            {
+                "name": "Something Is Killing the Children",
+                "wiki": "Something_Is_Killing_the_Children",
+                "title": "Something Is Killing the Children (2019)",
+                "year": "2019",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/something-is-killing-the-children-1.jpg",
+                "desc": "James Tynion IV and Werther Dell'Edera's hit horror series.",
+                "ext_id": "metron_series_614"
+            },
+            {
+                "name": "Batman: Year One",
+                "wiki": "Batman:_Year_One",
+                "title": "Batman: Year One (2005)",
+                "year": "2005",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-year-one.jpg",
+                "desc": "Frank Miller and David Mazzucchelli's definitive Batman origin.",
+                "ext_id": "metron_series_17378"
+            },
+            {
+                "name": "Saga",
+                "wiki": "Saga_(comics)",
+                "title": "Saga (2012)",
+                "year": "2012",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/saga-1.jpg",
+                "desc": "Brian K. Vaughan and Fiona Staples' epic space opera.",
+                "ext_id": "metron_series_916"
+            },
+            {
+                "name": "Ultimate Spider-Man",
+                "wiki": "Ultimate_Spider-Man",
+                "title": "Ultimate Spider-Man (2024)",
+                "year": "2024",
+                "img": "https://static.metron.cloud/media/issue/2024/01/10/ultimate-spider-man-1.jpg",
+                "desc": "Jonathan Hickman and Marco Checchetto's hit new Ultimate series.",
+                "ext_id": "metron_series_6600"
+            },
+            {
+                "name": "Sin City",
+                "wiki": "Sin_City",
+                "title": "Sin City: A Dame to Kill For (1993)",
+                "year": "1993",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/sin-city-1.jpg",
+                "desc": "Frank Miller's hardboiled noir graphic novel series.",
+                "ext_id": "metron_series_6128"
+            },
+            {
+                "name": "Preacher",
+                "wiki": "Preacher_(comics)",
+                "title": "Preacher (1995)",
+                "year": "1995",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/preacher-1.jpg",
+                "desc": "Garth Ennis and Steve Dillon's subversive Vertigo classic.",
+                "ext_id": "metron_series_4970"
+            },
+            {
+                "name": "Locke & Key",
+                "wiki": "Locke_%26_Key",
+                "title": "Locke & Key (2008)",
+                "year": "2008",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/locke-and-key-1.jpg",
+                "desc": "Joe Hill and Gabriel Rodriguez's acclaimed horror-fantasy.",
+                "ext_id": "metron_series_482"
+            },
+            {
+                "name": "Transformers",
+                "wiki": "Transformers_(comics)",
+                "title": "Transformers (2023)",
+                "year": "2023",
+                "img": "https://static.metron.cloud/media/issue/2023/10/04/transformers-1.jpg",
+                "desc": "Daniel Warren Johnson's Eisner-winning Energon Universe series.",
+                "ext_id": "metron_series_6100"
+            },
+            {
+                "name": "Blacksad",
+                "wiki": "Blacksad",
+                "title": "Blacksad (2010)",
+                "year": "2010",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/blacksad.jpg",
+                "desc": "Juan Díaz Canales and Juanjo Guarnido's celebrated anthropomorphic noir masterpiece.",
+                "ext_id": "metron_series_1100"
+            },
+            {
+                "name": "Monstress",
+                "wiki": "Monstress_(comics)",
+                "title": "Monstress (2015)",
+                "year": "2015",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/monstress-1.jpg",
+                "desc": "Marjorie Liu and Sana Takeda's award-winning dark fantasy.",
+                "ext_id": "metron_series_890"
+            },
+            {
+                "name": "Transmetropolitan",
+                "wiki": "Transmetropolitan",
+                "title": "Transmetropolitan (1997)",
+                "year": "1997",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/transmetropolitan-1.jpg",
+                "desc": "Warren Ellis and Darick Robertson's cyberpunk satire.",
+                "ext_id": "metron_series_5500"
+            },
+            {
+                "name": "Spawn",
+                "wiki": "Spawn_(comics)",
+                "title": "Spawn (1992)",
+                "year": "1992",
+                "img": "https://static.metron.cloud/media/issue/2020/07/19/spawn-1.jpg",
+                "desc": "Todd McFarlane's record-breaking independent superhero series.",
+                "ext_id": "metron_series_120"
+            }
         ]
 
-        raw_series: List[dict] = []
-        seen_series_ids = set()
+        def _fetch_pageviews(item: dict) -> Tuple[dict, int]:
+            art = item["wiki"]
+            url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{art}/daily/{start_str}/{end_str}"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode())
+                        items = data.get("items", [])
+                        total_views = sum(x.get("views", 0) for x in items)
+                        return (item, total_views)
+            except Exception:
+                pass
+            return (item, 0)
 
-        if res and res.get("results"):
-            for iss in res.get("results", []):
-                s_info = iss.get("series") or {}
-                s_id = s_info.get("id")
-                img_url = iss.get("image")
-                if not s_id or not img_url or s_id in seen_series_ids:
-                    continue
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            ranked = list(ex.map(_fetch_pageviews, candidates))
 
-                s_year = s_info.get("year_began") or current_year
-                store_date = iss.get("store_date") or iss.get("cover_date") or str(s_year)
-
-                # STRICT FILTER: Never include future solicitations (e.g. 2027)
-                if s_year > current_year:
-                    continue
-                if store_date and store_date > today_str:
-                    continue
-
-                s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
-                title = f"{s_name} ({s_year})" if s_year else s_name
-                desc = iss.get("desc") or f"Comic series begun in {s_year}."
-
-                if not is_safe_media_item(title, desc):
-                    continue
-
-                seen_series_ids.add(s_id)
-                raw_series.append({
-                    "id": s_id,
-                    "title": title,
-                    "name": s_name,
-                    "year": s_year,
-                    "date": store_date,
-                    "img": img_url,
-                    "desc": desc,
-                    "cv_id": s_info.get("cv_id")
-                })
-
-        # Score by authentic popularity + recency (so it is a real trending feed, not an alphabetical dump)
-        def _trending_score(item: dict) -> float:
-            score = 0.0
-            name_lower = item["name"].lower()
-            for idx, kw in enumerate(flagship_keywords):
-                if kw in name_lower:
-                    score += (1000.0 - idx * 25.0)
-                    break
-            if item["date"]:
-                try:
-                    dt = datetime.date.fromisoformat(item["date"][:10])
-                    days_ago = (today - dt).days
-                    score += max(0.0, 500.0 - days_ago * 0.8)
-                except Exception:
-                    pass
-            return score
-
-        raw_series.sort(key=_trending_score, reverse=True)
-        top_candidates = raw_series[:24]
+        # Sort dynamically by real-world readership momentum (highest Wikipedia pageviews first)
+        ranked.sort(key=lambda x: x[1], reverse=True)
 
         results: List[SearchResultItem] = []
-        for it in top_candidates:
-            s_id = it["id"]
-            cv_id = it["cv_id"]
-            ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
-            ic = series_counts.get(s_id)
-            badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
-
+        for it, views in ranked[:24]:
             results.append(SearchResultItem(
-                external_id=ext_id,
+                external_id=it["ext_id"],
                 title=it["title"],
                 image_url=it["img"],
                 description=it["desc"],
                 item_type="comic",
-                badge=badge_val,
-                page_count=ic,
-                release_date=str(it["year"]) if it["year"] else None
+                badge=None,  # Do not display issue counts in trending
+                release_date=it["year"]
             ))
 
         if results:
