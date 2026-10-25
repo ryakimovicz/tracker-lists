@@ -688,6 +688,53 @@ export const Search: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
+  // Rate limit tracking per category from backend headers
+  interface CategoryRateLimit {
+    category: string;
+    resetAt: number; // Unix timestamp in seconds
+    reason: string;
+  }
+  const [categoryRateLimits, setCategoryRateLimits] = useState<Record<string, CategoryRateLimit>>({});
+
+  const formatResetInfo = (resetAtSecs: number, lang: string) => {
+    const isEs = lang === 'es';
+    const now = Date.now();
+    const resetMs = resetAtSecs * 1000;
+    const diffSecs = Math.max(0, Math.round((resetMs - now) / 1000));
+    const diffMins = Math.round(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const remMins = diffMins % 60;
+
+    const resetDate = new Date(resetMs);
+    const isToday = resetDate.toDateString() === new Date().toDateString();
+
+    const timeStr = resetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = resetDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+    let fullTimeDisplay = '';
+    if (isToday) {
+      fullTimeDisplay = isEs ? `Hoy a las ${timeStr} hs` : `Today at ${timeStr}`;
+    } else {
+      fullTimeDisplay = isEs ? `El ${dateStr} a las ${timeStr} hs` : `${dateStr} at ${timeStr}`;
+    }
+
+    let relativeDisplay = '';
+    if (diffHours > 0) {
+      relativeDisplay = isEs 
+        ? `en ~${diffHours} h${remMins > 0 ? ` ${remMins} min` : ''}` 
+        : `in ~${diffHours}h${remMins > 0 ? ` ${remMins}m` : ''}`;
+    } else if (diffMins > 0) {
+      relativeDisplay = isEs ? `en ~${diffMins} min` : `in ~${diffMins} min`;
+    } else {
+      relativeDisplay = isEs ? 'en unos instantes' : 'in a few moments';
+    }
+
+    return {
+      fullTimeDisplay,
+      relativeDisplay
+    };
+  };
+
   // Reset visibleCount on tab change or new search query
   useEffect(() => {
     setVisibleCount(24);
@@ -1119,6 +1166,24 @@ export const Search: React.FC = () => {
         });
         if (searchRequestIdRef.current !== currentReqId) return;
 
+        // Check rate limit headers for primary request
+        const limCat = primaryRes.headers?.['x-category-rate-limited'];
+        const rst = Number(primaryRes.headers?.['x-category-rate-limit-reset'] || 0);
+        const rsn = primaryRes.headers?.['x-category-rate-limit-reason'] || 'temporary_limit';
+        if (limCat && rst > 0) {
+          setCategoryRateLimits(prev => ({
+            ...prev,
+            [limCat]: { category: limCat, resetAt: rst, reason: rsn }
+          }));
+        } else {
+          setCategoryRateLimits(prev => {
+            if (!prev[currentTab]) return prev;
+            const copy = { ...prev };
+            delete copy[currentTab];
+            return copy;
+          });
+        }
+
         const initialData = Array.isArray(primaryRes.data) ? primaryRes.data : [];
         setResults(prev => {
           // If we already had results for this exact query (e.g. from 'all' search), merge new items without discarding existing ones
@@ -1140,6 +1205,22 @@ export const Search: React.FC = () => {
           otherTypes.map(t => apiClient.get('/search/', { params: { q: cleanQuery, type: t } }))
         ).then(resultsArr => {
           if (searchRequestIdRef.current !== currentReqId) return;
+          const bgLimits: Record<string, CategoryRateLimit> = {};
+          resultsArr.forEach(resObj => {
+            if (resObj.status === 'fulfilled') {
+              const hdrs = (resObj.value as any)?.headers || {};
+              const bgCat = hdrs['x-category-rate-limited'];
+              const bgRst = Number(hdrs['x-category-rate-limit-reset'] || 0);
+              const bgRsn = hdrs['x-category-rate-limit-reason'] || 'temporary_limit';
+              if (bgCat && bgRst > 0) {
+                bgLimits[bgCat] = { category: bgCat, resetAt: bgRst, reason: bgRsn };
+              }
+            }
+          });
+          if (Object.keys(bgLimits).length > 0) {
+            setCategoryRateLimits(prev => ({ ...prev, ...bgLimits }));
+          }
+
           setResults(prev => {
             const existingIds = new Set(prev.map(p => p.external_id));
             const newItems: SearchResultItem[] = [];
@@ -1163,6 +1244,21 @@ export const Search: React.FC = () => {
           params: { q: cleanQuery }
         });
         if (searchRequestIdRef.current !== currentReqId) return;
+
+        const catsHdr = response.headers?.['x-categories-rate-limited'];
+        if (catsHdr) {
+          const allLimits: Record<string, CategoryRateLimit> = {};
+          catsHdr.split(',').forEach((entry: string) => {
+            const [c, rsn, rst] = entry.split(':');
+            if (c && rst) {
+              allLimits[c] = { category: c, reason: rsn || 'temporary_limit', resetAt: Number(rst) };
+            }
+          });
+          if (Object.keys(allLimits).length > 0) {
+            setCategoryRateLimits(prev => ({ ...prev, ...allLimits }));
+          }
+        }
+
         const filteredAll = Array.isArray(response.data) ? response.data : [];
         setResults(filteredAll);
         setIsSearching(false);
@@ -1951,7 +2047,28 @@ export const Search: React.FC = () => {
 
       {/* Search Results Display */}
       {!isSearching && filteredResults.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {activeTab !== 'all' && categoryRateLimits[activeTab] && (categoryRateLimits[activeTab].resetAt * 1000 > Date.now()) && (
+            <div style={{
+              padding: '0.85rem 1.25rem',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 20, 28, 0.6) 100%)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              color: '#fbbf24',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.05)'
+            }}>
+              <AlertCircle size={18} style={{ flexShrink: 0, color: '#f59e0b' }} />
+              <span>
+                {language === 'es'
+                  ? `Mostrando resultados en caché. El límite de búsquedas en vivo para ${getCategoryLabel(activeTab)} se restablecerá a las ${formatResetInfo(categoryRateLimits[activeTab].resetAt, language).fullTimeDisplay}.`
+                  : `Showing cached results. Live search limit for ${getCategoryLabel(activeTab)} will reset at ${formatResetInfo(categoryRateLimits[activeTab].resetAt, language).fullTimeDisplay}.`}
+              </span>
+            </div>
+          )}
           <div className="search-results-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
             {filteredResults.slice(0, visibleCount).map((item) => {
               return (
@@ -2205,15 +2322,177 @@ export const Search: React.FC = () => {
       )}
 
       {!isSearching && results.length > 0 && filteredResults.length === 0 && (
-        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
-        </div>
+        (() => {
+          const isCategoryLimited = activeTab !== 'all' && categoryRateLimits[activeTab] && (categoryRateLimits[activeTab].resetAt * 1000 > Date.now());
+          if (isCategoryLimited) {
+            const limitInfo = categoryRateLimits[activeTab];
+            const timeInfo = formatResetInfo(limitInfo.resetAt, language);
+            return (
+              <div 
+                className="glass-card" 
+                style={{ 
+                  padding: '3rem 2rem', 
+                  textAlign: 'center', 
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 20, 28, 0.75) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  boxShadow: '0 12px 32px rgba(245, 158, 11, 0.1)',
+                  borderRadius: '16px',
+                  maxWidth: '660px',
+                  margin: '2rem auto'
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', marginBottom: '1.25rem' }}>
+                  <Clock size={28} color="#f59e0b" />
+                </div>
+
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                  {language === 'es' 
+                    ? `Límite de búsquedas alcanzado en ${getCategoryLabel(activeTab)}`
+                    : `Search limit reached in ${getCategoryLabel(activeTab)}`}
+                </h3>
+
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+                  {limitInfo.reason === 'daily_limit'
+                    ? (language === 'es'
+                        ? `Se ha alcanzado la cuota diaria de consultas de este catálogo para proteger la disponibilidad del servicio. Las nuevas búsquedas en esta categoría se restablecerán a las:`
+                        : `The daily query quota for this catalog has been reached to protect service availability. New searches in this category will reset at:`)
+                    : (language === 'es'
+                        ? `Se ha pausado temporalmente la búsqueda en esta categoría para evitar sobrecargas del proveedor. Las búsquedas se restablecerán a las:`
+                        : `Searches in this category are temporarily paused to prevent provider overload. Searches will reset at:`)}
+                </p>
+
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.6rem', 
+                  padding: '0.65rem 1.4rem', 
+                  borderRadius: '30px', 
+                  background: 'rgba(245, 158, 11, 0.12)', 
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  color: '#fbbf24',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  marginBottom: '1.25rem'
+                }}>
+                  <Clock size={16} />
+                  <span>{timeInfo.fullTimeDisplay} ({timeInfo.relativeDisplay})</span>
+                </div>
+
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #94a3b8)', marginTop: '0.5rem' }}>
+                  {language === 'es'
+                    ? '💡 Los elementos que ya tengas en tu estantería o en caché siguen disponibles con normalidad.'
+                    : '💡 Items already saved in your shelf or cached continue to function normally.'}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
+            </div>
+          );
+        })()
       )}
 
       {results.length === 0 && !isSearching && submittedQuery && (
-        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {t('searchNoResults')}
-        </div>
+        (() => {
+          const isCategoryLimited = activeTab !== 'all' && categoryRateLimits[activeTab] && (categoryRateLimits[activeTab].resetAt * 1000 > Date.now());
+          if (isCategoryLimited) {
+            const limitInfo = categoryRateLimits[activeTab];
+            const timeInfo = formatResetInfo(limitInfo.resetAt, language);
+            return (
+              <div 
+                className="glass-card" 
+                style={{ 
+                  padding: '3rem 2rem', 
+                  textAlign: 'center', 
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 20, 28, 0.75) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  boxShadow: '0 12px 32px rgba(245, 158, 11, 0.1)',
+                  borderRadius: '16px',
+                  maxWidth: '660px',
+                  margin: '2rem auto'
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', marginBottom: '1.25rem' }}>
+                  <Clock size={28} color="#f59e0b" />
+                </div>
+
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                  {language === 'es' 
+                    ? `Límite de búsquedas alcanzado en ${getCategoryLabel(activeTab)}`
+                    : `Search limit reached in ${getCategoryLabel(activeTab)}`}
+                </h3>
+
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+                  {limitInfo.reason === 'daily_limit'
+                    ? (language === 'es'
+                        ? `Se ha alcanzado la cuota diaria de consultas de este catálogo para proteger la disponibilidad del servicio. Las nuevas búsquedas en esta categoría se restablecerán a las:`
+                        : `The daily query quota for this catalog has been reached to protect service availability. New searches in this category will reset at:`)
+                    : (language === 'es'
+                        ? `Se ha pausado temporalmente la búsqueda en esta categoría para evitar sobrecargas del proveedor. Las búsquedas se restablecerán a las:`
+                        : `Searches in this category are temporarily paused to prevent provider overload. Searches will reset at:`)}
+                </p>
+
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.6rem', 
+                  padding: '0.65rem 1.4rem', 
+                  borderRadius: '30px', 
+                  background: 'rgba(245, 158, 11, 0.12)', 
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  color: '#fbbf24',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  marginBottom: '1.25rem'
+                }}>
+                  <Clock size={16} />
+                  <span>{timeInfo.fullTimeDisplay} ({timeInfo.relativeDisplay})</span>
+                </div>
+
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #94a3b8)', marginTop: '0.5rem' }}>
+                  {language === 'es'
+                    ? '💡 Los elementos que ya tengas en tu estantería o en caché siguen disponibles con normalidad.'
+                    : '💡 Items already saved in your shelf or cached continue to function normally.'}
+                </div>
+              </div>
+            );
+          }
+
+          const limitedCatsInAll = activeTab === 'all'
+            ? Object.keys(categoryRateLimits).filter(cat => categoryRateLimits[cat].resetAt * 1000 > Date.now())
+            : [];
+
+          return (
+            <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <p style={{ margin: 0 }}>{t('searchNoResults')}</p>
+              {limitedCatsInAll.length > 0 && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1rem 1.5rem',
+                  borderRadius: '12px',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  color: '#fbbf24',
+                  fontSize: '0.9rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  maxWidth: '640px',
+                  textAlign: 'left'
+                }}>
+                  <AlertCircle size={20} style={{ flexShrink: 0, color: '#f59e0b' }} />
+                  <div>
+                    {language === 'es'
+                      ? `Nota: Las búsquedas en ${limitedCatsInAll.map(c => getCategoryLabel(c)).join(', ')} han alcanzado su límite de consultas y se restablecerán próximamente.`
+                      : `Notice: Searches in ${limitedCatsInAll.map(c => getCategoryLabel(c)).join(', ')} have reached their query limit and will reset soon.`}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()
       )}
       </>
       )}

@@ -1,9 +1,8 @@
 from typing import List, Dict, Tuple, Any, Optional
-from fastapi import APIRouter, Query, HTTPException, status, Request, Depends
+from fastapi import APIRouter, Query, HTTPException, status, Request, Response, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
-from app.models.user import User
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
@@ -16,7 +15,7 @@ from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
 from app.core.limiter import limiter
 from app.core.sfw_filter import is_safe_text, is_safe_media_item
-from app.core.circuit_breaker import execute_with_circuit_breaker
+from app.core.circuit_breaker import execute_with_circuit_breaker, get_circuit_breaker, CircuitState
 from app.core.popular_cache import popular_cache
 from app.core.config import settings
 
@@ -28,6 +27,38 @@ import urllib.parse
 import json
 
 router = APIRouter()
+
+def check_category_rate_limit_status(category: str) -> Optional[dict]:
+    """
+    Checks if a category provider is rate limited (proactive safety fuse, 429 backoff, or open circuit breaker).
+    Returns dict with {"category": category, "reason": reason, "reset_at": reset_timestamp} if limited, else None.
+    """
+    import time
+    now = time.time()
+    if category == "comic":
+        metron_status = MetronService.get_rate_limit_status()
+        if metron_status:
+            return metron_status
+
+    svc_map = {
+        "comic": "metron",
+        "book": "books",
+        "manga": "anilist",
+        "game": "igdb",
+        "movie": "trakt",
+        "anime": "tvmaze",
+        "series": "tvmaze"
+    }
+    svc = svc_map.get(category)
+    if svc:
+        cb = get_circuit_breaker(svc)
+        if cb.state == CircuitState.OPEN and (cb.last_failure_time + cb.recovery_timeout > now):
+            return {
+                "category": category,
+                "reason": "cooldown",
+                "reset_at": cb.last_failure_time + cb.recovery_timeout
+            }
+    return None
 
 def get_query_variations(q: str) -> List[str]:
     clean_q = q.strip()
@@ -220,6 +251,7 @@ _SEARCH_CACHE_TTL = 15 * 60  # 15 minutes
 @limiter.limit("60/minute")
 def search_media(
     request: Request,
+    response: Response,
     q: str = Query(..., min_length=1, description="The search query term"),
     type: str = Query("movie", description="The type of media to search for"),
     db: Session = Depends(get_db),
@@ -236,6 +268,14 @@ def search_media(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid search type. Must be 'manga', 'game', 'movie', 'anime', 'series', 'book' or 'comic'."
         )
+
+    # Attach rate limit headers if category is actively limited
+    rate_status = check_category_rate_limit_status(type_lower)
+    if rate_status:
+        response.headers["X-Category-Rate-Limited"] = rate_status["category"]
+        response.headers["X-Category-Rate-Limit-Reset"] = str(int(rate_status["reset_at"]))
+        response.headers["X-Category-Rate-Limit-Reason"] = rate_status["reason"]
+        response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason, X-Categories-Rate-Limited"
         
     import time
     now_ts = time.time()
@@ -302,6 +342,15 @@ def search_media(
                     print(f"Error fetching var {future_to_var[future]}: {e}")
 
     combined = rank_search_results(combined, q, variations)
+    # If no results and rate limit just got triggered during the request, attach headers
+    if not combined:
+        rate_status = check_category_rate_limit_status(type_lower)
+        if rate_status:
+            response.headers["X-Category-Rate-Limited"] = rate_status["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(rate_status["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = rate_status["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason, X-Categories-Rate-Limited"
+
     # Only cache if results were found, avoiding poisoning the 15-minute cache with circuit-breaker or rate-limit fallbacks
     if combined:
         _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
@@ -311,6 +360,7 @@ def search_media(
 @limiter.limit("60/minute")
 def search_all_media(
     request: Request,
+    response: Response,
     q: str = Query(..., min_length=1, description="The search query term"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
@@ -408,6 +458,16 @@ def search_all_media(
                 user_category_order = [c.strip() for c in current_user.category_order.split(",") if c.strip()]
         except Exception:
             user_category_order = None
+
+    # Attach rate limited categories if any
+    rate_limited_cats = []
+    for cat in ["movie", "series", "anime", "book", "comic", "manga", "game"]:
+        st = check_category_rate_limit_status(cat)
+        if st:
+            rate_limited_cats.append(f"{cat}:{st['reason']}:{int(st['reset_at'])}")
+    if rate_limited_cats:
+        response.headers["X-Categories-Rate-Limited"] = ",".join(rate_limited_cats)
+        response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason, X-Categories-Rate-Limited"
 
     combined = rank_search_results(combined, q, variations, category_order=user_category_order)
     # Only cache if results were found, avoiding poisoning the 15-minute cache with circuit-breaker or rate-limit fallbacks

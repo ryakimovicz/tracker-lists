@@ -6,6 +6,10 @@ import time
 import math
 import datetime
 import logging
+import os
+import sqlite3
+import threading
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Tuple, Optional, Any
 from app.core.config import settings
@@ -17,11 +21,56 @@ logger = logging.getLogger(__name__)
 USER_AGENT = settings.USER_AGENT
 BASE_URL = "https://metron.cloud/api"
 
-# In-memory caches to respect Metron's 20 req/min and 5,000 req/day limits
-_CACHE_TTL_SEARCH = 3600 * 6       # 6 hours
-_CACHE_TTL_SERIES = 3600 * 24      # 24 hours
-_CACHE_TTL_ISSUES = 3600 * 24      # 24 hours
-_CACHE_TTL_EXPLORE = 3600 * 4      # 4 hours
+# Persistent SQLite cache to minimize external Metron API calls across server reloads
+_CACHE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "metron_cache.db"))
+
+def _init_sqlite_cache():
+    try:
+        with sqlite3.connect(_CACHE_DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS metron_cache (
+                    key TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metron_cache_updated ON metron_cache(updated_at)")
+    except Exception as e:
+        logger.warning(f"Could not initialize metron_cache.db: {e}")
+
+_init_sqlite_cache()
+
+def _get_persistent_cache(key: str, ttl: float) -> Optional[Any]:
+    now = time.time()
+    try:
+        with sqlite3.connect(_CACHE_DB_PATH) as conn:
+            row = conn.execute("SELECT data, updated_at FROM metron_cache WHERE key = ?", (key,)).fetchone()
+            if row:
+                data_json, updated_at = row
+                if now - updated_at < ttl:
+                    return json.loads(data_json)
+    except Exception as e:
+        logger.debug(f"Cache get error for key '{key}': {e}")
+    return None
+
+def _set_persistent_cache(key: str, data: Any) -> None:
+    now = time.time()
+    try:
+        data_json = json.dumps(data)
+        with sqlite3.connect(_CACHE_DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO metron_cache (key, data, updated_at) VALUES (?, ?, ?)",
+                (key, data_json, now)
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"Cache set error for key '{key}': {e}")
+
+# Cache TTLs (prolonged to respect 5,000 daily and 20/min burst limits)
+_CACHE_TTL_SEARCH = 3600 * 24 * 7        # 7 days
+_CACHE_TTL_SERIES = 3600 * 24 * 30       # 30 days
+_CACHE_TTL_ISSUES = 3600 * 24 * 14       # 14 days
+_CACHE_TTL_EXPLORE = 3600 * 4            # 4 hours
 
 _SEARCH_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _SERIES_DETAIL_CACHE: Dict[str, Tuple[float, Optional[dict]]] = {}
@@ -29,9 +78,6 @@ _SERIES_ISSUES_CACHE: Dict[str, Tuple[float, List[dict]]] = {}
 _ISSUE_DETAIL_CACHE: Dict[str, Tuple[float, Optional[dict]]] = {}
 _NEW_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _TRENDING_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
-
-import threading
-from collections import deque
 
 _rate_limit_lock = threading.Lock()
 _request_timestamps = deque()
@@ -103,7 +149,7 @@ def _handle_429(headers: Any, url: str):
     logger.error(f"Metron 429 rate limit reached for '{url}'. Global circuit breaker active for {wait_s:.1f}s. Halting requests.")
 
 def _rate_limit_metron():
-    """Ensure respectful spacing and strict adherence to Metron's limits (max 10 req/min, 1.5s spacing)."""
+    """Ensure respectful spacing and strict adherence to Metron's limits (max 16 req/min, 0.5s spacing)."""
     global _blocked_until
     with _rate_limit_lock:
         now = time.time()
@@ -119,21 +165,21 @@ def _rate_limit_metron():
         while _request_timestamps and _request_timestamps[0] <= now - 60.0:
             _request_timestamps.popleft()
 
-        # 3. Conservative cap: max 10 requests per 60 seconds (Metron allows 20)
-        if len(_request_timestamps) >= 10:
-            sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.5
+        # 3. Controlled cap: max 16 requests per 60 seconds (Metron allows 20)
+        if len(_request_timestamps) >= 16:
+            sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.2
             if sleep_needed > 0:
-                logger.info(f"Metron client rate limit reached (10/min), sleeping for {sleep_needed:.1f}s...")
+                logger.info(f"Metron client rate limit pacing (16/min), waiting {sleep_needed:.1f}s...")
                 time.sleep(sleep_needed)
                 now = time.time()
                 while _request_timestamps and _request_timestamps[0] <= now - 60.0:
                     _request_timestamps.popleft()
 
-        # 4. Enforce minimum spacing of 1.5 seconds between consecutive requests
+        # 4. Enforce minimum spacing of 0.5 seconds between consecutive requests
         if _request_timestamps:
             elapsed = now - _request_timestamps[-1]
-            if elapsed < 1.5:
-                time.sleep(1.5 - elapsed)
+            if elapsed < 0.5:
+                time.sleep(0.5 - elapsed)
                 now = time.time()
 
         _request_timestamps.append(now)
@@ -204,19 +250,42 @@ class MetronService:
     """Service to search and fetch comics from Metron (https://metron.cloud), replacing Comic Vine."""
 
     @classmethod
+    def get_rate_limit_status(cls) -> Optional[dict]:
+        now = time.time()
+        if _daily_blocked_until > now:
+            return {
+                "category": "comic",
+                "reason": "daily_limit",
+                "reset_at": _daily_blocked_until
+            }
+        if _blocked_until > now:
+            return {
+                "category": "comic",
+                "reason": "burst_limit",
+                "reset_at": _blocked_until
+            }
+        return None
+
+    @classmethod
     def search_comics(cls, query: str) -> List[SearchResultItem]:
         if not query or not query.strip():
             return []
 
         cleaned_query = query.replace("#", " ")
         cleaned_query = " ".join(cleaned_query.split())
-        cache_key = cleaned_query.lower()
+        cache_key = f"search_{cleaned_query.lower()}"
         now_ts = time.time()
 
         if cache_key in _SEARCH_CACHE:
             ts, cached_res = _SEARCH_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_SEARCH:
                 return cached_res
+
+        cached_raw = _get_persistent_cache(cache_key, _CACHE_TTL_SEARCH)
+        if cached_raw:
+            items = [SearchResultItem(**item) for item in cached_raw]
+            _SEARCH_CACHE[cache_key] = (now_ts, items)
+            return items
 
         token = getattr(settings, "METRON_API_TOKEN", None)
         if not token:
@@ -232,11 +301,11 @@ class MetronService:
             issue_number = issue_number_match.group(2).strip()
 
             if series_name:
-                # 1. Search specific issue directly
+                # 1. Search specific issue directly (1 single call)
                 issue_data = _metron_request("issue/", {
                     "series_name": series_name,
                     "number": issue_number,
-                    "limit": 10
+                    "limit": 15
                 })
                 if issue_data:
                     for iss in issue_data.get("results", []):
@@ -260,115 +329,80 @@ class MetronService:
                             image_url=img_url,
                             description=desc,
                             item_type="comic",
-                            badge="issue",
+                            badge=f"#{issue_number}",
                             release_date=iss.get("store_date") or iss.get("cover_date")
                         ))
 
-        # 2. Sequentially fetch issue #1 (for covers) and series metadata (for issue counts)
-        issue1_data = _metron_request("issue/", {
-            "series_name": cleaned_query,
-            "number": "1",
-            "limit": 30
-        })
-        series_data = _metron_request("series/", {
-            "name": cleaned_query,
-            "limit": 50
-        })
-
-        series_counts: Dict[Any, int] = {}
-        if series_data and series_data.get("results"):
-            for s in series_data["results"]:
-                sid = s.get("id")
-                ic = s.get("issue_count")
-                if sid and ic is not None:
-                    series_counts[sid] = ic
-                s_title = (s.get("series") or s.get("name") or "").lower().strip()
-                if s_title and ic is not None:
-                    series_counts[s_title] = ic
-
-        missing_count_sids: List[Tuple[int, int]] = []
-        if issue1_data:
-            for iss in issue1_data.get("results", []):
-                s_info = iss.get("series", {})
-                s_id = s_info.get("id")
-                if not s_id or f"series_{s_id}" in seen_ids:
-                    continue
-                seen_ids.add(f"series_{s_id}")
-
-                s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
-                s_year = s_info.get("year_began")
-                full_title = f"{s_name} ({s_year})" if s_year else s_name
-                img_url = iss.get("image")
-                desc = iss.get("desc") or f"Comic series started in {s_year}."
-
-                if not is_safe_media_item(full_title, desc):
-                    continue
-
-                cv_id = s_info.get("cv_id")
-                ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
-
-                ic = series_counts.get(s_id) or series_counts.get(s_name.lower())
-                if ic is None:
-                    missing_count_sids.append((s_id, len(results)))
-
-                badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
-
-                results.append(SearchResultItem(
-                    external_id=ext_id,
-                    title=full_title,
-                    image_url=img_url,
-                    description=desc,
-                    item_type="comic",
-                    badge=badge_val,
-                    page_count=ic,
-                    release_date=str(s_year) if s_year else None
-                ))
-
-        # Fetch missing issue counts for top results (up to 2, sequentially)
-        if missing_count_sids:
-            for sid, idx in missing_count_sids[:2]:
-                s_dt = _metron_request(f"series/{sid}/")
-                if s_dt:
-                    c = s_dt.get("issue_count")
-                    if c is not None and c > 0:
-                        results[idx].page_count = c
-                        results[idx].badge = f"{c} {'Número' if c == 1 else 'Números'}"
-
-        # 3. Fallback: Search series endpoint directly if too few results
-        if len(results) < 8:
-            if not series_data:
-                series_data = _metron_request("series/", {
-                    "name": cleaned_query,
-                    "limit": 15
-                })
-            if series_data:
-                for s in series_data.get("results", []):
-                    s_id = s.get("id")
+        # 2. General series search via issue #1 (fetches title, year, series ID, and issue #1 cover in 1 single call)
+        if not results:
+            issue1_data = _metron_request("issue/", {
+                "series_name": cleaned_query,
+                "number": "1",
+                "limit": 30
+            })
+            if issue1_data and issue1_data.get("results"):
+                for iss in issue1_data["results"]:
+                    s_info = iss.get("series", {})
+                    s_id = s_info.get("id")
                     if not s_id or f"series_{s_id}" in seen_ids:
                         continue
                     seen_ids.add(f"series_{s_id}")
 
-                    s_title = s.get("series") or s.get("name")
-                    s_year = s.get("year_began")
-                    publisher = s.get("publisher", {}).get("name") if isinstance(s.get("publisher"), dict) else None
-                    desc = f"Publisher: {publisher}. Started in {s_year}." if publisher else f"Started in {s_year}."
+                    s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
+                    s_year = s_info.get("year_began")
+                    full_title = f"{s_name} ({s_year})" if s_year else s_name
+                    img_url = iss.get("image")
+                    desc = iss.get("desc") or f"Comic series started in {s_year}."
 
-                    cv_id = s.get("cv_id")
+                    if not is_safe_media_item(full_title, desc):
+                        continue
+
+                    cv_id = s_info.get("cv_id")
                     ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
-
-                    ic = s.get("issue_count") or series_counts.get(s_id)
-                    badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
 
                     results.append(SearchResultItem(
                         external_id=ext_id,
-                        title=s_title,
-                        image_url=None, # Loaded on detail
+                        title=full_title,
+                        image_url=img_url,
                         description=desc,
                         item_type="comic",
-                        badge=badge_val,
-                        page_count=ic,
+                        badge="Volumen",
                         release_date=str(s_year) if s_year else None
                     ))
+
+            # 3. Fallback: only if issue #1 query returned no results
+            if len(results) < 3:
+                series_data = _metron_request("series/", {
+                    "name": cleaned_query,
+                    "limit": 20
+                })
+                if series_data and series_data.get("results"):
+                    for s in series_data["results"]:
+                        s_id = s.get("id")
+                        if not s_id or f"series_{s_id}" in seen_ids:
+                            continue
+                        seen_ids.add(f"series_{s_id}")
+
+                        s_title = s.get("series") or s.get("name")
+                        s_year = s.get("year_began")
+                        publisher = s.get("publisher", {}).get("name") if isinstance(s.get("publisher"), dict) else None
+                        desc = f"Publisher: {publisher}. Started in {s_year}." if publisher else f"Started in {s_year}."
+
+                        cv_id = s.get("cv_id")
+                        ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+                        ic = s.get("issue_count")
+                        badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
+
+                        results.append(SearchResultItem(
+                            external_id=ext_id,
+                            title=s_title,
+                            image_url=None,
+                            description=desc,
+                            item_type="comic",
+                            badge=badge_val,
+                            page_count=ic,
+                            release_date=str(s_year) if s_year else None
+                        ))
 
         if results:
             def _comic_sort_key(item: SearchResultItem) -> float:
@@ -395,6 +429,7 @@ class MetronService:
 
             results.sort(key=_comic_sort_key, reverse=True)
             _SEARCH_CACHE[cache_key] = (now_ts, results)
+            _set_persistent_cache(cache_key, [item.model_dump() for item in results])
 
         return results
 
@@ -404,13 +439,18 @@ class MetronService:
             return None
 
         clean_id = str(vol_id).strip()
-        cache_key = clean_id.lower()
+        cache_key = f"detail_{clean_id.lower()}"
         now_ts = time.time()
 
         if cache_key in _SERIES_DETAIL_CACHE:
             ts, cached = _SERIES_DETAIL_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_SERIES:
                 return cached
+
+        cached_raw = _get_persistent_cache(cache_key, _CACHE_TTL_SERIES)
+        if cached_raw:
+            _SERIES_DETAIL_CACHE[cache_key] = (now_ts, cached_raw)
+            return cached_raw
 
         # Resolve series ID
         s_id: Optional[int] = None
@@ -481,6 +521,7 @@ class MetronService:
         }
 
         _SERIES_DETAIL_CACHE[cache_key] = (now_ts, vol_result)
+        _set_persistent_cache(cache_key, vol_result)
         return vol_result
 
     @classmethod
@@ -489,13 +530,18 @@ class MetronService:
             return []
 
         clean_id = str(vol_id).strip()
-        cache_key = clean_id.lower()
+        cache_key = f"issues_{clean_id.lower()}"
         now_ts = time.time()
 
         if cache_key in _SERIES_ISSUES_CACHE:
             ts, cached_eps = _SERIES_ISSUES_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_ISSUES:
                 return cached_eps
+
+        cached_raw = _get_persistent_cache(cache_key, _CACHE_TTL_ISSUES)
+        if cached_raw:
+            _SERIES_ISSUES_CACHE[cache_key] = (now_ts, cached_raw)
+            return cached_raw
 
         # Resolve series ID
         s_id: Optional[int] = None
@@ -579,6 +625,7 @@ class MetronService:
 
         if episodes:
             _SERIES_ISSUES_CACHE[cache_key] = (now_ts, episodes)
+            _set_persistent_cache(cache_key, episodes)
 
         return episodes
 
@@ -588,13 +635,18 @@ class MetronService:
             return None
 
         clean_id = str(issue_id).strip()
-        cache_key = clean_id.lower()
+        cache_key = f"issue_detail_{clean_id.lower()}"
         now_ts = time.time()
 
         if cache_key in _ISSUE_DETAIL_CACHE:
             ts, cached = _ISSUE_DETAIL_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_ISSUES:
                 return cached
+
+        cached_raw = _get_persistent_cache(cache_key, _CACHE_TTL_ISSUES)
+        if cached_raw:
+            _ISSUE_DETAIL_CACHE[cache_key] = (now_ts, cached_raw)
+            return cached_raw
 
         # Resolve issue ID
         clean_id = clean_id.replace("cv_issue_metron_issue_", "metron_issue_").replace("cv_vol_metron_series_", "metron_series_")
@@ -671,6 +723,7 @@ class MetronService:
         }
 
         _ISSUE_DETAIL_CACHE[cache_key] = (now_ts, issue_result)
+        _set_persistent_cache(cache_key, issue_result)
         return issue_result
 
     @classmethod
