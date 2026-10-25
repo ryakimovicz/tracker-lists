@@ -747,7 +747,7 @@ def get_explore_tabs(
             nuevo = [x for x in cached_items if is_item_allowed(x)]
 
     # 3. Tendencias (APIs with 4-hour in-memory cache)
-    cache_key_trend = "explore_tendencias_global_v13"
+    cache_key_trend = "explore_tendencias_global_v14"
     tendencias = []
     if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
         cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]
@@ -996,7 +996,14 @@ def lookup_media_item(
                         "release_date": c_detail.get("first_air_date"),
                         "start_year": c_detail.get("start_year"),
                         "is_ended": c_detail.get("is_ended"),
-                        "series_status": c_detail.get("status")
+                        "series_status": c_detail.get("status"),
+                        "seasons": c_detail.get("seasons") or [{
+                            "id": 1,
+                            "season_number": 1,
+                            "episode_count": c_detail.get("count_of_issues") or 1,
+                            "name": f"Volumen ({c_detail.get('start_year')})" if c_detail.get("start_year") else "Volumen"
+                        }],
+                        "count_of_issues": c_detail.get("count_of_issues")
                     }
             else:
                 iss_detail = MetronService.get_comic_issue_detail(clean_comic_ext)

@@ -61,13 +61,11 @@ def _rate_limit_metron():
 
         _request_timestamps.append(now)
 
-def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 8) -> Optional[dict]:
+def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 10, max_retries: int = 2) -> Optional[dict]:
     token = getattr(settings, "METRON_API_TOKEN", None)
     if not token:
         logger.warning("METRON_API_TOKEN is not configured in settings")
         return None
-
-    _rate_limit_metron()
 
     url = f"{BASE_URL}/{endpoint.lstrip('/')}"
     if params:
@@ -81,18 +79,32 @@ def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, time
         "Accept": "application/json"
     }
 
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            if response.status == 200:
-                return json.loads(response.read().decode())
-            elif response.status == 429:
-                retry_after = int(response.headers.get("Retry-After", 5))
-                logger.warning(f"Metron rate limited. Retry-After: {retry_after}s")
-                time.sleep(min(retry_after, 5))
-                return None
-    except Exception as e:
-        logger.warning(f"Metron request error for '{url}': {e}")
+    for attempt in range(max_retries + 1):
+        _rate_limit_metron()
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                if response.status == 200:
+                    return json.loads(response.read().decode())
+                elif response.status == 429:
+                    retry_after = int(response.headers.get("Retry-After", 2))
+                    time.sleep(min(retry_after, 4))
+                    continue
+        except urllib.error.HTTPError as he:
+            if he.code == 429 and attempt < max_retries:
+                retry_after = 2
+                try:
+                    retry_after = int(he.headers.get("Retry-After", 2))
+                except Exception:
+                    pass
+                logger.info(f"Metron 429 received, retrying in {retry_after}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(min(retry_after, 4))
+                continue
+            logger.warning(f"Metron HTTP {he.code} for '{url}': {he}")
+            return None
+        except Exception as e:
+            logger.warning(f"Metron request error for '{url}': {e}")
+            return None
 
     return None
 
@@ -450,14 +462,20 @@ class MetronService:
                 return _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": p})
 
             max_fetch_pages = min(total_pages + 1, 101)  # Up to 10,000 issues
-            with ThreadPoolExecutor(max_workers=8) as executor:
+            with ThreadPoolExecutor(max_workers=3) as executor:
                 pages_res = list(executor.map(_fetch_issue_page, range(2, max_fetch_pages)))
             for p_res in pages_res:
                 if p_res and p_res.get("results"):
                     raw_issues.extend(p_res["results"])
 
-        # Sort numerically by issue number
-        sorted_issues = sorted(raw_issues, key=lambda x: _parse_issue_num(x.get("number")))
+        # Sort chronologically by publication date, then numerically by issue number
+        def _issue_chronological_key(x: dict):
+            d = str(x.get("store_date") or x.get("cover_date") or "9999-12-31").strip()[:10]
+            if not d or d == "None":
+                d = "9999-12-31"
+            return (d, _parse_issue_num(x.get("number")))
+
+        sorted_issues = sorted(raw_issues, key=_issue_chronological_key)
 
         episodes = []
         for idx, itm in enumerate(sorted_issues, start=1):
@@ -664,7 +682,7 @@ class MetronService:
 
     @classmethod
     def get_trending_comics(cls) -> List[SearchResultItem]:
-        cache_key = "metron_trending_comics_wiki_v2"
+        cache_key = "metron_trending_comics_wiki_v3"
         now_ts = time.time()
         if cache_key in _TRENDING_COMICS_CACHE:
             ts, data = _TRENDING_COMICS_CACHE[cache_key]
@@ -682,37 +700,33 @@ class MetronService:
             {"title": "Absolute Batman (2024)", "wiki": "Absolute_Batman", "year": "2024", "desc": "DC's Absolute Universe reimagining of Batman by Scott Snyder and Nick Dragotta.", "ext_id": "metron_series_8477"},
             {"title": "Absolute Superman (2025)", "wiki": "Absolute_Superman", "year": "2025", "desc": "The Man of Steel reimagined in DC's new Absolute Universe by Jason Aaron.", "ext_id": "metron_series_8746"},
             {"title": "Watchmen (1986)", "wiki": "Watchmen", "year": "1986", "desc": "Alan Moore and Dave Gibbons' groundbreaking graphic novel masterpiece.", "ext_id": "metron_series_537"},
+            {"title": "The Dark Knight Returns (1986)", "wiki": "The_Dark_Knight_Returns", "year": "1986", "desc": "Frank Miller, Klaus Janson and Lynn Varley's defining Batman classic.", "ext_id": "metron_series_6891"},
             {"title": "The Boys (2006)", "wiki": "The_Boys_(comics)", "year": "2006", "desc": "Garth Ennis and Darick Robertson's subversive superhero satire.", "ext_id": "metron_series_3607"},
             {"title": "Maus (1986)", "wiki": "Maus", "year": "1986", "desc": "Art Spiegelman's Pulitzer Prize-winning graphic novel.", "ext_id": "metron_series_15420"},
             {"title": "The Sandman (1989)", "wiki": "The_Sandman_(comic_book)", "year": "1989", "desc": "Neil Gaiman's legendary dark fantasy masterpiece from Vertigo/DC.", "ext_id": "metron_series_3315"},
             {"title": "Teenage Mutant Ninja Turtles (2024)", "wiki": "Teenage_Mutant_Ninja_Turtles_(comic_book)", "year": "2024", "desc": "The legendary Ninja Turtles in their acclaimed modern comic run.", "ext_id": "metron_series_7881"},
-            {"title": "X-Men (2024)", "wiki": "X-Men_(comic_book)", "year": "2024", "desc": "Marvel's 'From the Ashes' flagship mutant ongoing series by Jed MacKay.", "ext_id": "metron_series_7700"},
             {"title": "V for Vendetta (1988)", "wiki": "V_for_Vendetta", "year": "1988", "desc": "Alan Moore and David Lloyd's dystopian graphic novel masterpiece.", "ext_id": "metron_series_5676"},
             {"title": "Invincible (2003)", "wiki": "Invincible_(comics)", "year": "2003", "desc": "Robert Kirkman, Cory Walker and Ryan Ottley's celebrated superhero saga.", "ext_id": "metron_series_2186"},
             {"title": "The Walking Dead (2003)", "wiki": "The_Walking_Dead_(comic_book)", "year": "2003", "desc": "Robert Kirkman and Charlie Adlard's landmark zombie survival epic.", "ext_id": "metron_series_376"},
-            {"title": "Batman: The Killing Joke (1988)", "wiki": "Batman:_The_Killing_Joke", "year": "1988", "desc": "Alan Moore and Brian Bolland's definitive Joker story.", "ext_id": "metron_series_6246"},
-            {"title": "The Dark Knight Returns (1986)", "wiki": "The_Dark_Knight_Returns", "year": "1986", "desc": "Frank Miller, Klaus Janson and Lynn Varley's defining Batman classic.", "ext_id": "metron_series_6245"},
-            {"title": "Scott Pilgrim (2004)", "wiki": "Scott_Pilgrim", "year": "2004", "desc": "Bryan Lee O'Malley's acclaimed graphic novel series.", "ext_id": "metron_series_13815"},
-            {"title": "Something Is Killing the Children (2019)", "wiki": "Something_Is_Killing_the_Children", "year": "2019", "desc": "James Tynion IV and Werther Dell'Edera's hit horror series.", "ext_id": "metron_series_1111"},
-            {"title": "Saga (2012)", "wiki": "Saga_(comics)", "year": "2012", "desc": "Brian K. Vaughan and Fiona Staples' acclaimed sci-fi fantasy space opera.", "ext_id": "metron_series_14947"},
-            {"title": "Spawn (1992)", "wiki": "Spawn_(comics)", "year": "1992", "desc": "Todd McFarlane's record-breaking independent superhero series.", "ext_id": "metron_series_120"},
+            {"title": "Batman: The Killing Joke (1988)", "wiki": "Batman:_The_Killing_Joke", "year": "1988", "desc": "Alan Moore and Brian Bolland's definitive Joker story.", "ext_id": "metron_series_761"},
+            {"title": "Batman: The Long Halloween (1996)", "wiki": "Batman:_The_Long_Halloween", "year": "1996", "desc": "Jeph Loeb and Tim Sale's iconic Gotham mystery noir.", "ext_id": "metron_series_1029"},
+            {"title": "Batman: Year One (1987)", "wiki": "Batman:_Year_One", "year": "1987", "desc": "Frank Miller and David Mazzucchelli's canonical Batman origin.", "ext_id": "metron_series_17378"},
+            {"title": "All-Star Superman (2005)", "wiki": "All-Star_Superman", "year": "2005", "desc": "Grant Morrison and Frank Quitely's acclaimed Superman classic.", "ext_id": "metron_series_3988"},
+            {"title": "Saga (2012)", "wiki": "Saga_(comics)", "year": "2012", "desc": "Brian K. Vaughan and Fiona Staples' acclaimed sci-fi fantasy space opera.", "ext_id": "metron_series_916"},
+            {"title": "Spawn (1992)", "wiki": "Spawn_(comics)", "year": "1992", "desc": "Todd McFarlane's record-breaking independent superhero series.", "ext_id": "metron_series_4210"},
+            {"title": "Something Is Killing the Children (2019)", "wiki": "Something_Is_Killing_the_Children", "year": "2019", "desc": "James Tynion IV and Werther Dell'Edera's hit horror series.", "ext_id": "metron_series_614"},
             {"title": "Hellboy: Seed of Destruction (1994)", "wiki": "Hellboy", "year": "1994", "desc": "Mike Mignola's legendary paranormal dark fantasy comic.", "ext_id": "metron_series_52"},
-            {"title": "Batman: Year One (1987)", "wiki": "Batman:_Year_One", "year": "1987", "desc": "Frank Miller and David Mazzucchelli's canonical Batman origin.", "ext_id": "metron_series_6247"},
-            {"title": "Persepolis (2000)", "wiki": "Persepolis_(comics)", "year": "2000", "desc": "Marjane Satrapi's autobiographical graphic novel masterpiece.", "ext_id": "metron_series_12987"},
-            {"title": "Preacher (1995)", "wiki": "Preacher_(comics)", "year": "1995", "desc": "Garth Ennis and Steve Dillon's subversive Vertigo classic.", "ext_id": "metron_series_9651"},
-            {"title": "The Amazing Spider-Man (1963)", "wiki": "The_Amazing_Spider-Man", "year": "1963", "desc": "Stan Lee and Steve Ditko's legendary flagship superhero series.", "ext_id": "metron_series_10958"},
-            {"title": "Monstress (2015)", "wiki": "Monstress_(comics)", "year": "2015", "desc": "Marjorie Liu and Sana Takeda's award-winning dark fantasy saga.", "ext_id": "metron_series_3742"},
-            {"title": "Blacksad (2000)", "wiki": "Blacksad", "year": "2000", "desc": "Juan Díaz Canales and Juanjo Guarnido's acclaimed anthropomorphic noir.", "ext_id": "metron_series_6178"},
-            {"title": "Sin City (1991)", "wiki": "Sin_City", "year": "1991", "desc": "Frank Miller's definitive neo-noir crime comic masterpiece.", "ext_id": "metron_series_2500"},
-            {"title": "Batman: The Long Halloween (1996)", "wiki": "Batman:_The_Long_Halloween", "year": "1996", "desc": "Jeph Loeb and Tim Sale's iconic Gotham mystery noir.", "ext_id": "metron_series_3200"},
-            {"title": "Y: The Last Man (2002)", "wiki": "Y:_The_Last_Man", "year": "2002", "desc": "Brian K. Vaughan and Pia Guerra's post-apocalyptic Vertigo epic.", "ext_id": "metron_series_3300"},
-            {"title": "Civil War (2006)", "wiki": "Civil_War_(comics)", "year": "2006", "desc": "Mark Millar and Steve McNiven's Marvel crossover blockbuster.", "ext_id": "metron_series_4100"},
-            {"title": "The Infinity Gauntlet (1991)", "wiki": "The_Infinity_Gauntlet", "year": "1991", "desc": "Jim Starlin, George Pérez and Ron Lim's cosmic Marvel epic.", "ext_id": "metron_series_1400"},
-            {"title": "All-Star Superman (2005)", "wiki": "All-Star_Superman", "year": "2005", "desc": "Grant Morrison and Frank Quitely's acclaimed Superman classic.", "ext_id": "metron_series_2200"},
-            {"title": "Paper Girls (2015)", "wiki": "Paper_Girls", "year": "2015", "desc": "Brian K. Vaughan and Cliff Chiang's sci-fi mystery series.", "ext_id": "metron_series_3800"},
-            {"title": "Bone (1991)", "wiki": "Bone_(comics)", "year": "1991", "desc": "Jeff Smith's legendary high fantasy epic.", "ext_id": "metron_series_1600"},
-            {"title": "Ultimate Spider-Man (2000)", "wiki": "Ultimate_Spider-Man", "year": "2000", "desc": "Brian Michael Bendis and Mark Bagley's landmark Marvel reboot.", "ext_id": "metron_series_2100"},
-            {"title": "Daredevil: Born Again (1986)", "wiki": "Born_Again_(comics)", "year": "1986", "desc": "Frank Miller and David Mazzucchelli's definitive Daredevil story.", "ext_id": "metron_series_4500"}
+            {"title": "Preacher (1995)", "wiki": "Preacher_(comics)", "year": "1995", "desc": "Garth Ennis and Steve Dillon's subversive Vertigo classic.", "ext_id": "metron_series_4970"},
+            {"title": "The Amazing Spider-Man (1963)", "wiki": "The_Amazing_Spider-Man", "year": "1963", "desc": "Stan Lee and Steve Ditko's legendary flagship superhero series.", "ext_id": "metron_series_835"},
+            {"title": "Ultimate Spider-Man (2000)", "wiki": "Ultimate_Spider-Man", "year": "2000", "desc": "Brian Michael Bendis and Mark Bagley's landmark Marvel reboot.", "ext_id": "metron_series_5537"},
+            {"title": "Monstress (2015)", "wiki": "Monstress_(comics)", "year": "2015", "desc": "Marjorie Liu and Sana Takeda's award-winning dark fantasy saga.", "ext_id": "metron_series_4733"},
+            {"title": "Sin City (1991)", "wiki": "Sin_City", "year": "1991", "desc": "Frank Miller's definitive neo-noir crime comic masterpiece.", "ext_id": "metron_series_6128"},
+            {"title": "Y: The Last Man (2002)", "wiki": "Y:_The_Last_Man", "year": "2002", "desc": "Brian K. Vaughan and Pia Guerra's post-apocalyptic Vertigo epic.", "ext_id": "metron_series_4935"},
+            {"title": "Civil War (2006)", "wiki": "Civil_War_(comics)", "year": "2006", "desc": "Mark Millar and Steve McNiven's Marvel crossover blockbuster.", "ext_id": "metron_series_402"},
+            {"title": "The Infinity Gauntlet (1991)", "wiki": "The_Infinity_Gauntlet", "year": "1991", "desc": "Jim Starlin, George Pérez and Ron Lim's cosmic Marvel epic.", "ext_id": "metron_series_3047"},
+            {"title": "Paper Girls (2015)", "wiki": "Paper_Girls", "year": "2015", "desc": "Brian K. Vaughan and Cliff Chiang's sci-fi mystery series.", "ext_id": "metron_series_70"},
+            {"title": "Bone (1991)", "wiki": "Bone_(comics)", "year": "1991", "desc": "Jeff Smith's legendary high fantasy epic.", "ext_id": "metron_series_119"},
+            {"title": "Persepolis (2000)", "wiki": "Persepolis_(comics)", "year": "2000", "desc": "Marjane Satrapi's autobiographical graphic novel masterpiece.", "ext_id": "metron_series_12614"}
         ]
 
         def _fetch_candidate_data(item: dict) -> Tuple[dict, int]:

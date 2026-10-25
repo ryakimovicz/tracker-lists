@@ -1517,6 +1517,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     missingEpisodes: any[];
   } | null>(null);
 
+  const [comicVisibleCount, setComicVisibleCount] = useState<number>(100);
+
   // Dialog for comic issue status confirmations & re-read / unmark options
   const [comicIssuePrompt, setComicIssuePrompt] = useState<{
     type: 'unmark_reading' | 'unmark_dropped' | 'read_options' | 'read_to_reading';
@@ -2845,6 +2847,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (!grouped[sNum]) grouped[sNum] = [];
         grouped[sNum].push(ep);
       });
+      if (isComic) {
+        Object.keys(grouped).forEach(k => {
+          const key = parseInt(k);
+          grouped[key].sort((a: any, b: any) => {
+            const dateA = a.air_date || a.airdate || '';
+            const dateB = b.air_date || b.airdate || '';
+            if (dateA && dateB && dateA !== dateB) {
+              return new Date(dateA).getTime() - new Date(dateB).getTime();
+            }
+            if (dateA && !dateB) return -1;
+            if (!dateA && dateB) return 1;
+            const numA = parseFloat(a.issue_number || a.episode_number || '0');
+            const numB = parseFloat(b.issue_number || b.episode_number || '0');
+            return numA - numB;
+          });
+        });
+      }
       setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
     };
 
@@ -2895,6 +2914,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const sortEpisodesChronologically = (eps: any[]) => {
       return [...eps].sort((a: any, b: any) => {
         if (isComic) {
+          const dateA = a.air_date || a.airdate || '';
+          const dateB = b.air_date || b.airdate || '';
+          if (dateA && dateB && dateA !== dateB) {
+            return new Date(dateA).getTime() - new Date(dateB).getTime();
+          }
+          if (dateA && !dateB) return -1;
+          if (!dateA && dateB) return 1;
           const numA = parseFloat(a.issue_number || a.episode_number || '0');
           const numB = parseFloat(b.issue_number || b.episode_number || '0');
           if (numA !== numB) return numA - numB;
@@ -3075,6 +3101,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     hasManuallyToggledSeasonRef.current = false;
     hasUserScrolledSeasonContainerRef.current = false;
     hasUserScrolledComicContainerRef.current = false;
+    setComicVisibleCount(100);
     
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
@@ -3280,6 +3307,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           Object.keys(grouped).forEach(k => {
             const key = parseInt(k);
             grouped[key].sort((a: any, b: any) => {
+              if (isComic) {
+                const dateA = a.air_date || a.airdate || '';
+                const dateB = b.air_date || b.airdate || '';
+                if (dateA && dateB && dateA !== dateB) {
+                  return new Date(dateA).getTime() - new Date(dateB).getTime();
+                }
+                if (dateA && !dateB) return -1;
+                if (!dateA && dateB) return 1;
+                const numA = parseFloat(a.issue_number || a.episode_number || '0');
+                const numB = parseFloat(b.issue_number || b.episode_number || '0');
+                return numA - numB;
+              }
               if (a.air_date && b.air_date) {
                 const diff = new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
                 if (diff !== 0) return diff;
@@ -8013,7 +8052,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* TV Series Season / Comic Volume Accordion Tracking */}
-                  {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
+                  {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && (seasons.length > 0 || selectedItem.item_type === 'comic') && !isEpisode && (
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
                         {selectedItem.item_type === 'comic' 
@@ -8046,6 +8085,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }
 
                             const comicNextCandidate = findNextEpisodeCandidate(displayedIssues, episodes, globalProgress, true).nextEp;
+                            const visibleIssues = displayedIssues.slice(0, comicVisibleCount);
 
                             return (
                               <div 
@@ -8054,7 +8094,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 onMouseDown={() => { hasUserScrolledComicContainerRef.current = true; }}
                                 style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}
                               >
-                                {displayedIssues.map((ep: any) => {
+                                {visibleIssues.map((ep: any) => {
                                   const cleanEpId = String(ep.id || ep.external_id || '')
                                     .replace('cv_issue_metron_issue_', '')
                                     .replace('cv_issue_', '')
@@ -8209,6 +8249,45 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     </div>
                                   );
                                 })}
+
+                                {displayedIssues.length > comicVisibleCount && (
+                                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '0.5rem', paddingBottom: '0.25rem' }}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setComicVisibleCount(prev => prev + 100);
+                                      }}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        padding: '0.5rem 1.1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-card, rgba(255,255,255,0.06))',
+                                        color: 'var(--text-color)',
+                                        fontSize: '0.82rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-comic, #8b5cf6)';
+                                        (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-color)';
+                                        (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+                                      }}
+                                    >
+                                      <ChevronDown size={15} />
+                                      {language === 'es'
+                                        ? `Cargar más números (${visibleIssues.length} de ${displayedIssues.length})`
+                                        : `Load more issues (${visibleIssues.length} of ${displayedIssues.length})`}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             );
                           })()
