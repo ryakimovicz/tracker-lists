@@ -36,21 +36,24 @@ from collections import deque
 _rate_limit_lock = threading.Lock()
 _request_timestamps = deque()
 _blocked_until: float = 0.0  # Unix timestamp until which all Metron requests are paused (circuit breaker)
+_daily_blocked_until: float = 0.0  # Unix timestamp until which Metron requests are cut off if daily quota runs low
 
 def _update_rate_limit_from_headers(headers: Any):
-    """Inspect Metron rate limit headers to proactively back off before hitting 429."""
-    global _blocked_until
+    """Inspect Metron rate limit headers to proactively back off before hitting 429 or exceeding daily limits."""
+    global _blocked_until, _daily_blocked_until
     if not headers:
         return
     try:
         burst_rem_str = headers.get("X-Ratelimit-Burst-Remaining")
         burst_reset_str = headers.get("X-Ratelimit-Burst-Reset")
         sustained_rem_str = headers.get("X-Ratelimit-Sustained-Remaining")
+        sustained_reset_str = headers.get("X-Ratelimit-Sustained-Reset")
+
+        now = time.time()
 
         if burst_rem_str is not None:
             burst_rem = int(burst_rem_str)
             burst_reset = float(burst_reset_str) if burst_reset_str else 0.0
-            now = time.time()
             # If 2 or fewer requests remain in this 60s burst window, proactively pause until reset
             if burst_rem <= 2 and burst_reset > now:
                 with _rate_limit_lock:
@@ -63,8 +66,18 @@ def _update_rate_limit_from_headers(headers: Any):
 
         if sustained_rem_str is not None:
             sustained_rem = int(sustained_rem_str)
-            if sustained_rem <= 50:
-                logger.error(f"Metron daily sustained limit critical: only {sustained_rem} requests remaining today!")
+            sustained_reset = float(sustained_reset_str) if sustained_reset_str else 0.0
+            # Safety fuse: if fewer than 25 requests remain out of 5,000, cut off outgoing requests until reset
+            if sustained_rem <= 25 and sustained_reset > now:
+                with _rate_limit_lock:
+                    if sustained_reset + 2.0 > _daily_blocked_until:
+                        _daily_blocked_until = sustained_reset + 2.0
+                        logger.critical(
+                            f"Metron daily sustained limit safety fuse triggered ({sustained_rem} left). "
+                            f"Suspending outgoing requests until daily reset at {datetime.datetime.fromtimestamp(_daily_blocked_until).isoformat()}."
+                        )
+            elif sustained_rem <= 100:
+                logger.warning(f"Metron daily sustained quota running low: {sustained_rem} requests remaining today.")
     except Exception as e:
         logger.debug(f"Failed to parse Metron rate limit headers: {e}")
 
@@ -126,6 +139,11 @@ def _rate_limit_metron():
         _request_timestamps.append(now)
 
 def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 10) -> Optional[dict]:
+    global _daily_blocked_until
+    if _daily_blocked_until > time.time():
+        logger.warning("Metron request aborted: daily limit safety fuse active until daily window reset.")
+        return None
+
     token = getattr(settings, "METRON_API_TOKEN", None)
     if not token:
         logger.warning("METRON_API_TOKEN is not configured in settings")
