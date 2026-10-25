@@ -37,6 +37,11 @@ class BookSearchService:
     _request_timestamps = deque()
     _blocked_until: float = 0.0  # Unix timestamp until which Open Library calls are halted (circuit breaker)
 
+    # Inventaire rate limiting & sliding window pacing state (respectful community pacing: max 5 req / sec)
+    _inv_rate_limit_lock = threading.Lock()
+    _inv_request_timestamps = deque()
+    _inv_blocked_until: float = 0.0  # Unix timestamp until which Inventaire calls are paused (circuit breaker)
+
     @classmethod
     def _handle_rate_limit(cls, headers: Any, url: str, status_code: int = 429) -> None:
         """Handle 429 or 403 by activating an immediate global circuit breaker honoring Retry-After."""
@@ -140,6 +145,99 @@ class BookSearchService:
                 "reason": "rate_limit",
                 "reset_at": cls._blocked_until
             }
+        return None
+
+    @classmethod
+    def _handle_inv_rate_limit(cls, headers: Any, url: str) -> None:
+        """Handle Inventaire 429 by activating an immediate circuit breaker honoring Retry-After."""
+        now = time.time()
+        wait_s = 30.0
+        try:
+            if headers:
+                retry_after = headers.get("Retry-After")
+                if retry_after:
+                    wait_s = float(retry_after) + 2.0
+        except Exception:
+            pass
+
+        with cls._inv_rate_limit_lock:
+            cls._inv_blocked_until = now + wait_s
+
+        logger.error(
+            f"Inventaire 429 rate limit reached for '{url}'. "
+            f"Global circuit breaker active for {wait_s:.1f}s. Halting Inventaire requests."
+        )
+
+    @classmethod
+    def _rate_limit_inv(cls) -> bool:
+        """
+        Enforce respectful sliding window rate pacing for Inventaire:
+        - Max 5 requests per 1.0 second rolling window.
+        - Min spacing of 0.18s (180ms) between consecutive requests.
+        - Honors global circuit breaker when blocked by 429.
+        """
+        with cls._inv_rate_limit_lock:
+            now = time.time()
+
+            # 1. Check circuit breaker / active rate limit
+            if cls._inv_blocked_until > now:
+                wait_time = cls._inv_blocked_until - now
+                if wait_time <= 1.0:
+                    time.sleep(wait_time)
+                    now = time.time()
+                else:
+                    logger.info(f"Inventaire circuit breaker holding requests (blocked for {wait_time:.1f}s remaining)")
+                    return False
+
+            # 2. Sliding window: clean timestamps older than 1.0 second
+            while cls._inv_request_timestamps and cls._inv_request_timestamps[0] <= now - 1.0:
+                cls._inv_request_timestamps.popleft()
+
+            # 3. Controlled cap: max 5 requests per 1.0 second
+            if len(cls._inv_request_timestamps) >= 5:
+                sleep_needed = 1.0 - (now - cls._inv_request_timestamps[0]) + 0.05
+                if sleep_needed > 0:
+                    if sleep_needed <= 2.0:
+                        time.sleep(sleep_needed)
+                        now = time.time()
+                        while cls._inv_request_timestamps and cls._inv_request_timestamps[0] <= now - 1.0:
+                            cls._inv_request_timestamps.popleft()
+                    else:
+                        return False
+
+            # 4. Enforce minimum spacing of 0.18 seconds between consecutive requests
+            if cls._inv_request_timestamps:
+                elapsed = now - cls._inv_request_timestamps[-1]
+                if elapsed < 0.18:
+                    time.sleep(0.18 - elapsed)
+                    now = time.time()
+
+            cls._inv_request_timestamps.append(now)
+            return True
+
+    @classmethod
+    def _inv_request(cls, url: str, timeout: int = 6) -> Optional[Any]:
+        """Centralized Inventaire HTTP request handler with rate pacing and 429 circuit breaker."""
+        if not cls._rate_limit_inv():
+            return None
+
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                if res.status == 200:
+                    return json.loads(res.read().decode('utf-8'))
+                elif res.status == 429:
+                    cls._handle_inv_rate_limit(res.headers, url)
+                    return None
+        except urllib.error.HTTPError as he:
+            if he.code == 429:
+                cls._handle_inv_rate_limit(he.headers, url)
+                return None
+            logger.warning(f"Inventaire HTTP {he.code} for '{url}': {he}")
+            return None
+        except Exception as e:
+            logger.warning(f"Inventaire request error for '{url}': {e}")
+            return None
         return None
 
     @staticmethod
@@ -270,53 +368,49 @@ class BookSearchService:
         try:
             if is_isbn:
                 url = f"https://inventaire.io/api/entities/by-uris?uris=isbn:{query_clean}"
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=6) as res:
-                    if res.status == 200:
-                        d = json.loads(res.read().decode())
-                        entities = d.get("entities", {})
-                        for uri, ent in entities.items():
-                            label = cls._extract_inventaire_label(ent)
-                            desc = cls._extract_inventaire_description(ent)
-                            claims = ent.get("claims", {})
-                            ol_claims = claims.get("wdt:P648", [])
-                            image_url = cls._extract_inventaire_image(ent.get("image"))
-                            ext_id = f"inventaire-{uri.replace(':', '_')}"
-                            item = SearchResultItem(
-                                external_id=ext_id,
-                                title=label,
-                                image_url=image_url,
-                                description=desc,
-                                item_type="book"
-                            )
-                            results.append((item, [query_clean], ol_claims))
+                d = cls._inv_request(url, timeout=6)
+                if d and isinstance(d, dict):
+                    entities = d.get("entities", {})
+                    for uri, ent in entities.items():
+                        label = cls._extract_inventaire_label(ent)
+                        desc = cls._extract_inventaire_description(ent)
+                        claims = ent.get("claims", {})
+                        ol_claims = claims.get("wdt:P648", [])
+                        image_url = cls._extract_inventaire_image(ent.get("image"))
+                        ext_id = f"inventaire-{uri.replace(':', '_')}"
+                        item = SearchResultItem(
+                            external_id=ext_id,
+                            title=label,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="book"
+                        )
+                        results.append((item, [query_clean], ol_claims))
             else:
                 encoded = urllib.parse.quote(query.strip())
                 url = f"https://inventaire.io/api/search?types=works&limit=10&search={encoded}"
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=6) as res:
-                    if res.status == 200:
-                        d = json.loads(res.read().decode())
-                        for r in d.get("results", []):
-                            label = cls._extract_inventaire_label(r)
-                            desc = cls._extract_inventaire_description(r)
-                            if not is_safe_media_item(label, desc):
-                                continue
+                d = cls._inv_request(url, timeout=6)
+                if d and isinstance(d, dict):
+                    for r in d.get("results", []):
+                        label = cls._extract_inventaire_label(r)
+                        desc = cls._extract_inventaire_description(r)
+                        if not is_safe_media_item(label, desc):
+                            continue
 
-                            uri = r.get("uri") or f"inv:{r.get('id', '')}"
-                            claims = r.get("claims", {})
-                            ol_claims = claims.get("wdt:P648", [])
-                            image_url = cls._extract_inventaire_image(r.get("image"))
-                            ext_id = f"inventaire-{uri.replace(':', '_')}"
+                        uri = r.get("uri") or f"inv:{r.get('id', '')}"
+                        claims = r.get("claims", {})
+                        ol_claims = claims.get("wdt:P648", [])
+                        image_url = cls._extract_inventaire_image(r.get("image"))
+                        ext_id = f"inventaire-{uri.replace(':', '_')}"
 
-                            item = SearchResultItem(
-                                external_id=ext_id,
-                                title=label,
-                                image_url=image_url,
-                                description=desc,
-                                item_type="book"
-                            )
-                            results.append((item, [], ol_claims))
+                        item = SearchResultItem(
+                            external_id=ext_id,
+                            title=label,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="book"
+                        )
+                        results.append((item, [], ol_claims))
         except Exception as e:
             logger.warning(f"Inventaire search error for '{query}': {e}")
 
@@ -491,22 +585,18 @@ class BookSearchService:
                     if not desc:
                         try:
                             inv_url = f"https://inventaire.io/api/search?types=works&limit=1&search={urllib.parse.quote(title)}"
-                            inv_req = urllib.request.Request(inv_url, headers={"User-Agent": USER_AGENT})
-                            with urllib.request.urlopen(inv_req, timeout=4) as inv_res:
-                                if inv_res.status == 200:
-                                    inv_data = json.loads(inv_res.read().decode())
-                                    results = inv_data.get("results", [])
-                                    if results:
-                                        first_uri = results[0].get("uri")
-                                        if first_uri:
-                                            sum_url = f"https://inventaire.io/api/data/summaries?uri={first_uri}"
-                                            sum_req = urllib.request.Request(sum_url, headers={"User-Agent": USER_AGENT})
-                                            with urllib.request.urlopen(sum_req, timeout=4) as sum_res:
-                                                if sum_res.status == 200:
-                                                    sum_json = json.loads(sum_res.read().decode())
-                                                    summaries = sum_json.get("summaries", [])
-                                                    if summaries:
-                                                        desc = summaries[0].get("text") or ""
+                            inv_data = cls._inv_request(inv_url, timeout=4)
+                            if inv_data and isinstance(inv_data, dict):
+                                results = inv_data.get("results", [])
+                                if results:
+                                    first_uri = results[0].get("uri")
+                                    if first_uri:
+                                        sum_url = f"https://inventaire.io/api/data/summaries?uri={first_uri}"
+                                        sum_json = cls._inv_request(sum_url, timeout=4)
+                                        if sum_json and isinstance(sum_json, dict):
+                                            summaries = sum_json.get("summaries", [])
+                                            if summaries:
+                                                desc = summaries[0].get("text") or ""
                         except Exception:
                             pass
 
@@ -529,37 +619,33 @@ class BookSearchService:
             try:
                 # 1. Fetch entity
                 ent_url = f"https://inventaire.io/api/entities/by-uris?uris={uri}"
-                ent_req = urllib.request.Request(ent_url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(ent_req, timeout=6) as ent_res:
-                    if ent_res.status == 200:
-                        ent_data = json.loads(ent_res.read().decode())
-                        ent = ent_data.get("entities", {}).get(uri, {})
-                        title = cls._extract_inventaire_label(ent)
-                        image_url = cls._extract_inventaire_image(ent.get("image"))
+                ent_data = cls._inv_request(ent_url, timeout=6)
+                if ent_data and isinstance(ent_data, dict):
+                    ent = ent_data.get("entities", {}).get(uri, {})
+                    title = cls._extract_inventaire_label(ent)
+                    image_url = cls._extract_inventaire_image(ent.get("image"))
 
-                        # 2. Fetch rich summary
-                        desc = cls._extract_inventaire_description(ent)
-                        try:
-                            sum_url = f"https://inventaire.io/api/data/summaries?uri={uri}"
-                            sum_req = urllib.request.Request(sum_url, headers={"User-Agent": USER_AGENT})
-                            with urllib.request.urlopen(sum_req, timeout=5) as sum_res:
-                                if sum_res.status == 200:
-                                    sum_json = json.loads(sum_res.read().decode())
-                                    summaries = sum_json.get("summaries", [])
-                                    if summaries and summaries[0].get("text"):
-                                        desc = summaries[0]["text"]
-                        except Exception:
-                            pass
+                    # 2. Fetch rich summary
+                    desc = cls._extract_inventaire_description(ent)
+                    try:
+                        sum_url = f"https://inventaire.io/api/data/summaries?uri={uri}"
+                        sum_json = cls._inv_request(sum_url, timeout=5)
+                        if sum_json and isinstance(sum_json, dict):
+                            summaries = sum_json.get("summaries", [])
+                            if summaries and summaries[0].get("text"):
+                                desc = summaries[0]["text"]
+                    except Exception:
+                        pass
 
-                        result = SearchResultItem(
-                            external_id=clean_ext,
-                            title=title,
-                            image_url=image_url,
-                            description=desc,
-                            item_type="book"
-                        )
-                        cls._details_cache[cache_key] = (now_ts, result)
-                        return result
+                    result = SearchResultItem(
+                        external_id=clean_ext,
+                        title=title,
+                        image_url=image_url,
+                        description=desc,
+                        item_type="book"
+                    )
+                    cls._details_cache[cache_key] = (now_ts, result)
+                    return result
             except Exception as e:
                 logger.warning(f"Error fetching Inventaire entity {uri}: {e}")
 
