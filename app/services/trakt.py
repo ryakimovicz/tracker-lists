@@ -31,7 +31,7 @@ class TraktService:
             "Content-Type": "application/json",
             "trakt-api-version": "2",
             "trakt-api-key": cls.get_client_id(),
-            "User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"
+            "User-Agent": settings.USER_AGENT
         }
 
     @classmethod
@@ -54,7 +54,7 @@ class TraktService:
             return cls._fanart_cache[imdb_id]
 
         url = f"https://webservice.fanart.tv/v3/movies/{imdb_id}?api_key={settings.FANART_API_KEY}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.net)"})
+        req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
 
         poster_url = None
         try:
@@ -302,7 +302,7 @@ class TraktService:
                         if settings.FANART_API_KEY and imdb_id:
                             try:
                                 fan_url = f"https://webservice.fanart.tv/v3/movies/{imdb_id}?api_key={settings.FANART_API_KEY}"
-                                req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.net)"})
+                                req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
                                 with urllib.request.urlopen(req_fan, timeout=2.0) as resp_f:
                                     if resp_f.status == 200:
                                         fan_data = json.loads(resp_f.read().decode())

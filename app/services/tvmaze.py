@@ -5,6 +5,9 @@ import time
 from typing import List, Dict, Optional
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
+from app.core.config import settings
+
+USER_AGENT = settings.USER_AGENT
 
 # In-memory cache for show akas (localized titles): show_id -> (timestamp, list of akas)
 _TVMAZE_AKAS_CACHE: Dict[int, tuple[float, List[dict]]] = {}
@@ -31,7 +34,7 @@ class TVMazeService:
                 return cached_akas
         
         url = f"https://api.tvmaze.com/shows/{show_id}/akas"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=3) as res:
                 if res.status == 200:
@@ -88,7 +91,7 @@ class TVMazeService:
         
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "TrackerLists/1.0"}
+            headers={"User-Agent": USER_AGENT}
         )
         
         results = []
@@ -168,7 +171,7 @@ class TVMazeService:
                 return cached_eps
 
         url = f"https://api.tvmaze.com/shows/{real_id}/episodes?specials=1"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         
         episodes = []
         try:
@@ -219,7 +222,7 @@ class TVMazeService:
                 return cached_detail
 
         url = f"https://api.tvmaze.com/shows/{real_id}"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
@@ -303,7 +306,7 @@ class TVMazeService:
     def get_episode_detail(series_id: str, season_number: int, episode_number: int) -> dict:
         real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
         url = f"https://api.tvmaze.com/shows/{real_id}/episodebynumber?season={season_number}&number={episode_number}"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -348,7 +351,7 @@ class TVMazeService:
 
         def fetch_url(u):
             try:
-                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=4) as response:
                     if response.status == 200:
                         return json.loads(response.read().decode())
@@ -449,7 +452,7 @@ class TVMazeService:
 
         def fetch_url(u):
             try:
-                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                req = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=4) as response:
                     if response.status == 200:
                         return json.loads(response.read().decode())
@@ -566,7 +569,7 @@ class TVMazeService:
                 ymd = dt.strftime("%Y/%m/%d")
                 top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
                 try:
-                    req = urllib.request.Request(top_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                    req = urllib.request.Request(top_url, headers={"User-Agent": USER_AGENT})
                     with urllib.request.urlopen(req, timeout=7) as resp:
                         if resp.status == 200:
                             data = json.loads(resp.read().decode())
@@ -625,7 +628,7 @@ class TVMazeService:
                     d_str = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
                     for sched_url in [f"https://api.tvmaze.com/schedule/web?date={d_str}", f"https://api.tvmaze.com/schedule?date={d_str}&country=US"]:
                         try:
-                            s_req = urllib.request.Request(sched_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                            s_req = urllib.request.Request(sched_url, headers={"User-Agent": USER_AGENT})
                             with urllib.request.urlopen(s_req, timeout=3.5) as s_resp:
                                 if s_resp.status == 200:
                                     s_data = json.loads(s_resp.read().decode())
@@ -666,7 +669,7 @@ class TVMazeService:
         if len(results) < 20:
             try:
                 url = "https://api.tvmaze.com/shows"
-                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:
                         data = json.loads(response.read().decode())
@@ -740,7 +743,13 @@ class TVMazeService:
             }
             """
             payload = json.dumps({"query": graphql_query}).encode("utf-8")
-            headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Origin": "https://anilist.co",
+                "Referer": "https://anilist.co/"
+            }
             req_al = urllib.request.Request(url_al, data=payload, headers=headers)
             with urllib.request.urlopen(req_al, timeout=5) as resp_al:
                 if resp_al.status == 200:
@@ -768,7 +777,7 @@ class TVMazeService:
             ]
             for u in urls:
                 try:
-                    req_s = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                    req_s = urllib.request.Request(u, headers={"User-Agent": USER_AGENT})
                     with urllib.request.urlopen(req_s, timeout=4) as response_s:
                         if response_s.status == 200:
                             sdata = json.loads(response_s.read().decode())
@@ -825,7 +834,7 @@ class TVMazeService:
         if len(results) < 12:
             try:
                 url_fb = "https://api.tvmaze.com/shows"
-                req_fb = urllib.request.Request(url_fb, headers={"User-Agent": "TrackerLists/1.0"})
+                req_fb = urllib.request.Request(url_fb, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req_fb, timeout=5) as response_fb:
                     if response_fb.status == 200:
                         fb_shows = json.loads(response_fb.read().decode())

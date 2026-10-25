@@ -31,7 +31,7 @@ class EmailService:
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": "Pathd/1.0"
+                "User-Agent": settings.USER_AGENT
             },
             method="POST"
         )

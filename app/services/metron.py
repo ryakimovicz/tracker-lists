@@ -14,7 +14,7 @@ from app.core.sfw_filter import is_safe_media_item
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "Pathd/1.0 (https://pathd.net; contact@pathd.net)"
+USER_AGENT = settings.USER_AGENT
 BASE_URL = "https://metron.cloud/api"
 
 # In-memory caches to respect Metron's 20 req/min and 5,000 req/day limits

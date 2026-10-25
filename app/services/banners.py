@@ -168,7 +168,13 @@ class BannerService:
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"}
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Origin": "https://anilist.co",
+                    "Referer": "https://anilist.co/"
+                }
             )
             try:
                 with urllib.request.urlopen(req, timeout=5) as resp:
@@ -235,7 +241,7 @@ class BannerService:
             encoded = urllib.parse.quote(term)
             url = f"https://api.tvmaze.com/search/shows?q={encoded}"
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
                 with urllib.request.urlopen(req, timeout=2.0) as resp:
                     if resp.status == 200:
                         shows = json.loads(resp.read().decode())
@@ -261,7 +267,7 @@ class BannerService:
                 lookup_id = thetvdb_id or imdb_id
                 fan_url = f"https://webservice.fanart.tv/v3/tv/{lookup_id}?api_key={settings.FANART_API_KEY}"
                 try:
-                    req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "TrackerLists/1.0"})
+                    req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
                     with urllib.request.urlopen(req_fan, timeout=1.8) as r_fan:
                         if r_fan.status == 200:
                             fan_data = json.loads(r_fan.read().decode())
@@ -291,7 +297,7 @@ class BannerService:
             # 2. TVMaze Images
             if show_id:
                 img_url = f"https://api.tvmaze.com/shows/{show_id}/images"
-                req_img = urllib.request.Request(img_url, headers={"User-Agent": "Pathd/1.0"})
+                req_img = urllib.request.Request(img_url, headers={"User-Agent": settings.USER_AGENT})
                 try:
                     with urllib.request.urlopen(req_img, timeout=1.8) as r_img:
                         if r_img.status == 200:
@@ -398,7 +404,7 @@ class BannerService:
             # 1. Query Last.fm for artist info and MBID
             clean_q = urllib.parse.quote(query.strip())
             lfm_url = f"https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist={clean_q}&api_key={settings.LASTFM_API_KEY}&format=json"
-            req_lfm = urllib.request.Request(lfm_url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+            req_lfm = urllib.request.Request(lfm_url, headers={"User-Agent": settings.USER_AGENT})
             with urllib.request.urlopen(req_lfm, timeout=3.5) as lfm_resp:
                 if lfm_resp.status == 200:
                     lfm_data = json.loads(lfm_resp.read().decode('utf-8', errors='replace'))
@@ -410,7 +416,7 @@ class BannerService:
                         # 2. Query Fanart.tv for widescreen music banners and artist wallpapers
                         fan_url = f"https://webservice.fanart.tv/v3/music/{mbid}?api_key={settings.FANART_API_KEY}"
                         try:
-                            req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "PathdApp/1.0"})
+                            req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
                             with urllib.request.urlopen(req_fan, timeout=3.0) as fan_resp:
                                 if fan_resp.status == 200:
                                     fan_data = json.loads(fan_resp.read().decode('utf-8', errors='replace'))

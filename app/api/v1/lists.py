@@ -22,6 +22,7 @@ from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.activity import UserActivityLog
 from app.models.consumption import ConsumptionHistory
 from app.api.v1.users import check_user_is_pro
+from app.core.config import settings
 from app.schemas.list import (
     ReadingListCreate,
     ReadingListUpdate,
@@ -854,7 +855,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         import urllib.request, json
         url = f"https://api.tvmaze.com/episodes/{ep_id}?embed=show"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
@@ -1597,7 +1598,7 @@ def check_series_completion(user_id: int, ep_external_id: str):
         import urllib.request, json
         # 1. Get show id from episode
         url = f"https://api.tvmaze.com/episodes/{ep_id}?embed=show"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
         show_id = None
         show_name = None
         show_image = None
@@ -1615,7 +1616,7 @@ def check_series_completion(user_id: int, ep_external_id: str):
             
         # 2. Get all episodes for the show (including specials)
         episodes_url = f"https://api.tvmaze.com/shows/{show_id}/episodes?specials=1"
-        req2 = urllib.request.Request(episodes_url, headers={"User-Agent": "TrackerLists/1.0"})
+        req2 = urllib.request.Request(episodes_url, headers={"User-Agent": settings.USER_AGENT})
         with urllib.request.urlopen(req2, timeout=5) as response2:
             if response2.status == 200:
                 episodes = json.loads(response2.read().decode())

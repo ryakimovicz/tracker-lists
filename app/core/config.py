@@ -11,6 +11,8 @@ def assemble_cors_origins(v: Union[str, List[str]]) -> Union[List[str], str]:
         return v
     raise ValueError(v)
 
+DEFAULT_USER_AGENT = "Pathd (https://pathd.net; contact@pathd.net)"
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_ignore_empty=True, extra="ignore"
@@ -18,6 +20,7 @@ class Settings(BaseSettings):
     
     PROJECT_NAME: str = "Pathd"
     API_V1_STR: str = "/api/v1"
+    USER_AGENT: str = DEFAULT_USER_AGENT
     
     # Database
     DATABASE_URL: str = "sqlite:///./tracker_lists.db"

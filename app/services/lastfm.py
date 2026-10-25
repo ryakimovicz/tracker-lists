@@ -10,6 +10,8 @@ import concurrent.futures
 from typing import Optional, Dict, Any, List
 from app.core.config import settings
 
+USER_AGENT = settings.USER_AGENT
+
 class LastFMMeta(type):
     @property
     def API_KEY(cls) -> str:
@@ -106,7 +108,7 @@ class LastFMService(metaclass=LastFMMeta):
         }
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         
         try:
@@ -195,7 +197,7 @@ class LastFMService(metaclass=LastFMMeta):
                     "autocorrect": "1"
                 }
                 url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-                headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+                headers = {"User-Agent": USER_AGENT}
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=4.5) as response:
                     if response.status == 200:
@@ -234,7 +236,7 @@ class LastFMService(metaclass=LastFMMeta):
             norm_target = re.sub(r'[^a-zA-Z0-9]', '', norm_clean).lower()
             q = urllib.parse.quote(clean_name)
             url = f"https://api.deezer.com/search/artist?q={q}&limit=15"
-            headers = {"User-Agent": "PathdApp/1.0"}
+            headers = {"User-Agent": USER_AGENT}
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
@@ -253,7 +255,7 @@ class LastFMService(metaclass=LastFMMeta):
                             clean_t_title = re.sub(r'\(.*?\)', '', trk_title).strip()
                             tq = urllib.parse.quote(f"{clean_name} {clean_t_title}")
                             try:
-                                treq = urllib.request.Request(f"https://api.deezer.com/search/track?q={tq}&limit=5", headers={"User-Agent": "PathdApp/1.0"})
+                                treq = urllib.request.Request(f"https://api.deezer.com/search/track?q={tq}&limit=5", headers={"User-Agent": USER_AGENT})
                                 with urllib.request.urlopen(treq, timeout=2.5) as tres:
                                     if tres.status == 200:
                                         tdata = json.loads(tres.read().decode('utf-8', errors='replace'))
@@ -315,7 +317,7 @@ class LastFMService(metaclass=LastFMMeta):
                             # 1. Check top track overlap against Last.fm top tracks
                             if lfm_tracks_norm:
                                 try:
-                                    treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
+                                    treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": USER_AGENT})
                                     with urllib.request.urlopen(treq, timeout=2.5) as tres:
                                         td = json.loads(tres.read().decode('utf-8', errors='replace'))
                                         deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
@@ -328,7 +330,7 @@ class LastFMService(metaclass=LastFMMeta):
                             # 2. Fetch full artist info if nb_fan or high-res pictures are missing
                             if full_artist_info.get("nb_fan") is None or not full_artist_info.get("picture_xl"):
                                 try:
-                                    areq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}", headers={"User-Agent": "PathdApp/1.0"})
+                                    areq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}", headers={"User-Agent": USER_AGENT})
                                     with urllib.request.urlopen(areq, timeout=2.5) as ares:
                                         ad = json.loads(ares.read().decode('utf-8', errors='replace'))
                                         for k, v in ad.items():
@@ -388,7 +390,7 @@ class LastFMService(metaclass=LastFMMeta):
 
             q = urllib.parse.quote(query_str)
             url = f"https://api.deezer.com/search/track?q={q}&limit=5"
-            headers = {"User-Agent": "PathdApp/1.0"}
+            headers = {"User-Agent": USER_AGENT}
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
@@ -432,7 +434,7 @@ class LastFMService(metaclass=LastFMMeta):
 
             q = urllib.parse.quote(query_str)
             url = f"https://api.deezer.com/search/album?q={q}&limit=5"
-            headers = {"User-Agent": "PathdApp/1.0"}
+            headers = {"User-Agent": USER_AGENT}
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
@@ -484,7 +486,7 @@ class LastFMService(metaclass=LastFMMeta):
         }
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         
         albums = []
@@ -562,7 +564,7 @@ class LastFMService(metaclass=LastFMMeta):
         }
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         
         artists = []
@@ -638,7 +640,7 @@ class LastFMService(metaclass=LastFMMeta):
         }
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         
         tracks = []
@@ -775,7 +777,7 @@ class LastFMService(metaclass=LastFMMeta):
                 try:
                     q = urllib.parse.quote(cand)
                     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{q}"
-                    req = urllib.request.Request(url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
                     with urllib.request.urlopen(req, timeout=3) as res:
                         if res.status == 200:
                             d = json.loads(res.read().decode('utf-8', errors='replace'))
@@ -788,7 +790,7 @@ class LastFMService(metaclass=LastFMMeta):
             try:
                 q = urllib.parse.quote(artist_name)
                 url = f"https://{lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch={q}&format=json"
-                req = urllib.request.Request(url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=3) as res:
                     if res.status == 200:
                         d = json.loads(res.read().decode('utf-8', errors='replace'))
@@ -799,7 +801,7 @@ class LastFMService(metaclass=LastFMMeta):
                                 continue
                             t_q = urllib.parse.quote(title)
                             s_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{t_q}"
-                            s_req = urllib.request.Request(s_url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                            s_req = urllib.request.Request(s_url, headers={"User-Agent": USER_AGENT})
                             try:
                                 with urllib.request.urlopen(s_req, timeout=3) as s_res:
                                     if s_res.status == 200:
@@ -827,7 +829,7 @@ class LastFMService(metaclass=LastFMMeta):
                 "limit": "50"
             }
             url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-            headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+            headers = {"User-Agent": USER_AGENT}
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=4) as res:
                 if res.status == 200:
@@ -898,7 +900,7 @@ class LastFMService(metaclass=LastFMMeta):
             matched_artist = cls._resolve_deezer_artist(artist_name)
             if matched_artist and matched_artist.get("id"):
                 artist_id = matched_artist["id"]
-                req_alb = urllib.request.Request(f"https://api.deezer.com/artist/{artist_id}/albums?limit=100", headers={"User-Agent": "PathdApp/1.0"})
+                req_alb = urllib.request.Request(f"https://api.deezer.com/artist/{artist_id}/albums?limit=100", headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req_alb, timeout=6) as a_res:
                     if a_res.status == 200:
                         alb_data = json.loads(a_res.read().decode('utf-8', errors='replace'))
@@ -979,7 +981,7 @@ class LastFMService(metaclass=LastFMMeta):
         def _fetch_deezer() -> Optional[str]:
             try:
                 q = urllib.parse.quote(f"{artist_name} {query_title}".strip())
-                req = urllib.request.Request(f"https://api.deezer.com/search/album?q={q}&limit=5", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                req = urllib.request.Request(f"https://api.deezer.com/search/album?q={q}&limit=5", headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=2.5) as res:
                     if res.status == 200:
                         d = json.loads(res.read().decode('utf-8'))
@@ -988,7 +990,7 @@ class LastFMService(metaclass=LastFMMeta):
                             if cls._titles_match(album_name, cand_t):
                                 alb_id = itm.get("id")
                                 if alb_id:
-                                    req2 = urllib.request.Request(f"https://api.deezer.com/album/{alb_id}", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                                    req2 = urllib.request.Request(f"https://api.deezer.com/album/{alb_id}", headers={"User-Agent": USER_AGENT})
                                     with urllib.request.urlopen(req2, timeout=2.5) as res2:
                                         d2 = json.loads(res2.read().decode('utf-8'))
                                         rel_date = (d2.get("release_date") or "")[:10]
@@ -1060,7 +1062,7 @@ class LastFMService(metaclass=LastFMMeta):
             "autocorrect": "1"
         }
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -1130,7 +1132,7 @@ class LastFMService(metaclass=LastFMMeta):
             "autocorrect": "1"
         }
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -1245,7 +1247,7 @@ class LastFMService(metaclass=LastFMMeta):
             "autocorrect": "1"
         }
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -1337,7 +1339,7 @@ class LastFMService(metaclass=LastFMMeta):
             return 0
 
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        headers = {"User-Agent": USER_AGENT}
         req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=4) as response:

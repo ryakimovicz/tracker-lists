@@ -3,6 +3,7 @@ import json
 import re
 import time
 from typing import List, Tuple, Optional
+from app.core.config import settings
 
 class WikiReleasesService:
     _cached_releases: Optional[Tuple[float, List[Tuple[str, str]]]] = None
@@ -23,7 +24,7 @@ class WikiReleasesService:
 
         current_year = "2026"
         url = f"https://en.wikipedia.org/w/api.php?action=parse&page=List_of_American_films_of_{current_year}&prop=wikitext&format=json"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.app)"})
+        req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
         
         parsed_items: List[Tuple[str, str]] = []
         try:

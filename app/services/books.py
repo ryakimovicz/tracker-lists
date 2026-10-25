@@ -9,10 +9,11 @@ import logging
 from typing import List, Tuple, Set, Optional, Dict, Any
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "Pathd/1.0 (https://pathd.net; contact@pathd.net)"
+USER_AGENT = settings.USER_AGENT
 
 def normalize_title(text: str) -> str:
     if not text:

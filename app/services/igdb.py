@@ -26,7 +26,7 @@ class IGDBService:
 
         # Fetch new token
         url = f"https://id.twitch.tv/oauth2/token?client_id={client_id}&client_secret={client_secret}&grant_type=client_credentials"
-        req = urllib.request.Request(url, method="POST")
+        req = urllib.request.Request(url, method="POST", headers={"User-Agent": settings.USER_AGENT})
 
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
@@ -39,6 +39,15 @@ class IGDBService:
         except Exception as e:
             print(f"IGDB Auth Error: {e}")
         return None
+
+    @classmethod
+    def _get_headers(cls, client_id: str, token: str) -> dict:
+        return {
+            "Client-ID": client_id,
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": settings.USER_AGENT
+        }
 
     @classmethod
     def search_games(cls, query: str) -> List[SearchResultItem]:
@@ -67,11 +76,7 @@ class IGDBService:
         req = urllib.request.Request(
             "https://api.igdb.com/v4/games",
             data=body.encode("utf-8"),
-            headers={
-                "Client-ID": client_id,
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json"
-            }
+            headers=cls._get_headers(client_id, token)
         )
 
         try:
@@ -87,11 +92,7 @@ class IGDBService:
                 req_where = urllib.request.Request(
                     "https://api.igdb.com/v4/games",
                     data=body_where.encode("utf-8"),
-                    headers={
-                        "Client-ID": client_id,
-                        "Authorization": f"Bearer {token}",
-                        "Accept": "application/json"
-                    }
+                    headers=cls._get_headers(client_id, token)
                 )
                 try:
                     with urllib.request.urlopen(req_where, timeout=8) as response_where:
@@ -298,7 +299,7 @@ class IGDBService:
         }
 
         try:
-            req1 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_main.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+            req1 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_main.encode("utf-8"), headers=cls._get_headers(client_id, token))
             vpid = None
             parent_id = None
             with urllib.request.urlopen(req1, timeout=8) as resp1:
@@ -347,7 +348,7 @@ class IGDBService:
             body_children = f'''fields id, name, category, game_type, cover.image_id, first_release_date, bundles, version_parent, parent_game;
                 where bundles = ({gid}) | version_parent = ({version_targets}) | parent_game = ({gid}); limit 50;'''
 
-            req2 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_children.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+            req2 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_children.encode("utf-8"), headers=cls._get_headers(client_id, token))
             with urllib.request.urlopen(req2, timeout=8) as resp2:
                 data_children = json.loads(resp2.read().decode())
                 for child in data_children:
@@ -389,7 +390,7 @@ class IGDBService:
         client_id = getattr(settings, "TWITCH_CLIENT_ID", None)
         token = cls._get_access_token()
         if not client_id or not token: return []
-        req = urllib.request.Request("https://api.igdb.com/v4/games", data=body.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+        req = urllib.request.Request("https://api.igdb.com/v4/games", data=body.encode("utf-8"), headers=cls._get_headers(client_id, token))
         try:
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
@@ -464,7 +465,7 @@ class IGDBService:
             # 9: Steam Global Top Sellers (viral sales surges)
             # 34: Twitch 24hr Hours Watched (viral livestream sensations)
             # 5: Steam 24hr Peak Players (most played games today)
-            headers = {"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"}
+            headers = cls._get_headers(client_id, token)
             url = "https://api.igdb.com/v4/popularity_primitives"
             lists = []
             for pop_type in [9, 34, 5]:

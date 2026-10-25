@@ -177,7 +177,13 @@ class CharacterService:
             req_char = urllib.request.Request(
                 url,
                 data=payload_char,
-                headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"}
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Origin": "https://anilist.co",
+                    "Referer": "https://anilist.co/"
+                }
             )
 
             try:
@@ -221,7 +227,13 @@ class CharacterService:
             req_media = urllib.request.Request(
                 url,
                 data=payload_media,
-                headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"}
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Origin": "https://anilist.co",
+                    "Referer": "https://anilist.co/"
+                }
             )
 
             try:
@@ -455,7 +467,7 @@ class CharacterService:
             shows_url = f"https://api.tvmaze.com/search/shows?q={encoded_query}"
             shows_to_fetch_cast = []
             try:
-                req_shows = urllib.request.Request(shows_url, headers={"User-Agent": "Pathd/1.0"})
+                req_shows = urllib.request.Request(shows_url, headers={"User-Agent": settings.USER_AGENT})
                 with urllib.request.urlopen(req_shows, timeout=3.5) as response:
                     if response.status == 200:
                         shows_data = json.loads(response.read().decode())
@@ -485,7 +497,7 @@ class CharacterService:
             if shows_to_fetch_cast:
                 def fetch_cast(show_id: int, s_name: str):
                     cast_url = f"https://api.tvmaze.com/shows/{show_id}/cast"
-                    req_cast = urllib.request.Request(cast_url, headers={"User-Agent": "Pathd/1.0"})
+                    req_cast = urllib.request.Request(cast_url, headers={"User-Agent": settings.USER_AGENT})
                     cast_members = []
                     try:
                         with urllib.request.urlopen(req_cast, timeout=2.5) as c_resp:
@@ -530,7 +542,7 @@ class CharacterService:
             # 2. Search people/actors
             people_url = f"https://api.tvmaze.com/search/people?q={encoded_query}"
             try:
-                req_people = urllib.request.Request(people_url, headers={"User-Agent": "Pathd/1.0"})
+                req_people = urllib.request.Request(people_url, headers={"User-Agent": settings.USER_AGENT})
                 with urllib.request.urlopen(req_people, timeout=3.0) as p_resp:
                     if p_resp.status == 200:
                         people_data = json.loads(p_resp.read().decode())
@@ -598,7 +610,7 @@ class CharacterService:
             return []
         results = []
         clean_q = urllib.parse.quote(query.strip())
-        headers = {"User-Agent": "PathdApp/1.0"}
+        headers = {"User-Agent": settings.USER_AGENT}
 
         # 1. Deezer Artists (1:1 square pictures of musicians)
         try:

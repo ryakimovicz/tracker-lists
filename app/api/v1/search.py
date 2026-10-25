@@ -18,6 +18,7 @@ from app.core.limiter import limiter
 from app.core.sfw_filter import is_safe_text, is_safe_media_item
 from app.core.circuit_breaker import execute_with_circuit_breaker
 from app.core.popular_cache import popular_cache
+from app.core.config import settings
 
 import re
 import concurrent.futures
@@ -1029,7 +1030,7 @@ def lookup_media_item(
             if ep_raw_id.isdigit():
                 try:
                     ep_url = f"https://api.tvmaze.com/episodes/{ep_raw_id}?embed=show"
-                    req = urllib.request.Request(ep_url, headers={"User-Agent": "TrackerLists/1.0"})
+                    req = urllib.request.Request(ep_url, headers={"User-Agent": settings.USER_AGENT})
                     with urllib.request.urlopen(req, timeout=5) as ep_res:
                         if ep_res.status == 200:
                             ep_json = json.loads(ep_res.read().decode())
@@ -1107,7 +1108,13 @@ def lookup_media_item(
                 req = urllib.request.Request(
                     "https://graphql.anilist.co",
                     data=payload,
-                    headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Origin": "https://anilist.co",
+                        "Referer": "https://anilist.co/"
+                    }
                 )
                 with urllib.request.urlopen(req, timeout=5) as m_res:
                     if m_res.status == 200:
