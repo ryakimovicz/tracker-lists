@@ -423,14 +423,14 @@ class MetronService:
         raw_issues = list(issues_res.get("results", []))
         total_count = issues_res.get("count", 0)
 
-        # Paginate if series has more than 100 issues (fetch full issue list up to 3000 issues concurrently)
+        # Paginate if series has more than 100 issues (fetch full issue list up to 10,000 issues concurrently)
         total_pages = math.ceil(total_count / 100)
         if total_pages > 1:
             def _fetch_issue_page(p: int):
                 return _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": p})
 
-            max_fetch_pages = min(total_pages + 1, 31)  # Up to 3,000 issues
-            with ThreadPoolExecutor(max_workers=6) as executor:
+            max_fetch_pages = min(total_pages + 1, 101)  # Up to 10,000 issues
+            with ThreadPoolExecutor(max_workers=8) as executor:
                 pages_res = list(executor.map(_fetch_issue_page, range(2, max_fetch_pages)))
             for p_res in pages_res:
                 if p_res and p_res.get("results"):
