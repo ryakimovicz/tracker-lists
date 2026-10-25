@@ -1,11 +1,14 @@
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 import time
 import datetime
 import unicodedata
 import re
 import logging
+import threading
+from collections import deque
 from typing import List, Tuple, Set, Optional, Dict, Any
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
@@ -29,16 +32,115 @@ class BookSearchService:
     _trending_cache: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
     _new_books_cache: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
     
-    _last_ol_request_ts: float = 0.0
+    # Rate limiting & sliding window pacing state (Open Library limit: 3 req / sec for identified apps)
+    _rate_limit_lock = threading.Lock()
+    _request_timestamps = deque()
+    _blocked_until: float = 0.0  # Unix timestamp until which Open Library calls are halted (circuit breaker)
 
     @classmethod
-    def _rate_limit_ol(cls):
-        """Ensure we respect Open Library guidelines (~3 requests per second limit)."""
+    def _handle_rate_limit(cls, headers: Any, url: str, status_code: int = 429) -> None:
+        """Handle 429 or 403 by activating an immediate global circuit breaker honoring Retry-After."""
         now = time.time()
-        elapsed = now - cls._last_ol_request_ts
-        if elapsed < 0.35: # Min 350ms between requests
-            time.sleep(0.35 - elapsed)
-        cls._last_ol_request_ts = time.time()
+        wait_s = 60.0 if status_code == 403 else 30.0
+        try:
+            if headers:
+                retry_after = headers.get("Retry-After")
+                if retry_after:
+                    wait_s = float(retry_after) + 2.0
+        except Exception:
+            pass
+
+        with cls._rate_limit_lock:
+            cls._blocked_until = now + wait_s
+
+        logger.error(
+            f"Open Library {status_code} limit reached for '{url}'. "
+            f"Global circuit breaker active for {wait_s:.1f}s. Halting requests."
+        )
+
+    @classmethod
+    def _rate_limit_ol(cls) -> bool:
+        """
+        Enforce thread-safe sliding window rate pacing for Open Library:
+        - Max 3 requests in any 1.0 second rolling window (identified requests limit).
+        - Min spacing of 0.33s (330ms) between consecutive requests.
+        - Honors global circuit breaker when blocked by 429 or 403.
+        """
+        with cls._rate_limit_lock:
+            now = time.time()
+
+            # 1. Check circuit breaker / active rate limit
+            if cls._blocked_until > now:
+                wait_time = cls._blocked_until - now
+                if wait_time <= 1.0:
+                    time.sleep(wait_time)
+                    now = time.time()
+                else:
+                    logger.info(f"Open Library circuit breaker holding requests (blocked for {wait_time:.1f}s remaining)")
+                    return False
+
+            # 2. Sliding window: clean timestamps older than 1.0 second
+            while cls._request_timestamps and cls._request_timestamps[0] <= now - 1.0:
+                cls._request_timestamps.popleft()
+
+            # 3. Controlled cap: max 3 requests in any 1.0-second rolling window
+            if len(cls._request_timestamps) >= 3:
+                sleep_needed = 1.0 - (now - cls._request_timestamps[0]) + 0.05
+                if sleep_needed > 0:
+                    if sleep_needed <= 2.0:
+                        time.sleep(sleep_needed)
+                        now = time.time()
+                        while cls._request_timestamps and cls._request_timestamps[0] <= now - 1.0:
+                            cls._request_timestamps.popleft()
+                    else:
+                        return False
+
+            # 4. Enforce minimum spacing of 0.33 seconds between consecutive requests
+            if cls._request_timestamps:
+                elapsed = now - cls._request_timestamps[-1]
+                if elapsed < 0.33:
+                    time.sleep(0.33 - elapsed)
+                    now = time.time()
+
+            cls._request_timestamps.append(now)
+            return True
+
+    @classmethod
+    def _ol_request(cls, url: str, timeout: int = 8) -> Optional[Any]:
+        """Centralized HTTP request handler with rate pacing, 429/403 circuit breaker, and Retry-After support."""
+        if not cls._rate_limit_ol():
+            return None
+
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                if res.status == 200:
+                    return json.loads(res.read().decode('utf-8'))
+                elif res.status in (429, 403):
+                    cls._handle_rate_limit(res.headers, url, res.status)
+                    return None
+        except urllib.error.HTTPError as he:
+            if he.code in (429, 403):
+                cls._handle_rate_limit(he.headers, url, he.code)
+                return None
+            logger.warning(f"Open Library HTTP {he.code} for '{url}': {he}")
+            return None
+        except Exception as e:
+            logger.warning(f"Open Library request error for '{url}': {e}")
+            return None
+        return None
+
+    @classmethod
+    def get_rate_limit_status(cls) -> Optional[dict]:
+        """Provides status for search router and frontend warning banner if Open Library is limited."""
+        now = time.time()
+        if cls._blocked_until > now:
+            return {
+                "category": "book",
+                "reason": "rate_limit",
+                "reset_at": cls._blocked_until
+            }
+        return None
 
     @staticmethod
     def _extract_inventaire_image(img: Any) -> Optional[str]:
@@ -105,56 +207,54 @@ class BookSearchService:
             encoded_query = urllib.parse.quote(query.strip())
             url = f"https://openlibrary.org/search.json?q={encoded_query}&limit=20"
 
-        cls._rate_limit_ol()
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        
+        data = cls._ol_request(url, timeout=8)
+        if not data or not isinstance(data, dict):
+            return []
+
         results: List[Tuple[SearchResultItem, List[str], Optional[str]]] = []
-        try:
-            with urllib.request.urlopen(req, timeout=8) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for doc in data.get("docs", []):
-                        title = doc.get("title") or "Untitled Book"
-                        authors = doc.get("author_name", [])
-                        author_str = f"Author: {authors[0]}." if authors else ""
-                        first_publish = doc.get("first_publish_year")
-                        pub_str = f" First published in {first_publish}." if first_publish else ""
-                        desc = f"{author_str}{pub_str}"
+        for doc in data.get("docs", []):
+            title = doc.get("title") or "Untitled Book"
+            authors = doc.get("author_name", [])
+            author_str = f"Author: {authors[0]}." if authors else ""
+            first_publish = doc.get("first_publish_year")
+            pub_str = f" First published in {first_publish}." if first_publish else ""
+            desc = f"{author_str}{pub_str}"
 
-                        if not is_safe_media_item(title, desc):
-                            continue
+            if not is_safe_media_item(title, desc):
+                continue
 
-                        isbns: List[str] = []
-                        for raw_isbn in doc.get("isbn", [])[:5]:
-                            clean_val = str(raw_isbn).strip().replace("-", "").replace(" ", "").lower()
-                            if clean_val:
-                                isbns.append(clean_val)
+            isbns: List[str] = []
+            for raw_isbn in doc.get("isbn", [])[:5]:
+                clean_val = str(raw_isbn).strip().replace("-", "").replace(" ", "").lower()
+                if clean_val:
+                    isbns.append(clean_val)
 
-                        cover_i = doc.get("cover_i")
-                        image_url = None
-                        if cover_i:
-                            image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
-                        elif isbns:
-                            image_url = f"https://covers.openlibrary.org/b/isbn/{isbns[0]}-L.jpg"
+            cover_i = doc.get("cover_i")
+            cover_edition_key = doc.get("cover_edition_key")
+            image_url = None
+            if cover_i:
+                image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+            elif cover_edition_key:
+                image_url = f"https://covers.openlibrary.org/b/olid/{cover_edition_key}-L.jpg"
+            elif isbns:
+                image_url = f"https://covers.openlibrary.org/b/isbn/{isbns[0]}-L.jpg"
 
-                        raw_key = str(doc.get("key", "")).replace("/works/", "").strip()
-                        ol_key = raw_key if raw_key.startswith("OL") else None
-                        ext_id = f"openlibrary-{raw_key}" if raw_key else f"openlibrary-{isbns[0] if isbns else 'unknown'}"
+            raw_key = str(doc.get("key", "")).replace("/works/", "").strip()
+            ol_key = raw_key if raw_key.startswith("OL") else None
+            ext_id = f"openlibrary-{raw_key}" if raw_key else f"openlibrary-{isbns[0] if isbns else 'unknown'}"
 
-                        page_count = doc.get("number_of_pages_median") or doc.get("number_of_pages")
+            page_count = doc.get("number_of_pages_median") or doc.get("number_of_pages")
 
-                        item = SearchResultItem(
-                            external_id=ext_id,
-                            title=title,
-                            image_url=image_url,
-                            description=desc,
-                            item_type="book",
-                            release_date=str(first_publish) if first_publish else None,
-                            page_count=int(page_count) if page_count and str(page_count).isdigit() else None
-                        )
-                        results.append((item, isbns, ol_key))
-        except Exception as e:
-            logger.warning(f"Open Library search error for '{query}': {e}")
+            item = SearchResultItem(
+                external_id=ext_id,
+                title=title,
+                image_url=image_url,
+                description=desc,
+                item_type="book",
+                release_date=str(first_publish) if first_publish else None,
+                page_count=int(page_count) if page_count and str(page_count).isdigit() else None
+            )
+            results.append((item, isbns, ol_key))
 
         return results
 
@@ -337,97 +437,89 @@ class BookSearchService:
             work_key = clean_ext.replace("openlibrary-", "").replace("ol_", "").strip()
             # If it's a numeric ISBN instead of work key (OL...W)
             if work_key.isdigit():
-                cls._rate_limit_ol()
                 try:
                     url = f"https://openlibrary.org/isbn/{work_key}.json"
-                    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                    with urllib.request.urlopen(req, timeout=6) as res:
-                        if res.status == 200:
-                            data = json.loads(res.read().decode())
-                            title = data.get("title") or "Untitled Book"
-                            desc_raw = data.get("description")
-                            desc = desc_raw.get("value") if isinstance(desc_raw, dict) else (desc_raw or "")
-                            covers = data.get("covers") or []
-                            image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else f"https://covers.openlibrary.org/b/isbn/{work_key}-L.jpg"
-                            pub_date = data.get("publish_date")
-                            result = SearchResultItem(
-                                external_id=clean_ext,
-                                title=title,
-                                image_url=image_url,
-                                description=desc,
-                                item_type="book",
-                                release_date=pub_date,
-                                page_count=data.get("number_of_pages")
-                            )
-                            cls._details_cache[cache_key] = (now_ts, result)
-                            return result
-                except Exception:
-                    pass
-
-            cls._rate_limit_ol()
-            try:
-                url = f"https://openlibrary.org/works/{work_key}.json"
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=6) as res:
-                    if res.status == 200:
-                        data = json.loads(res.read().decode())
+                    data = cls._ol_request(url, timeout=6)
+                    if data and isinstance(data, dict):
                         title = data.get("title") or "Untitled Book"
                         desc_raw = data.get("description")
                         desc = desc_raw.get("value") if isinstance(desc_raw, dict) else (desc_raw or "")
                         covers = data.get("covers") or []
-                        image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else None
-
-                        # If work record does not have a direct cover, check first editions
-                        if not image_url:
-                            try:
-                                ed_url = f"https://openlibrary.org/works/{work_key}/editions.json?limit=3"
-                                ed_req = urllib.request.Request(ed_url, headers={"User-Agent": USER_AGENT})
-                                with urllib.request.urlopen(ed_req, timeout=4) as ed_res:
-                                    if ed_res.status == 200:
-                                        ed_data = json.loads(ed_res.read().decode())
-                                        for entry in ed_data.get("entries", []):
-                                            entry_covers = entry.get("covers") or []
-                                            if entry_covers and entry_covers[0] > 0:
-                                                image_url = f"https://covers.openlibrary.org/b/id/{entry_covers[0]}-L.jpg"
-                                                break
-                            except Exception:
-                                pass
-
-                        first_pub = data.get("first_publish_date")
-
-                        # If Open Library description is empty, check Inventaire summary
-                        if not desc:
-                            try:
-                                inv_url = f"https://inventaire.io/api/search?types=works&limit=1&search={urllib.parse.quote(title)}"
-                                inv_req = urllib.request.Request(inv_url, headers={"User-Agent": USER_AGENT})
-                                with urllib.request.urlopen(inv_req, timeout=4) as inv_res:
-                                    if inv_res.status == 200:
-                                        inv_data = json.loads(inv_res.read().decode())
-                                        results = inv_data.get("results", [])
-                                        if results:
-                                            first_uri = results[0].get("uri")
-                                            if first_uri:
-                                                sum_url = f"https://inventaire.io/api/data/summaries?uri={first_uri}"
-                                                sum_req = urllib.request.Request(sum_url, headers={"User-Agent": USER_AGENT})
-                                                with urllib.request.urlopen(sum_req, timeout=4) as sum_res:
-                                                    if sum_res.status == 200:
-                                                        sum_json = json.loads(sum_res.read().decode())
-                                                        summaries = sum_json.get("summaries", [])
-                                                        if summaries:
-                                                            desc = summaries[0].get("text") or ""
-                            except Exception:
-                                pass
-
+                        image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else f"https://covers.openlibrary.org/b/isbn/{work_key}-L.jpg"
+                        pub_date = data.get("publish_date")
                         result = SearchResultItem(
                             external_id=clean_ext,
                             title=title,
                             image_url=image_url,
                             description=desc,
                             item_type="book",
-                            release_date=str(first_pub) if first_pub else None
+                            release_date=pub_date,
+                            page_count=data.get("number_of_pages")
                         )
                         cls._details_cache[cache_key] = (now_ts, result)
                         return result
+                except Exception:
+                    pass
+
+            try:
+                url = f"https://openlibrary.org/works/{work_key}.json"
+                data = cls._ol_request(url, timeout=6)
+                if data and isinstance(data, dict):
+                    title = data.get("title") or "Untitled Book"
+                    desc_raw = data.get("description")
+                    desc = desc_raw.get("value") if isinstance(desc_raw, dict) else (desc_raw or "")
+                    covers = data.get("covers") or []
+                    image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else None
+
+                    # If work record does not have a direct cover, check first editions
+                    if not image_url:
+                        try:
+                            ed_url = f"https://openlibrary.org/works/{work_key}/editions.json?limit=3"
+                            ed_data = cls._ol_request(ed_url, timeout=4)
+                            if ed_data and isinstance(ed_data, dict):
+                                for entry in ed_data.get("entries", []):
+                                    entry_covers = entry.get("covers") or []
+                                    if entry_covers and entry_covers[0] > 0:
+                                        image_url = f"https://covers.openlibrary.org/b/id/{entry_covers[0]}-L.jpg"
+                                        break
+                        except Exception:
+                            pass
+
+                    first_pub = data.get("first_publish_date")
+
+                    # If Open Library description is empty, check Inventaire summary
+                    if not desc:
+                        try:
+                            inv_url = f"https://inventaire.io/api/search?types=works&limit=1&search={urllib.parse.quote(title)}"
+                            inv_req = urllib.request.Request(inv_url, headers={"User-Agent": USER_AGENT})
+                            with urllib.request.urlopen(inv_req, timeout=4) as inv_res:
+                                if inv_res.status == 200:
+                                    inv_data = json.loads(inv_res.read().decode())
+                                    results = inv_data.get("results", [])
+                                    if results:
+                                        first_uri = results[0].get("uri")
+                                        if first_uri:
+                                            sum_url = f"https://inventaire.io/api/data/summaries?uri={first_uri}"
+                                            sum_req = urllib.request.Request(sum_url, headers={"User-Agent": USER_AGENT})
+                                            with urllib.request.urlopen(sum_req, timeout=4) as sum_res:
+                                                if sum_res.status == 200:
+                                                    sum_json = json.loads(sum_res.read().decode())
+                                                    summaries = sum_json.get("summaries", [])
+                                                    if summaries:
+                                                        desc = summaries[0].get("text") or ""
+                        except Exception:
+                            pass
+
+                    result = SearchResultItem(
+                        external_id=clean_ext,
+                        title=title,
+                        image_url=image_url,
+                        description=desc,
+                        item_type="book",
+                        release_date=str(first_pub) if first_pub else None
+                    )
+                    cls._details_cache[cache_key] = (now_ts, result)
+                    return result
             except Exception as e:
                 logger.warning(f"Error fetching Open Library work {work_key}: {e}")
 
@@ -495,47 +587,50 @@ class BookSearchService:
         seen_keys: Set[str] = set()
         seen_titles: Set[str] = set()
 
-        cls._rate_limit_ol()
         try:
             url = "https://openlibrary.org/trending/daily.json?limit=35"
-            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=8) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for work in data.get("works", []):
-                        title = work.get("title") or "Untitled Book"
-                        norm = normalize_title(title)
-                        if norm in seen_titles:
-                            continue
+            data = cls._ol_request(url, timeout=8)
+            if data and isinstance(data, dict):
+                for work in data.get("works", []):
+                    title = work.get("title") or "Untitled Book"
+                    norm = normalize_title(title)
+                    if norm in seen_titles:
+                        continue
 
-                        authors = [a.get("name") for a in work.get("authors", []) if a.get("name")]
-                        author_str = f"Author: {authors[0]}." if authors else ""
-                        first_pub = work.get("first_publish_year")
-                        pub_str = f" First published: {first_pub}." if first_pub else ""
-                        desc = f"{author_str}{pub_str}"
+                    authors = [a.get("name") for a in work.get("authors", []) if a.get("name")]
+                    author_str = f"Author: {authors[0]}." if authors else ""
+                    first_pub = work.get("first_publish_year")
+                    pub_str = f" First published: {first_pub}." if first_pub else ""
+                    desc = f"{author_str}{pub_str}"
 
-                        if not is_safe_media_item(title, desc):
-                            continue
+                    if not is_safe_media_item(title, desc):
+                        continue
 
-                        cover_i = work.get("cover_i") or work.get("cover_id")
-                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg" if cover_i else None
-                        key_raw = str(work.get("key", "")).replace("/works/", "")
-                        ext_id = f"openlibrary-{key_raw}"
+                    cover_i = work.get("cover_i") or work.get("cover_id")
+                    cover_edition_key = work.get("cover_edition_key")
+                    image_url = None
+                    if cover_i:
+                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+                    elif cover_edition_key:
+                        image_url = f"https://covers.openlibrary.org/b/olid/{cover_edition_key}-L.jpg"
 
-                        if ext_id not in seen_keys:
-                            seen_keys.add(ext_id)
-                            seen_titles.add(norm)
-                            results.append(SearchResultItem(
-                                external_id=ext_id,
-                                title=title,
-                                image_url=image_url,
-                                description=desc,
-                                item_type="book",
-                                release_date=str(first_pub) if first_pub else None
-                            ))
+                    key_raw = str(work.get("key", "")).replace("/works/", "")
+                    ext_id = f"openlibrary-{key_raw}"
 
-                        if len(results) >= 24:
-                            break
+                    if ext_id not in seen_keys:
+                        seen_keys.add(ext_id)
+                        seen_titles.add(norm)
+                        results.append(SearchResultItem(
+                            external_id=ext_id,
+                            title=title,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="book",
+                            release_date=str(first_pub) if first_pub else None
+                        ))
+
+                    if len(results) >= 24:
+                        break
         except Exception as e:
             logger.warning(f"Open Library trending daily error: {e}")
 
@@ -567,7 +662,6 @@ class BookSearchService:
             ]
             return not any(b in t for b in blocked_terms)
 
-        cls._rate_limit_ol()
         try:
             # Query current year (e.g. 2026) first releases sorted by reader anticipation / demand
             params = urllib.parse.urlencode({
@@ -577,67 +671,64 @@ class BookSearchService:
                 "limit": 45
             })
             url = f"https://openlibrary.org/search.json?{params}"
-            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=8) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for doc in data.get("docs", []):
-                        title = doc.get("title") or "Untitled Book"
-                        pub_year = doc.get("first_publish_year")
-                        cover_i = doc.get("cover_i")
+            data = cls._ol_request(url, timeout=8)
+            if data and isinstance(data, dict):
+                for doc in data.get("docs", []):
+                    title = doc.get("title") or "Untitled Book"
+                    pub_year = doc.get("first_publish_year")
+                    cover_i = doc.get("cover_i")
 
-                        # Must have valid cover artwork and match current year
-                        if not cover_i or not pub_year:
+                    # Must have valid cover artwork and match current year
+                    if not cover_i or not pub_year:
+                        continue
+                    try:
+                        if int(pub_year) != current_year:
                             continue
-                        try:
-                            if int(pub_year) != current_year:
-                                continue
-                        except (ValueError, TypeError):
-                            continue
+                    except (ValueError, TypeError):
+                        continue
 
-                        if not is_suitable_book_release(title):
-                            continue
+                    if not is_suitable_book_release(title):
+                        continue
 
-                        key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
-                        if not key_raw:
-                            continue
-                        ext_id = f"openlibrary-{key_raw}"
+                    key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
+                    if not key_raw:
+                        continue
+                    ext_id = f"openlibrary-{key_raw}"
 
-                        norm = normalize_title(title)
-                        if ext_id in seen_keys or (norm and norm in seen_titles):
-                            continue
+                    norm = normalize_title(title)
+                    if ext_id in seen_keys or (norm and norm in seen_titles):
+                        continue
 
-                        authors = doc.get("author_name") or []
-                        author_str = f"Author: {authors[0]}." if authors else ""
-                        pub_str = f" First published: {pub_year}."
-                        desc = f"{author_str}{pub_str}".strip()
+                    authors = doc.get("author_name") or []
+                    author_str = f"Author: {authors[0]}." if authors else ""
+                    pub_str = f" First published: {pub_year}."
+                    desc = f"{author_str}{pub_str}".strip()
 
-                        if not is_safe_media_item(title, desc):
-                            continue
+                    if not is_safe_media_item(title, desc):
+                        continue
 
-                        seen_keys.add(ext_id)
-                        if norm:
-                            seen_titles.add(norm)
+                    seen_keys.add(ext_id)
+                    if norm:
+                        seen_titles.add(norm)
 
-                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+                    image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
 
-                        results.append(SearchResultItem(
-                            external_id=ext_id,
-                            title=title,
-                            image_url=image_url,
-                            description=desc,
-                            item_type="book",
-                            release_date=str(pub_year)
-                        ))
+                    results.append(SearchResultItem(
+                        external_id=ext_id,
+                        title=title,
+                        image_url=image_url,
+                        description=desc,
+                        item_type="book",
+                        release_date=str(pub_year)
+                    ))
 
-                        if len(results) >= 24:
-                            break
+                    if len(results) >= 24:
+                        break
         except Exception as e:
             logger.warning(f"Open Library new books error: {e}")
 
         # If current year has fewer than 16 items (e.g. at the beginning of the year), backfill with prior year
         if len(results) < 16:
-            cls._rate_limit_ol()
             try:
                 params = urllib.parse.urlencode({
                     "q": f"first_publish_year:{current_year - 1}",
@@ -646,11 +737,9 @@ class BookSearchService:
                     "limit": 25
                 })
                 url = f"https://openlibrary.org/search.json?{params}"
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=7) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for doc in data.get("docs", []):
+                data = cls._ol_request(url, timeout=7)
+                if data and isinstance(data, dict):
+                    for doc in data.get("docs", []):
                             title = doc.get("title") or "Untitled Book"
                             pub_year = doc.get("first_publish_year")
                             cover_i = doc.get("cover_i")

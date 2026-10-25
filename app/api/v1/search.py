@@ -47,6 +47,10 @@ def check_category_rate_limit_status(category: str) -> Optional[dict]:
         tvm_status = TVMazeService.get_rate_limit_status(category)
         if tvm_status:
             return tvm_status
+    elif category == "book":
+        book_status = BookSearchService.get_rate_limit_status()
+        if book_status:
+            return book_status
 
     svc_map = {
         "comic": "metron",
