@@ -838,7 +838,16 @@ export const Search: React.FC = () => {
   const exploreNewCategories = React.useMemo(() => {
     const items = exploreData?.nuevo || [];
     const cats = buildCategorizedList(items);
+    const now = new Date();
+    const twoWeeksForward = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const maxFutureDateStr = twoWeeksForward.toISOString().slice(0, 10);
+
     cats.forEach(c => {
+      // For movies in Novedades, strictly filter out films scheduled more than 2 weeks after current day
+      if (c.type === 'movie') {
+        c.items = c.items.filter(it => !it.release_date || it.release_date <= maxFutureDateStr);
+      }
+
       c.items.sort((a, b) => {
         if (!a.release_date) return 1;
         if (!b.release_date) return -1;

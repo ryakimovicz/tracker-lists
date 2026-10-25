@@ -337,7 +337,12 @@ class TraktService:
 
     @classmethod
     def get_new_movies(cls) -> List[SearchResultItem]:
-        cache_key = "_trakt_anticipated_new_movies_v1"
+        from datetime import datetime, timedelta
+        today = datetime.utcnow()
+        min_date = (today - timedelta(days=14)).strftime("%Y-%m-%d")
+        max_date = (today + timedelta(days=14)).strftime("%Y-%m-%d")
+
+        cache_key = f"_trakt_new_movies_window_{min_date}_{max_date}"
         now_ts = time.time()
         if cache_key in cls._search_cache:
             ts, data = cls._search_cache[cache_key]
@@ -348,46 +353,63 @@ class TraktService:
         if not client_id:
             return []
 
-        # Fetch anticipated / upcoming movies from Trakt
-        url = "https://api.trakt.tv/movies/anticipated?extended=full,images&limit=24"
         results: List[SearchResultItem] = []
         seen_ids = set()
+        from app.core.sfw_filter import is_safe_media_item
 
+        # 1. Official theatrical calendar: 14 days back (last week & current week) to 14 days forward (+2 weeks)
+        cal_url = f"https://api.trakt.tv/calendars/all/movies/{min_date}/28?extended=full,images"
         try:
-            req = urllib.request.Request(url, headers=cls._build_headers())
-            with urllib.request.urlopen(req, timeout=5) as res:
+            req = urllib.request.Request(cal_url, headers=cls._build_headers())
+            with urllib.request.urlopen(req, timeout=7) as res:
                 if res.status == 200:
                     data = json.loads(res.read().decode())
-                    from app.core.sfw_filter import is_safe_media_item
                     for entry in data:
                         movie_data = entry.get("movie")
-                        if movie_data:
-                            item = cls._format_movie_item(movie_data)
-                            if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
-                                seen_ids.add(item.external_id)
-                                results.append(item)
+                        if not movie_data:
+                            continue
+                        rel_date = entry.get("released") or movie_data.get("released")
+                        movie_year = movie_data.get("year") or 0
+                        # Enforce strict 4-week window (previous week, current week, and up to 2 weeks ahead)
+                        if not rel_date or str(rel_date) < min_date or str(rel_date) > max_date:
+                            continue
+                        # Exclude vintage catalog re-releases (e.g. 1991 movies)
+                        if movie_year < today.year - 1:
+                            continue
+                        movie_data["released"] = rel_date
+                        item = cls._format_movie_item(movie_data)
+                        if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
+                            seen_ids.add(item.external_id)
+                            results.append(item)
         except Exception as e:
-            print(f"Trakt get_new_movies (anticipated) error: {e}")
+            print(f"Trakt get_new_movies (calendar) error: {e}")
 
-        # If fewer than 18 items returned, supplement with popular releases
-        if len(results) < 18:
-            try:
-                pop_url = "https://api.trakt.tv/movies/popular?extended=full,images&limit=24"
-                req_p = urllib.request.Request(pop_url, headers=cls._build_headers())
-                with urllib.request.urlopen(req_p, timeout=5) as res_p:
-                    if res_p.status == 200:
-                        data_p = json.loads(res_p.read().decode())
-                        from app.core.sfw_filter import is_safe_media_item
-                        for movie_data in data_p:
-                            if movie_data:
-                                item = cls._format_movie_item(movie_data)
-                                if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
-                                    seen_ids.add(item.external_id)
-                                    results.append(item)
-                                if len(results) >= 24:
-                                    break
-            except Exception as e:
-                print(f"Trakt get_new_movies (popular fallback) error: {e}")
+        # 2. Box office supplement (films currently in theaters within the requested window)
+        try:
+            bo_url = "https://api.trakt.tv/movies/boxoffice?extended=full,images"
+            req_bo = urllib.request.Request(bo_url, headers=cls._build_headers())
+            with urllib.request.urlopen(req_bo, timeout=5) as res_bo:
+                if res_bo.status == 200:
+                    bo_data = json.loads(res_bo.read().decode())
+                    for entry in bo_data:
+                        movie_data = entry.get("movie")
+                        if not movie_data:
+                            continue
+                        rel_date = movie_data.get("released")
+                        movie_year = movie_data.get("year") or 0
+                        if not rel_date or str(rel_date) < min_date or str(rel_date) > max_date:
+                            continue
+                        if movie_year < today.year - 1:
+                            continue
+                        item = cls._format_movie_item(movie_data)
+                        if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
+                            seen_ids.add(item.external_id)
+                            results.append(item)
+        except Exception as e:
+            print(f"Trakt get_new_movies (box office) error: {e}")
+
+        # Sort descending by release date (upcoming films in next 14 days, followed by current & last week)
+        results.sort(key=lambda x: str(x.release_date or ""), reverse=True)
 
         if results:
             cls._search_cache[cache_key] = (now_ts, results)
