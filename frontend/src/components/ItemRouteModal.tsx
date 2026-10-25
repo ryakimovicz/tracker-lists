@@ -288,7 +288,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
   }
 
   // If rate limit active and no valid full item could be resolved
-  if (rateLimitInfo && (!item || (!item.title && !item.name))) {
+  if (rateLimitInfo && (!item || (!item.title && !item.name) || (!item.description && !item.image_url))) {
     const timeInfo = formatResetInfo(rateLimitInfo.resetAt, language);
     return (
       <div

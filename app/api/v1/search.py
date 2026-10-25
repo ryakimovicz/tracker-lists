@@ -39,6 +39,10 @@ def check_category_rate_limit_status(category: str) -> Optional[dict]:
         metron_status = MetronService.get_rate_limit_status()
         if metron_status:
             return metron_status
+    elif category == "movie":
+        trakt_status = TraktService.get_rate_limit_status()
+        if trakt_status:
+            return trakt_status
 
     svc_map = {
         "comic": "metron",
@@ -547,6 +551,12 @@ def get_movie_detail(
 
         detail = TraktService.get_movie_detail(movie_id)
         if not detail:
+            st_after = check_category_rate_limit_status("movie")
+            if st_after:
+                response.headers["X-Category-Rate-Limited"] = st_after["category"]
+                response.headers["X-Category-Rate-Limit-Reset"] = str(int(st_after["reset_at"]))
+                response.headers["X-Category-Rate-Limit-Reason"] = st_after["reason"]
+                response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
             raise HTTPException(status_code=404, detail="Movie not found")
         return detail
     except HTTPException:
@@ -1286,6 +1296,14 @@ def lookup_media_item(
         result_data["is_favorite"] = existing.is_favorite
         result_data["tracking_list_id"] = existing.tracking_list_id
         result_data["completed_at"] = existing.completed_at.isoformat() if existing.completed_at else None
+
+    if response is not None:
+        st_after = check_category_rate_limit_status(type_clean)
+        if st_after:
+            response.headers["X-Category-Rate-Limited"] = st_after["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st_after["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st_after["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
 
     return result_data
 
