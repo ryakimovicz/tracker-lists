@@ -82,12 +82,20 @@ export const renderMediaBadge = (
     borderColor = 'rgba(249, 115, 22, 0.5)';
   } else if (bLower === 'issue' || bLower === 'número' || bLower === 'numero') {
     label = isEs ? 'Número' : 'Issue';
-    icon = <BookOpen size={11} color="#a855f7" />;
-    borderColor = 'rgba(168, 85, 247, 0.5)';
+    icon = null;
+    borderColor = 'rgba(255, 255, 255, 0.25)';
   } else if (bLower === 'series' || bLower === 'serie') {
     label = isEs ? 'Serie' : 'Series';
     icon = <Tv size={11} color="#3b82f6" />;
     borderColor = 'rgba(59, 130, 246, 0.5)';
+  } else {
+    const numMatch = bLower.match(/^(\d+)\s*(números?|numeros?|issues?)$/);
+    if (numMatch) {
+      const count = numMatch[1];
+      label = isEs ? `${count} ${count === '1' ? 'Número' : 'Números'}` : `${count} ${count === '1' ? 'Issue' : 'Issues'}`;
+      icon = null;
+      borderColor = 'rgba(255, 255, 255, 0.25)';
+    }
   }
 
   if (inline) {

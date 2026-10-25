@@ -3,8 +3,10 @@ import urllib.request
 import urllib.parse
 import re
 import time
+import math
 import datetime
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Tuple, Optional, Any
 from app.core.config import settings
 from app.services.base import SearchResultItem
@@ -154,12 +156,32 @@ class MetronService:
                             release_date=iss.get("store_date") or iss.get("cover_date")
                         ))
 
-        # 2. Search series via issue #1 (returns matching series with issue #1 cover artwork)
-        issue1_data = _metron_request("issue/", {
-            "series_name": cleaned_query,
-            "number": "1",
-            "limit": 25
-        })
+        # 2. Concurrently fetch series metadata (for issue counts) and issue #1 (for covers)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            fut_issue1 = executor.submit(_metron_request, "issue/", {
+                "series_name": cleaned_query,
+                "number": "1",
+                "limit": 30
+            })
+            fut_series = executor.submit(_metron_request, "series/", {
+                "name": cleaned_query,
+                "limit": 50
+            })
+
+        series_data = fut_series.result()
+        series_counts: Dict[Any, int] = {}
+        if series_data and series_data.get("results"):
+            for s in series_data["results"]:
+                sid = s.get("id")
+                ic = s.get("issue_count")
+                if sid and ic is not None:
+                    series_counts[sid] = ic
+                s_title = (s.get("series") or s.get("name") or "").lower().strip()
+                if s_title and ic is not None:
+                    series_counts[s_title] = ic
+
+        issue1_data = fut_issue1.result()
+        missing_count_sids: List[Tuple[int, int]] = []
         if issue1_data:
             for iss in issue1_data.get("results", []):
                 s_info = iss.get("series", {})
@@ -177,9 +199,14 @@ class MetronService:
                 if not is_safe_media_item(full_title, desc):
                     continue
 
-                # Use cv_id if present for seamless backward compatibility, else metron_series_{id}
                 cv_id = s_info.get("cv_id")
                 ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+
+                ic = series_counts.get(s_id) or series_counts.get(s_name.lower())
+                if ic is None:
+                    missing_count_sids.append((s_id, len(results)))
+
+                badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
 
                 results.append(SearchResultItem(
                     external_id=ext_id,
@@ -187,16 +214,32 @@ class MetronService:
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
-                    badge=None,
+                    badge=badge_val,
+                    page_count=ic,
                     release_date=str(s_year) if s_year else None
                 ))
 
-        # 3. Fallback: Search series endpoint directly
+        # Fetch missing issue counts for top results (up to 5)
+        if missing_count_sids:
+            top_missing = missing_count_sids[:5]
+            def _fetch_single_series_count(t: Tuple[int, int]):
+                sid, idx = t
+                s_dt = _metron_request(f"series/{sid}/")
+                return idx, s_dt.get("issue_count") if s_dt else None
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                for idx, c in executor.map(_fetch_single_series_count, top_missing):
+                    if c is not None and c > 0:
+                        results[idx].page_count = c
+                        results[idx].badge = f"{c} {'Número' if c == 1 else 'Números'}"
+
+        # 3. Fallback: Search series endpoint directly if too few results
         if len(results) < 8:
-            series_data = _metron_request("series/", {
-                "name": cleaned_query,
-                "limit": 15
-            })
+            if not series_data:
+                series_data = _metron_request("series/", {
+                    "name": cleaned_query,
+                    "limit": 15
+                })
             if series_data:
                 for s in series_data.get("results", []):
                     s_id = s.get("id")
@@ -212,13 +255,17 @@ class MetronService:
                     cv_id = s.get("cv_id")
                     ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
 
+                    ic = s.get("issue_count") or series_counts.get(s_id)
+                    badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
+
                     results.append(SearchResultItem(
                         external_id=ext_id,
                         title=s_title,
                         image_url=None, # Loaded on detail
                         description=desc,
                         item_type="comic",
-                        badge=None,
+                        badge=badge_val,
+                        page_count=ic,
                         release_date=str(s_year) if s_year else None
                     ))
 
@@ -376,14 +423,18 @@ class MetronService:
         raw_issues = list(issues_res.get("results", []))
         total_count = issues_res.get("count", 0)
 
-        # Paginate if series has more than 100 issues (up to 500)
-        page = 2
-        while len(raw_issues) < total_count and len(raw_issues) < 500:
-            next_page = _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": page})
-            if not next_page or not next_page.get("results"):
-                break
-            raw_issues.extend(next_page["results"])
-            page += 1
+        # Paginate if series has more than 100 issues (fetch full issue list up to 3000 issues concurrently)
+        total_pages = math.ceil(total_count / 100)
+        if total_pages > 1:
+            def _fetch_issue_page(p: int):
+                return _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": p})
+
+            max_fetch_pages = min(total_pages + 1, 31)  # Up to 3,000 issues
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                pages_res = list(executor.map(_fetch_issue_page, range(2, max_fetch_pages)))
+            for p_res in pages_res:
+                if p_res and p_res.get("results"):
+                    raw_issues.extend(p_res["results"])
 
         # Sort numerically by issue number
         sorted_issues = sorted(raw_issues, key=lambda x: _parse_issue_num(x.get("number")))
@@ -594,6 +645,8 @@ class MetronService:
         seen_series_ids = set()
 
         if res and res.get("results"):
+            raw_trending = []
+            trending_sids = []
             for iss in res.get("results", []):
                 s_info = iss.get("series") or {}
                 s_id = s_info.get("id")
@@ -601,11 +654,26 @@ class MetronService:
                 if not s_id or not img_url or s_id in seen_series_ids:
                     continue
                 seen_series_ids.add(s_id)
+                trending_sids.append(s_id)
+                raw_trending.append((iss, s_info, s_id, img_url))
+                if len(raw_trending) >= 24:
+                    break
 
+            series_counts: Dict[int, int] = {}
+            def _fetch_series_count(sid: int):
+                s_data = _metron_request(f"series/{sid}/")
+                return sid, s_data.get("issue_count") if s_data else None
+
+            if trending_sids:
+                with ThreadPoolExecutor(max_workers=6) as executor:
+                    for sid, ic in executor.map(_fetch_series_count, trending_sids):
+                        if ic is not None:
+                            series_counts[sid] = ic
+
+            for iss, s_info, s_id, img_url in raw_trending:
                 s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
                 s_year = s_info.get("year_began") or current_year
                 title = f"{s_name} ({s_year})" if s_year else s_name
-                store_date = iss.get("store_date") or iss.get("cover_date") or str(s_year)
                 desc = iss.get("desc") or f"Comic series begun in {s_year}."
 
                 if not is_safe_media_item(title, desc):
@@ -613,6 +681,8 @@ class MetronService:
 
                 cv_id = s_info.get("cv_id")
                 ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+                ic = series_counts.get(s_id)
+                badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
 
                 results.append(SearchResultItem(
                     external_id=ext_id,
@@ -620,12 +690,10 @@ class MetronService:
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
-                    badge=None,
+                    badge=badge_val,
+                    page_count=ic,
                     release_date=str(s_year) if s_year else None
                 ))
-
-                if len(results) >= 24:
-                    break
 
         if results:
             _TRENDING_COMICS_CACHE[cache_key] = (now_ts, results)

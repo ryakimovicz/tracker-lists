@@ -1437,6 +1437,11 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
+/* On desktop, the media badge is already shown on the card poster, so hide the inline duplicate */
+.search-results-grid .search-item-card .search-media-badge-inline {
+  display: none !important;
+}
+
 @media (max-width: 768px) {
   /* Hide desktop sidebar */
   .sidebar {
@@ -2904,6 +2909,7 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Inline media badge inside the card body (e.g. 50 Números, DLC, Colección) */
   .search-results-grid .search-item-card .search-media-badge-inline {
+    display: inline-flex !important;
     font-size: 0.65rem !important;
     font-weight: 600 !important;
     padding: 0.1rem 0.4rem !important;
