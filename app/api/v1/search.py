@@ -478,9 +478,17 @@ def search_all_media(
 
 @router.get("/series/{series_id}/episodes")
 def get_all_episodes(
-    series_id: str
+    series_id: str,
+    response: Response
 ):
     try:
+        cat = "anime" if str(series_id).startswith("anime_") else "series"
+        st = check_category_rate_limit_status(cat)
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
         if str(series_id).startswith("anime_"):
             return AnilistService.get_anime_episodes(series_id)
         return TVMazeService.get_all_episodes(series_id)
@@ -493,9 +501,18 @@ def get_all_episodes(
 @router.get("/series/{series_id}")
 def get_series_detail(
     series_id: str,
-    request: Request
+    request: Request,
+    response: Response
 ):
     try:
+        cat = "anime" if str(series_id).startswith("anime_") else "series"
+        st = check_category_rate_limit_status(cat)
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+
         accept_lang = request.headers.get("Accept-Language", "es")
         parts = accept_lang.split("-")
         client_lang = parts[0].lower() if parts else "es"
@@ -517,9 +534,17 @@ def get_series_detail(
 
 @router.get("/movies/{movie_id}")
 def get_movie_detail(
-    movie_id: str
+    movie_id: str,
+    response: Response
 ):
     try:
+        st = check_category_rate_limit_status("movie")
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+
         detail = TraktService.get_movie_detail(movie_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Movie not found")
@@ -887,9 +912,17 @@ def get_game_relations(
 @router.get("/comic/volume/{vol_id}")
 def get_comic_volume_detail(
     vol_id: str,
-    request: Request
+    request: Request,
+    response: Response
 ):
     try:
+        st = check_category_rate_limit_status("comic")
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+
         detail = MetronService.get_comic_volume_detail(vol_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Comic volume not found")
@@ -903,9 +936,17 @@ def get_comic_volume_detail(
 @router.get("/comic/volume/{vol_id}/issues")
 def get_comic_volume_issues(
     vol_id: str,
-    request: Request
+    request: Request,
+    response: Response
 ):
     try:
+        st = check_category_rate_limit_status("comic")
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+
         return MetronService.get_comic_volume_issues(vol_id)
     except Exception as e:
         print(f"Error fetching issues for comic volume {vol_id}: {e}")
@@ -914,9 +955,17 @@ def get_comic_volume_issues(
 @router.get("/comic/issue/{issue_id}")
 def get_comic_issue_detail(
     issue_id: str,
-    request: Request
+    request: Request,
+    response: Response
 ):
     try:
+        st = check_category_rate_limit_status("comic")
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
+
         detail = MetronService.get_comic_issue_detail(issue_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Comic issue not found")
@@ -943,11 +992,20 @@ def get_manga_relations(
 def lookup_media_item(
     item_type: str = Query(..., description="Type of media (movie, series, anime, book, comic, manga, game, episode)"),
     external_id: str = Query(..., description="External ID of the media item"),
+    response: Response = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
     type_clean = item_type.lower().strip()
     ext_id_clean = str(external_id).strip()
+
+    if response is not None:
+        st = check_category_rate_limit_status(type_clean)
+        if st:
+            response.headers["X-Category-Rate-Limited"] = st["category"]
+            response.headers["X-Category-Rate-Limit-Reset"] = str(int(st["reset_at"]))
+            response.headers["X-Category-Rate-Limit-Reason"] = st["reason"]
+            response.headers["Access-Control-Expose-Headers"] = "X-Category-Rate-Limited, X-Category-Rate-Limit-Reset, X-Category-Rate-Limit-Reason"
 
     # 1. First check if it already exists in the user's library or database UserLibraryItem
     existing = None

@@ -1469,6 +1469,43 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [globalProgress, setGlobalProgress] = useState<Record<string, boolean>>({});
   const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [contentRateLimit, setContentRateLimit] = useState<{ category: string; resetAt: number; reason: string } | null>(null);
+
+  const formatContentResetInfo = (resetAtSecs: number, lang: string) => {
+    const isEs = lang === 'es';
+    const now = Date.now();
+    const resetMs = resetAtSecs * 1000;
+    const diffSecs = Math.max(0, Math.round((resetMs - now) / 1000));
+    const diffMins = Math.round(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const remMins = diffMins % 60;
+
+    const resetDate = new Date(resetMs);
+    const isToday = resetDate.toDateString() === new Date().toDateString();
+
+    const timeStr = resetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = resetDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+    let fullTimeDisplay = '';
+    if (isToday) {
+      fullTimeDisplay = isEs ? `Hoy a las ${timeStr} hs` : `Today at ${timeStr}`;
+    } else {
+      fullTimeDisplay = isEs ? `El ${dateStr} a las ${timeStr} hs` : `${dateStr} at ${timeStr}`;
+    }
+
+    let relativeDisplay = '';
+    if (diffHours > 0) {
+      relativeDisplay = isEs 
+        ? `en ~${diffHours} h${remMins > 0 ? ` ${remMins} min` : ''}` 
+        : `in ~${diffHours}h${remMins > 0 ? ` ${remMins}m` : ''}`;
+    } else if (diffMins > 0) {
+      relativeDisplay = isEs ? `en ~${diffMins} min` : `in ~${diffMins} min`;
+    } else {
+      relativeDisplay = isEs ? 'en unos instantes' : 'in a few moments';
+    }
+
+    return { fullTimeDisplay, relativeDisplay };
+  };
 
   
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -3539,11 +3576,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
           // Background network sync: always fetch latest episodes in background so newly released episodes appear seamlessly
           apiClient.get(`/search/series/${seriesId}/episodes`).then(res => {
+            const limCat = res.headers?.['x-category-rate-limited'];
+            const rst = Number(res.headers?.['x-category-rate-limit-reset'] || 0);
+            const rsn = res.headers?.['x-category-rate-limit-reason'] || 'temporary_limit';
+            if (limCat && rst > 0) {
+              setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+            }
+
             if (Array.isArray(res.data) && res.data.length > 0) {
               setCachedSeries(cacheKeyAll, res.data);
               processAllEps(res.data);
             }
-          }).catch(() => {}).finally(() => setIsLoadingSeasonEpisodes(false));
+          }).catch(err => {
+            const hdrs = err.response?.headers || {};
+            const limCat = hdrs['x-category-rate-limited'] || (err.response?.status === 429 ? 'series' : null);
+            const rst = Number(hdrs['x-category-rate-limit-reset'] || 0);
+            const rsn = hdrs['x-category-rate-limit-reason'] || (err.response?.status === 429 ? 'daily_limit' : 'temporary_limit');
+            if (limCat && rst > 0) {
+              setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+            }
+          }).finally(() => setIsLoadingSeasonEpisodes(false));
 
 
         if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
@@ -3562,6 +3614,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
           if (!cachedMeta || !cachedMeta.seasons) {
             apiClient.get(`/search/comic/volume/${volId}`).then(volRes => {
+              const limCat = volRes.headers?.['x-category-rate-limited'];
+              const rst = Number(volRes.headers?.['x-category-rate-limit-reset'] || 0);
+              const rsn = volRes.headers?.['x-category-rate-limit-reason'] || 'temporary_limit';
+              if (limCat && rst > 0) {
+                setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+              }
+
               const volData = volRes.data || {};
               let rawSeasons = volData?.seasons || [{ id: 1, season_number: 1, episode_count: volData.count_of_issues || 1 }];
               const currentYear = new Date().getFullYear();
@@ -3588,7 +3647,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 is_ended: isEndedVal,
                 series_status: statusVal
               } : null);
-            }).catch(console.error);
+            }).catch(err => {
+              const hdrs = err.response?.headers || {};
+              const limCat = hdrs['x-category-rate-limited'] || (err.response?.status === 429 ? 'comic' : null);
+              const rst = Number(hdrs['x-category-rate-limit-reset'] || 0);
+              const rsn = hdrs['x-category-rate-limit-reason'] || (err.response?.status === 429 ? 'daily_limit' : 'temporary_limit');
+              if (limCat && rst > 0) {
+                setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+              }
+            });
           } else {
             const currentYear = new Date().getFullYear();
             const startYrInt = parseInt(cachedMeta.start_year || cachedMeta.first_air_date || '0');
@@ -3613,11 +3680,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }
 
           apiClient.get(`/search/comic/volume/${volId}/issues`).then(res => {
+            const limCat = res.headers?.['x-category-rate-limited'];
+            const rst = Number(res.headers?.['x-category-rate-limit-reset'] || 0);
+            const rsn = res.headers?.['x-category-rate-limit-reason'] || 'temporary_limit';
+            if (limCat && rst > 0) {
+              setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+            }
+
             if (Array.isArray(res.data) && res.data.length > 0) {
               setCachedSeries(cacheKeyAll, res.data);
               processAllEps(res.data);
             }
-          }).catch(console.error).finally(() => setIsLoadingSeasonEpisodes(false));
+          }).catch(err => {
+            const hdrs = err.response?.headers || {};
+            const limCat = hdrs['x-category-rate-limited'] || (err.response?.status === 429 ? 'comic' : null);
+            const rst = Number(hdrs['x-category-rate-limit-reset'] || 0);
+            const rsn = hdrs['x-category-rate-limit-reason'] || (err.response?.status === 429 ? 'daily_limit' : 'temporary_limit');
+            if (limCat && rst > 0) {
+              setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
+            }
+          }).finally(() => setIsLoadingSeasonEpisodes(false));
 
           if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
             setIsLoadingSeasonEpisodes(true);
@@ -8068,6 +8150,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               ? seasonEpisodes[1]
                               : (Array.isArray(cachedAll) ? cachedAll : []);
 
+                            if (contentRateLimit && displayedIssues.length === 0 && (contentRateLimit.resetAt * 1000 > Date.now())) {
+                              const reset = formatContentResetInfo(contentRateLimit.resetAt, language);
+                              return (
+                                <div style={{
+                                  padding: '1rem',
+                                  margin: '0.25rem 0',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                                  background: 'rgba(245, 158, 11, 0.08)',
+                                  color: 'var(--text-primary)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  fontSize: '0.85rem'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
+                                    <Clock size={16} />
+                                    <span>{language === 'es' ? 'Límite de consultas alcanzado' : 'Rate limit reached'}</span>
+                                  </div>
+                                  <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                    {language === 'es'
+                                      ? 'Se ha alcanzado temporalmente el cupo de solicitudes de la API de cómics. No se pudieron cargar los números en este momento.'
+                                      : 'The API rate limit for comics has been reached. Issues could not be loaded at this time.'}
+                                  </p>
+                                  <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 500, marginTop: '0.2rem' }}>
+                                    {language === 'es'
+                                      ? `Disponible nuevamente: ${reset.fullTimeDisplay} (${reset.relativeDisplay})`
+                                      : `Available again: ${reset.fullTimeDisplay} (${reset.relativeDisplay})`}
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             if (isLoadingSeasonEpisodes && displayedIssues.length === 0) {
                               return (
                                 <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -8732,7 +8847,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                          onMouseDown={() => { hasUserScrolledSeasonContainerRef.current = true; }}
                                          style={{ position: 'relative', padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}
                                        >
-                                         {isLoadingSeasonEpisodes && displayedSeasonEps.length === 0 ? (
+                                         {contentRateLimit && displayedSeasonEps.length === 0 && (contentRateLimit.resetAt * 1000 > Date.now()) ? (
+                                            (() => {
+                                              const reset = formatContentResetInfo(contentRateLimit.resetAt, language);
+                                              return (
+                                                <div style={{
+                                                  padding: '1rem',
+                                                  margin: '0.25rem 0',
+                                                  borderRadius: '8px',
+                                                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                                                  background: 'rgba(245, 158, 11, 0.08)',
+                                                  color: 'var(--text-primary)',
+                                                  display: 'flex',
+                                                  flexDirection: 'column',
+                                                  gap: '0.4rem',
+                                                  fontSize: '0.85rem'
+                                                }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
+                                                    <Clock size={16} />
+                                                    <span>{language === 'es' ? 'Límite de consultas alcanzado' : 'Rate limit reached'}</span>
+                                                  </div>
+                                                  <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                                    {language === 'es'
+                                                      ? 'Se ha alcanzado temporalmente el cupo de solicitudes de la API de series. No se pudieron cargar los capítulos en este momento.'
+                                                      : 'The API rate limit has been reached. Episodes could not be loaded at this time.'}
+                                                  </p>
+                                                  <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 500, marginTop: '0.2rem' }}>
+                                                    {language === 'es'
+                                                      ? `Disponible nuevamente: ${reset.fullTimeDisplay} (${reset.relativeDisplay})`
+                                                      : `Available again: ${reset.fullTimeDisplay} (${reset.relativeDisplay})`}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })()
+                                          ) : isLoadingSeasonEpisodes && displayedSeasonEps.length === 0 ? (
                                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                              {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
                                            </div>
