@@ -10123,13 +10123,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </a>
                 )}
                 {selectedItem.item_type === 'book' && (
-                  (selectedItem.external_id || '').startsWith('openlibrary-') ? (
-                    <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Open Library
+                  (selectedItem.external_id || '').startsWith('inventaire-') ? (
+                    <a href="https://inventaire.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Inventaire
                     </a>
                   ) : (
-                    <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Google Books
+                    <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Open Library
                     </a>
                   )
                 )}

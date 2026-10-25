@@ -355,7 +355,7 @@ class LastFMService(metaclass=LastFMMeta):
 
     @classmethod
     def _fetch_artist_image(cls, artist_name: str) -> str:
-        """Fetches artist picture from Deezer API with song/album cross-referencing and popularity verification, falling back to iTunes"""
+        """Fetches artist picture from Deezer API with song/album cross-referencing and popularity verification."""
         if not artist_name:
             return ""
         key = artist_name.strip().lower()

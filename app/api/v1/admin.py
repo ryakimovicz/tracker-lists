@@ -237,34 +237,42 @@ def admin_search_franchises(
 
     results = []
     if item_type in ("comic", "manga"):
-        api_key = settings.COMIC_VINE_API_KEY
-        if api_key:
-            try:
-                encoded_q = urllib.parse.quote(query.strip())
-                url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,publisher&query={encoded_q}&limit=12"
-                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
-                with urllib.request.urlopen(req, timeout=7) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for it in data.get("results", []):
-                            res_type = it.get("resource_type")  # 'volume' or 'publisher'
-                            img_obj = it.get("image", {})
-                            img_url = img_obj.get("thumb_url") or img_obj.get("small_url") or img_obj.get("medium_url")
-                            pub_name = it.get("publisher", {}).get("name") if res_type == "volume" and it.get("publisher") else None
-                            
-                            results.append({
-                                "target_type": res_type,  # 'volume' or 'publisher'
-                                "target_id": f"cv_{res_type}_{it.get('id')}",
-                                "raw_id": it.get("id"),
-                                "name": it.get("name") or "Sin nombre",
-                                "publisher": pub_name,
-                                "count_of_issues": it.get("count_of_issues") if res_type == "volume" else None,
-                                "start_year": it.get("start_year"),
-                                "image_url": img_url,
-                                "item_type": item_type
-                            })
-            except Exception as e:
-                print(f"Admin search franchises error: {e}")
+        from app.services.metron import _metron_request
+        try:
+            s_data = _metron_request("series/", {"name": query.strip(), "limit": 10})
+            if s_data and s_data.get("results"):
+                for it in s_data["results"]:
+                    sid = it.get("id")
+                    pub = it.get("publisher", {})
+                    pub_name = pub.get("name") if isinstance(pub, dict) else None
+                    results.append({
+                        "target_type": "series",
+                        "target_id": f"metron_series_{sid}",
+                        "raw_id": sid,
+                        "name": it.get("series") or "Sin nombre",
+                        "publisher": pub_name,
+                        "count_of_issues": it.get("issue_count"),
+                        "start_year": it.get("year_began"),
+                        "image_url": None,
+                        "item_type": item_type
+                    })
+            p_data = _metron_request("publisher/", {"name": query.strip(), "limit": 4})
+            if p_data and p_data.get("results"):
+                for pub in p_data["results"]:
+                    pid = pub.get("id")
+                    results.append({
+                        "target_type": "publisher",
+                        "target_id": f"metron_publisher_{pid}",
+                        "raw_id": pid,
+                        "name": pub.get("name") or "Sin nombre",
+                        "publisher": None,
+                        "count_of_issues": None,
+                        "start_year": None,
+                        "image_url": pub.get("image"),
+                        "item_type": item_type
+                    })
+        except Exception as e:
+            print(f"Admin search franchises error: {e}")
 
     return results
 
@@ -280,7 +288,6 @@ def admin_resolve_franchise_from_media(
     so the admin can ban the entire franchise with one click.
     """
     import urllib.request, urllib.parse, re, json
-    from app.core.config import settings
 
     def clean_saga_name(t: str) -> str:
         if not t:
@@ -294,54 +301,56 @@ def admin_resolve_franchise_from_media(
     resolved_candidates = []
 
     if item_type in ("comic", "manga"):
-        api_key = settings.COMIC_VINE_API_KEY
-        raw_issue_id = external_id.replace("cv_issue_", "").replace("cv_", "")
+        from app.services.metron import _metron_request
+        clean_id = external_id.replace("metron_issue_", "").replace("metron_series_", "").replace("cv_issue_", "").replace("cv_vol_", "").replace("cv_", "")
         
-        # 1. If we have a comic issue ID, fetch the volume directly from Comic Vine API
-        if api_key and raw_issue_id.isdigit():
+        # 1. If we have a comic issue ID or series ID, resolve directly from Metron
+        if clean_id.isdigit():
             try:
-                url = f"https://comicvine.gamespot.com/api/issue/4000-{raw_issue_id}/?api_key={api_key}&format=json"
-                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
-                with urllib.request.urlopen(req, timeout=6) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        res = data.get("results", {})
-                        vol = res.get("volume")
-                        if vol and vol.get("id"):
-                            vol_img = vol.get("image", {})
-                            resolved_candidates.append({
-                                "target_type": "volume",
-                                "target_id": f"cv_volume_{vol.get('id')}",
-                                "name": vol.get("name") or title,
-                                "publisher": None,
-                                "image_url": vol_img.get("thumb_url") or vol_img.get("small_url"),
-                                "item_type": item_type
-                            })
+                if "issue" in external_id:
+                    iss_dt = _metron_request(f"issue/{clean_id}/")
+                    if iss_dt and iss_dt.get("series"):
+                        s_info = iss_dt["series"]
+                        resolved_candidates.append({
+                            "target_type": "series",
+                            "target_id": f"metron_series_{s_info.get('id')}",
+                            "name": s_info.get("name") or title,
+                            "publisher": None,
+                            "image_url": iss_dt.get("image"),
+                            "item_type": item_type
+                        })
+                else:
+                    s_dt = _metron_request(f"series/{clean_id}/")
+                    if s_dt:
+                        resolved_candidates.append({
+                            "target_type": "series",
+                            "target_id": f"metron_series_{s_dt.get('id')}",
+                            "name": s_dt.get("series") or title,
+                            "publisher": s_dt.get("publisher", {}).get("name") if isinstance(s_dt.get("publisher"), dict) else None,
+                            "image_url": None,
+                            "item_type": item_type
+                        })
             except Exception as e:
-                print(f"Error fetching issue volume directly: {e}")
+                print(f"Error fetching series directly from Metron: {e}")
 
-        # 2. Fallback / supplementary: search by extracted saga name if needed
+        # 2. Fallback / supplementary: search by extracted saga name in Metron series
         if not resolved_candidates and title:
             extracted_name = clean_saga_name(title)
-            if extracted_name and len(extracted_name) >= 2 and api_key:
+            if extracted_name and len(extracted_name) >= 2:
                 try:
-                    encoded_q = urllib.parse.quote(extracted_name)
-                    url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,publisher&query={encoded_q}&limit=5"
-                    req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
-                    with urllib.request.urlopen(req, timeout=6) as response:
-                        if response.status == 200:
-                            data = json.loads(response.read().decode())
-                            for it in data.get("results", []):
-                                res_type = it.get("resource_type")
-                                img_obj = it.get("image", {})
-                                resolved_candidates.append({
-                                    "target_type": res_type,
-                                    "target_id": f"cv_{res_type}_{it.get('id')}",
-                                    "name": it.get("name") or extracted_name,
-                                    "publisher": it.get("publisher", {}).get("name") if res_type == "volume" and it.get("publisher") else None,
-                                    "image_url": img_obj.get("thumb_url") or img_obj.get("small_url"),
-                                    "item_type": item_type
-                                })
+                    s_data = _metron_request("series/", {"name": extracted_name, "limit": 5})
+                    if s_data and s_data.get("results"):
+                        for it in s_data["results"]:
+                            pub = it.get("publisher", {})
+                            pub_name = pub.get("name") if isinstance(pub, dict) else None
+                            resolved_candidates.append({
+                                "target_type": "series",
+                                "target_id": f"metron_series_{it.get('id')}",
+                                "name": it.get("series") or extracted_name,
+                                "publisher": pub_name,
+                                "image_url": None,
+                                "item_type": item_type
+                            })
                 except Exception as e:
                     print(f"Error resolving saga name: {e}")
 
