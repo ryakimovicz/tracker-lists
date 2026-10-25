@@ -32,36 +32,100 @@ _TRENDING_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 
 import threading
 from collections import deque
+
 _rate_limit_lock = threading.Lock()
 _request_timestamps = deque()
+_blocked_until: float = 0.0  # Unix timestamp until which all Metron requests are paused (circuit breaker)
 
-def _rate_limit_metron():
-    """Ensure respectful spacing and strict adherence to Metron's 20 req/min limit."""
+def _update_rate_limit_from_headers(headers: Any):
+    """Inspect Metron rate limit headers to proactively back off before hitting 429."""
+    global _blocked_until
+    if not headers:
+        return
+    try:
+        burst_rem_str = headers.get("X-Ratelimit-Burst-Remaining")
+        burst_reset_str = headers.get("X-Ratelimit-Burst-Reset")
+        sustained_rem_str = headers.get("X-Ratelimit-Sustained-Remaining")
+
+        if burst_rem_str is not None:
+            burst_rem = int(burst_rem_str)
+            burst_reset = float(burst_reset_str) if burst_reset_str else 0.0
+            now = time.time()
+            # If 2 or fewer requests remain in this 60s burst window, proactively pause until reset
+            if burst_rem <= 2 and burst_reset > now:
+                with _rate_limit_lock:
+                    if burst_reset + 1.0 > _blocked_until:
+                        _blocked_until = burst_reset + 1.0
+                        logger.warning(
+                            f"Metron burst quota nearing limit ({burst_rem} remaining). "
+                            f"Proactively pausing all requests for {_blocked_until - now:.1f}s until reset."
+                        )
+
+        if sustained_rem_str is not None:
+            sustained_rem = int(sustained_rem_str)
+            if sustained_rem <= 50:
+                logger.error(f"Metron daily sustained limit critical: only {sustained_rem} requests remaining today!")
+    except Exception as e:
+        logger.debug(f"Failed to parse Metron rate limit headers: {e}")
+
+def _handle_429(headers: Any, url: str):
+    """Handle 429 Too Many Requests by activating an immediate global circuit breaker."""
+    global _blocked_until
+    wait_s = 60.0
+    try:
+        if headers:
+            burst_reset = headers.get("X-Ratelimit-Burst-Reset")
+            retry_after = headers.get("Retry-After")
+            if burst_reset:
+                wait_s = max(float(burst_reset) - time.time(), 5.0) + 1.5
+            elif retry_after:
+                wait_s = float(retry_after) + 1.5
+    except Exception:
+        pass
+
     with _rate_limit_lock:
         now = time.time()
-        # Remove timestamps older than 60 seconds
+        _blocked_until = now + wait_s
+
+    logger.error(f"Metron 429 rate limit reached for '{url}'. Global circuit breaker active for {wait_s:.1f}s. Halting requests.")
+
+def _rate_limit_metron():
+    """Ensure respectful spacing and strict adherence to Metron's limits (max 10 req/min, 1.5s spacing)."""
+    global _blocked_until
+    with _rate_limit_lock:
+        now = time.time()
+
+        # 1. Honor circuit breaker / proactive backoff
+        if _blocked_until > now:
+            wait_time = _blocked_until - now
+            logger.info(f"Metron rate limiter holding requests for {wait_time:.1f}s...")
+            time.sleep(wait_time)
+            now = time.time()
+
+        # 2. Sliding window: clean timestamps older than 60 seconds
         while _request_timestamps and _request_timestamps[0] <= now - 60.0:
             _request_timestamps.popleft()
 
-        # If at 18 requests in the last 60 seconds, wait until oldest expires
-        if len(_request_timestamps) >= 18:
-            sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.1
+        # 3. Conservative cap: max 10 requests per 60 seconds (Metron allows 20)
+        if len(_request_timestamps) >= 10:
+            sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.5
             if sleep_needed > 0:
+                logger.info(f"Metron client rate limit reached (10/min), sleeping for {sleep_needed:.1f}s...")
                 time.sleep(sleep_needed)
                 now = time.time()
                 while _request_timestamps and _request_timestamps[0] <= now - 60.0:
                     _request_timestamps.popleft()
 
-        # Also enforce a minimum spacing between consecutive requests
+        # 4. Enforce minimum spacing of 1.5 seconds between consecutive requests
         if _request_timestamps:
             elapsed = now - _request_timestamps[-1]
-            if elapsed < 0.4:
-                time.sleep(0.4 - elapsed)
+            if elapsed < 1.5:
+                time.sleep(1.5 - elapsed)
                 now = time.time()
 
         _request_timestamps.append(now)
 
-def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 10, max_retries: int = 2) -> Optional[dict]:
+def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 10) -> Optional[dict]:
     token = getattr(settings, "METRON_API_TOKEN", None)
     if not token:
         logger.warning("METRON_API_TOKEN is not configured in settings")
@@ -79,32 +143,26 @@ def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, time
         "Accept": "application/json"
     }
 
-    for attempt in range(max_retries + 1):
-        _rate_limit_metron()
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                if response.status == 200:
-                    return json.loads(response.read().decode())
-                elif response.status == 429:
-                    retry_after = int(response.headers.get("Retry-After", 2))
-                    time.sleep(min(retry_after, 4))
-                    continue
-        except urllib.error.HTTPError as he:
-            if he.code == 429 and attempt < max_retries:
-                retry_after = 2
-                try:
-                    retry_after = int(he.headers.get("Retry-After", 2))
-                except Exception:
-                    pass
-                logger.info(f"Metron 429 received, retrying in {retry_after}s (attempt {attempt + 1}/{max_retries})...")
-                time.sleep(min(retry_after, 4))
-                continue
-            logger.warning(f"Metron HTTP {he.code} for '{url}': {he}")
+    _rate_limit_metron()
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            _update_rate_limit_from_headers(response.headers)
+            if response.status == 200:
+                return json.loads(response.read().decode())
+            elif response.status == 429:
+                _handle_429(response.headers, url)
+                return None
+    except urllib.error.HTTPError as he:
+        _update_rate_limit_from_headers(he.headers)
+        if he.code == 429:
+            _handle_429(he.headers, url)
             return None
-        except Exception as e:
-            logger.warning(f"Metron request error for '{url}': {e}")
-            return None
+        logger.warning(f"Metron HTTP {he.code} for '{url}': {he}")
+        return None
+    except Exception as e:
+        logger.warning(f"Metron request error for '{url}': {e}")
+        return None
 
     return None
 
@@ -188,19 +246,17 @@ class MetronService:
                             release_date=iss.get("store_date") or iss.get("cover_date")
                         ))
 
-        # 2. Concurrently fetch series metadata (for issue counts) and issue #1 (for covers)
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            fut_issue1 = executor.submit(_metron_request, "issue/", {
-                "series_name": cleaned_query,
-                "number": "1",
-                "limit": 30
-            })
-            fut_series = executor.submit(_metron_request, "series/", {
-                "name": cleaned_query,
-                "limit": 50
-            })
+        # 2. Sequentially fetch issue #1 (for covers) and series metadata (for issue counts)
+        issue1_data = _metron_request("issue/", {
+            "series_name": cleaned_query,
+            "number": "1",
+            "limit": 30
+        })
+        series_data = _metron_request("series/", {
+            "name": cleaned_query,
+            "limit": 50
+        })
 
-        series_data = fut_series.result()
         series_counts: Dict[Any, int] = {}
         if series_data and series_data.get("results"):
             for s in series_data["results"]:
@@ -212,7 +268,6 @@ class MetronService:
                 if s_title and ic is not None:
                     series_counts[s_title] = ic
 
-        issue1_data = fut_issue1.result()
         missing_count_sids: List[Tuple[int, int]] = []
         if issue1_data:
             for iss in issue1_data.get("results", []):
@@ -251,16 +306,12 @@ class MetronService:
                     release_date=str(s_year) if s_year else None
                 ))
 
-        # Fetch missing issue counts for top results (up to 5)
+        # Fetch missing issue counts for top results (up to 2, sequentially)
         if missing_count_sids:
-            top_missing = missing_count_sids[:5]
-            def _fetch_single_series_count(t: Tuple[int, int]):
-                sid, idx = t
+            for sid, idx in missing_count_sids[:2]:
                 s_dt = _metron_request(f"series/{sid}/")
-                return idx, s_dt.get("issue_count") if s_dt else None
-
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                for idx, c in executor.map(_fetch_single_series_count, top_missing):
+                if s_dt:
+                    c = s_dt.get("issue_count")
                     if c is not None and c > 0:
                         results[idx].page_count = c
                         results[idx].badge = f"{c} {'Número' if c == 1 else 'Números'}"
@@ -455,18 +506,16 @@ class MetronService:
         raw_issues = list(issues_res.get("results", []))
         total_count = issues_res.get("count", 0)
 
-        # Paginate if series has more than 100 issues (fetch full issue list up to 10,000 issues concurrently)
+        # Paginate sequentially if series has more than 100 issues (strictly avoid concurrent workers)
         total_pages = math.ceil(total_count / 100)
         if total_pages > 1:
-            def _fetch_issue_page(p: int):
-                return _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": p})
-
-            max_fetch_pages = min(total_pages + 1, 101)  # Up to 10,000 issues
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                pages_res = list(executor.map(_fetch_issue_page, range(2, max_fetch_pages)))
-            for p_res in pages_res:
+            max_fetch_pages = min(total_pages + 1, 11)  # Up to 1,000 issues sequentially
+            for p in range(2, max_fetch_pages):
+                p_res = _metron_request(f"series/{s_id}/issue_list/", {"limit": 100, "page": p})
                 if p_res and p_res.get("results"):
                     raw_issues.extend(p_res["results"])
+                else:
+                    break
 
         # Sort chronologically by publication date, then numerically by issue number
         def _issue_chronological_key(x: dict):

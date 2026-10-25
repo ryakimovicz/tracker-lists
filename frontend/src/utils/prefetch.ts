@@ -47,36 +47,10 @@ export const prefetchMediaDetails = (item: any) => {
         }
       }).catch(() => {});
     }
-  } else if (type === 'comic' || extId.startsWith('cv_vol_') || extId.startsWith('cv_issue_')) {
-    if (extId.startsWith('cv_issue_') || extId.startsWith('4000-')) {
-      const cacheKeyIssue = `issue_${extId}`;
-      if (!getCachedSeries(cacheKeyIssue)) {
-        apiClient.get(`/search/comic/issue/${extId}`).then(res => {
-          if (res.data) setCachedSeries(cacheKeyIssue, res.data);
-        }).catch(() => {});
-      }
-    } else {
-      const cacheKeyMeta = `${extId}_metadata`;
-      const cacheKeyAll = `${extId}_all_episodes`;
-
-      if (!getCachedSeries(cacheKeyMeta)) {
-        apiClient.get(`/search/comic/volume/${extId}`).then(res => {
-          if (res.data) {
-            const volData = res.data || {};
-            const rawSeasons = volData?.seasons || [{ id: 1, season_number: 1, episode_count: volData.count_of_issues || 1 }];
-            setCachedSeries(cacheKeyMeta, { ...volData, seasons: rawSeasons });
-          }
-        }).catch(() => {});
-      }
-
-      if (!getCachedSeries(cacheKeyAll)) {
-        apiClient.get(`/search/comic/volume/${extId}/issues`).then(res => {
-          if (Array.isArray(res.data) && res.data.length > 0) {
-            setCachedSeries(cacheKeyAll, res.data);
-          }
-        }).catch(() => {});
-      }
-    }
+  } else if (type === 'comic' || extId.startsWith('cv_vol_') || extId.startsWith('cv_issue_') || extId.startsWith('metron_')) {
+    // Intentionally skipped: Metron API enforces a strict 20 req/min limit.
+    // Comics are loaded on-demand when the user clicks the card to open ItemDetailsModal.
+    return;
   } else if (type === 'game') {
     const cacheKeyRel = `game_rel_${extId}`;
     if (!getCachedSeries(cacheKeyRel)) {
