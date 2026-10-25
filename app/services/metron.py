@@ -664,7 +664,7 @@ class MetronService:
 
     @classmethod
     def get_trending_comics(cls) -> List[SearchResultItem]:
-        cache_key = "metron_trending_comics_wiki_v1"
+        cache_key = "metron_trending_comics_wiki_v2"
         now_ts = time.time()
         if cache_key in _TRENDING_COMICS_CACHE:
             ts, data = _TRENDING_COMICS_CACHE[cache_key]
@@ -679,274 +679,80 @@ class MetronService:
         end_str = end_dt.strftime("%Y%m%d")
 
         candidates = [
-            {
-                "name": "Absolute Superman",
-                "wiki": "Superman",
-                "title": "Absolute Superman (2025)",
-                "year": "2025",
-                "img": "https://static.metron.cloud/media/issue/2024/11/06/absolute-superman-1.jpg",
-                "desc": "The Man of Steel in DC's new Absolute Universe.",
-                "ext_id": "metron_series_8400"
-            },
-            {
-                "name": "Teenage Mutant Ninja Turtles",
-                "wiki": "Teenage_Mutant_Ninja_Turtles",
-                "title": "Teenage Mutant Ninja Turtles (2024)",
-                "year": "2024",
-                "img": "https://static.metron.cloud/media/issue/2024/07/26/tmnt-1.jpg",
-                "desc": "The legendary Ninja Turtles in their acclaimed modern run.",
-                "ext_id": "metron_series_7881"
-            },
-            {
-                "name": "Absolute Batman",
-                "wiki": "Absolute_Batman",
-                "title": "Absolute Batman (2024)",
-                "year": "2024",
-                "img": "https://static.metron.cloud/media/issue/2024/07/26/absolute-batman-1.jpg",
-                "desc": "DC's Absolute Universe reimagining of Batman by Scott Snyder.",
-                "ext_id": "metron_series_8350"
-            },
-            {
-                "name": "Watchmen",
-                "wiki": "Watchmen",
-                "title": "Watchmen (1986)",
-                "year": "1986",
-                "img": "https://static.metron.cloud/media/issue/2019/08/19/watchmen-1.jpg",
-                "desc": "Alan Moore and Dave Gibbons' groundbreaking graphic novel masterpiece.",
-                "ext_id": "metron_series_537"
-            },
-            {
-                "name": "X-Men",
-                "wiki": "X-Men",
-                "title": "X-Men (2024)",
-                "year": "2024",
-                "img": "https://static.metron.cloud/media/issue/2024/07/10/x-men-1.jpg",
-                "desc": "Marvel's flagship mutant ongoing series in the From the Ashes era.",
-                "ext_id": "metron_series_7700"
-            },
-            {
-                "name": "V for Vendetta",
-                "wiki": "V_for_Vendetta",
-                "title": "V for Vendetta (1988)",
-                "year": "1988",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/v-for-vendetta-1.jpg",
-                "desc": "Alan Moore and David Lloyd's iconic dystopian graphic novel.",
-                "ext_id": "metron_series_5676"
-            },
-            {
-                "name": "Hellboy",
-                "wiki": "Hellboy",
-                "title": "Hellboy: Seed of Destruction (1994)",
-                "year": "1994",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/hellboy-1.jpg",
-                "desc": "Mike Mignola's supernatural detective masterpiece.",
-                "ext_id": "metron_series_52"
-            },
-            {
-                "name": "Maus",
-                "wiki": "Maus",
-                "title": "Maus: A Survivor's Tale (1986)",
-                "year": "1986",
-                "img": "https://static.metron.cloud/media/issue/2026/03/16/large-6702113.jpg",
-                "desc": "Art Spiegelman's Pulitzer Prize-winning graphic novel.",
-                "ext_id": "metron_series_15420"
-            },
-            {
-                "name": "Invincible",
-                "wiki": "Invincible_(comics)",
-                "title": "Invincible (2003)",
-                "year": "2003",
-                "img": "https://static.metron.cloud/media/issue/2021/04/10/invincible-1.jpg",
-                "desc": "Robert Kirkman's beloved superhero comic epic.",
-                "ext_id": "metron_series_2186"
-            },
-            {
-                "name": "The Sandman",
-                "wiki": "The_Sandman_(comic_book)",
-                "title": "Sandman (1989)",
-                "year": "1989",
-                "img": "https://static.metron.cloud/media/issue/2022/04/07/the-sandman-1.jpg",
-                "desc": "Neil Gaiman's acclaimed dark fantasy comic book series.",
-                "ext_id": "metron_series_3315"
-            },
-            {
-                "name": "The Dark Knight Returns",
-                "wiki": "The_Dark_Knight_Returns",
-                "title": "Batman: The Dark Knight (1986)",
-                "year": "1986",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-the-dark-knight-1.jpg",
-                "desc": "Frank Miller's seminal dark vision of an aging Bruce Wayne.",
-                "ext_id": "metron_series_6891"
-            },
-            {
-                "name": "The Walking Dead",
-                "wiki": "The_Walking_Dead_(comic_book)",
-                "title": "The Walking Dead (2003)",
-                "year": "2003",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/the-walking-dead-1.jpg",
-                "desc": "Robert Kirkman and Charlie Adlard's global zombie phenomenon.",
-                "ext_id": "metron_series_376"
-            },
-            {
-                "name": "Batman: The Killing Joke",
-                "wiki": "Batman:_The_Killing_Joke",
-                "title": "Batman: The Killing Joke (1988)",
-                "year": "1988",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-the-killing-joke-1.jpg",
-                "desc": "The origin of the Joker by Alan Moore and Brian Bolland.",
-                "ext_id": "metron_series_761"
-            },
-            {
-                "name": "Scott Pilgrim",
-                "wiki": "Scott_Pilgrim",
-                "title": "Scott Pilgrim EX (2026)",
-                "year": "2026",
-                "img": "https://static.metron.cloud/media/issue/2026/04/10/scott-pilgrim.jpg",
-                "desc": "Bryan Lee O'Malley's iconic graphic novel saga.",
-                "ext_id": "metron_series_17521"
-            },
-            {
-                "name": "Persepolis",
-                "wiki": "Persepolis_(comics)",
-                "title": "Persepolis GN (2003)",
-                "year": "2003",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/persepolis.jpg",
-                "desc": "Marjane Satrapi's autobiographical graphic novel.",
-                "ext_id": "metron_series_820"
-            },
-            {
-                "name": "Something Is Killing the Children",
-                "wiki": "Something_Is_Killing_the_Children",
-                "title": "Something Is Killing the Children (2019)",
-                "year": "2019",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/something-is-killing-the-children-1.jpg",
-                "desc": "James Tynion IV and Werther Dell'Edera's hit horror series.",
-                "ext_id": "metron_series_614"
-            },
-            {
-                "name": "Batman: Year One",
-                "wiki": "Batman:_Year_One",
-                "title": "Batman: Year One (2005)",
-                "year": "2005",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/batman-year-one.jpg",
-                "desc": "Frank Miller and David Mazzucchelli's definitive Batman origin.",
-                "ext_id": "metron_series_17378"
-            },
-            {
-                "name": "Saga",
-                "wiki": "Saga_(comics)",
-                "title": "Saga (2012)",
-                "year": "2012",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/saga-1.jpg",
-                "desc": "Brian K. Vaughan and Fiona Staples' epic space opera.",
-                "ext_id": "metron_series_916"
-            },
-            {
-                "name": "Ultimate Spider-Man",
-                "wiki": "Ultimate_Spider-Man",
-                "title": "Ultimate Spider-Man (2024)",
-                "year": "2024",
-                "img": "https://static.metron.cloud/media/issue/2024/01/10/ultimate-spider-man-1.jpg",
-                "desc": "Jonathan Hickman and Marco Checchetto's hit new Ultimate series.",
-                "ext_id": "metron_series_6600"
-            },
-            {
-                "name": "Sin City",
-                "wiki": "Sin_City",
-                "title": "Sin City: A Dame to Kill For (1993)",
-                "year": "1993",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/sin-city-1.jpg",
-                "desc": "Frank Miller's hardboiled noir graphic novel series.",
-                "ext_id": "metron_series_6128"
-            },
-            {
-                "name": "Preacher",
-                "wiki": "Preacher_(comics)",
-                "title": "Preacher (1995)",
-                "year": "1995",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/preacher-1.jpg",
-                "desc": "Garth Ennis and Steve Dillon's subversive Vertigo classic.",
-                "ext_id": "metron_series_4970"
-            },
-            {
-                "name": "Locke & Key",
-                "wiki": "Locke_%26_Key",
-                "title": "Locke & Key (2008)",
-                "year": "2008",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/locke-and-key-1.jpg",
-                "desc": "Joe Hill and Gabriel Rodriguez's acclaimed horror-fantasy.",
-                "ext_id": "metron_series_482"
-            },
-            {
-                "name": "Transformers",
-                "wiki": "Transformers_(comics)",
-                "title": "Transformers (2023)",
-                "year": "2023",
-                "img": "https://static.metron.cloud/media/issue/2023/10/04/transformers-1.jpg",
-                "desc": "Daniel Warren Johnson's Eisner-winning Energon Universe series.",
-                "ext_id": "metron_series_6100"
-            },
-            {
-                "name": "Blacksad",
-                "wiki": "Blacksad",
-                "title": "Blacksad (2010)",
-                "year": "2010",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/blacksad.jpg",
-                "desc": "Juan Díaz Canales and Juanjo Guarnido's celebrated anthropomorphic noir masterpiece.",
-                "ext_id": "metron_series_1100"
-            },
-            {
-                "name": "Monstress",
-                "wiki": "Monstress_(comics)",
-                "title": "Monstress (2015)",
-                "year": "2015",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/monstress-1.jpg",
-                "desc": "Marjorie Liu and Sana Takeda's award-winning dark fantasy.",
-                "ext_id": "metron_series_890"
-            },
-            {
-                "name": "Transmetropolitan",
-                "wiki": "Transmetropolitan",
-                "title": "Transmetropolitan (1997)",
-                "year": "1997",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/transmetropolitan-1.jpg",
-                "desc": "Warren Ellis and Darick Robertson's cyberpunk satire.",
-                "ext_id": "metron_series_5500"
-            },
-            {
-                "name": "Spawn",
-                "wiki": "Spawn_(comics)",
-                "title": "Spawn (1992)",
-                "year": "1992",
-                "img": "https://static.metron.cloud/media/issue/2020/07/19/spawn-1.jpg",
-                "desc": "Todd McFarlane's record-breaking independent superhero series.",
-                "ext_id": "metron_series_120"
-            }
+            {"title": "Absolute Batman (2024)", "wiki": "Absolute_Batman", "year": "2024", "desc": "DC's Absolute Universe reimagining of Batman by Scott Snyder and Nick Dragotta.", "ext_id": "metron_series_8477"},
+            {"title": "Absolute Superman (2025)", "wiki": "Absolute_Superman", "year": "2025", "desc": "The Man of Steel reimagined in DC's new Absolute Universe by Jason Aaron.", "ext_id": "metron_series_8746"},
+            {"title": "Watchmen (1986)", "wiki": "Watchmen", "year": "1986", "desc": "Alan Moore and Dave Gibbons' groundbreaking graphic novel masterpiece.", "ext_id": "metron_series_537"},
+            {"title": "The Boys (2006)", "wiki": "The_Boys_(comics)", "year": "2006", "desc": "Garth Ennis and Darick Robertson's subversive superhero satire.", "ext_id": "metron_series_3607"},
+            {"title": "Maus (1986)", "wiki": "Maus", "year": "1986", "desc": "Art Spiegelman's Pulitzer Prize-winning graphic novel.", "ext_id": "metron_series_15420"},
+            {"title": "The Sandman (1989)", "wiki": "The_Sandman_(comic_book)", "year": "1989", "desc": "Neil Gaiman's legendary dark fantasy masterpiece from Vertigo/DC.", "ext_id": "metron_series_3315"},
+            {"title": "Teenage Mutant Ninja Turtles (2024)", "wiki": "Teenage_Mutant_Ninja_Turtles_(comic_book)", "year": "2024", "desc": "The legendary Ninja Turtles in their acclaimed modern comic run.", "ext_id": "metron_series_7881"},
+            {"title": "X-Men (2024)", "wiki": "X-Men_(comic_book)", "year": "2024", "desc": "Marvel's 'From the Ashes' flagship mutant ongoing series by Jed MacKay.", "ext_id": "metron_series_7700"},
+            {"title": "V for Vendetta (1988)", "wiki": "V_for_Vendetta", "year": "1988", "desc": "Alan Moore and David Lloyd's dystopian graphic novel masterpiece.", "ext_id": "metron_series_5676"},
+            {"title": "Invincible (2003)", "wiki": "Invincible_(comics)", "year": "2003", "desc": "Robert Kirkman, Cory Walker and Ryan Ottley's celebrated superhero saga.", "ext_id": "metron_series_2186"},
+            {"title": "The Walking Dead (2003)", "wiki": "The_Walking_Dead_(comic_book)", "year": "2003", "desc": "Robert Kirkman and Charlie Adlard's landmark zombie survival epic.", "ext_id": "metron_series_376"},
+            {"title": "Batman: The Killing Joke (1988)", "wiki": "Batman:_The_Killing_Joke", "year": "1988", "desc": "Alan Moore and Brian Bolland's definitive Joker story.", "ext_id": "metron_series_6246"},
+            {"title": "The Dark Knight Returns (1986)", "wiki": "The_Dark_Knight_Returns", "year": "1986", "desc": "Frank Miller, Klaus Janson and Lynn Varley's defining Batman classic.", "ext_id": "metron_series_6245"},
+            {"title": "Scott Pilgrim (2004)", "wiki": "Scott_Pilgrim", "year": "2004", "desc": "Bryan Lee O'Malley's acclaimed graphic novel series.", "ext_id": "metron_series_13815"},
+            {"title": "Something Is Killing the Children (2019)", "wiki": "Something_Is_Killing_the_Children", "year": "2019", "desc": "James Tynion IV and Werther Dell'Edera's hit horror series.", "ext_id": "metron_series_1111"},
+            {"title": "Saga (2012)", "wiki": "Saga_(comics)", "year": "2012", "desc": "Brian K. Vaughan and Fiona Staples' acclaimed sci-fi fantasy space opera.", "ext_id": "metron_series_14947"},
+            {"title": "Spawn (1992)", "wiki": "Spawn_(comics)", "year": "1992", "desc": "Todd McFarlane's record-breaking independent superhero series.", "ext_id": "metron_series_120"},
+            {"title": "Hellboy: Seed of Destruction (1994)", "wiki": "Hellboy", "year": "1994", "desc": "Mike Mignola's legendary paranormal dark fantasy comic.", "ext_id": "metron_series_52"},
+            {"title": "Batman: Year One (1987)", "wiki": "Batman:_Year_One", "year": "1987", "desc": "Frank Miller and David Mazzucchelli's canonical Batman origin.", "ext_id": "metron_series_6247"},
+            {"title": "Persepolis (2000)", "wiki": "Persepolis_(comics)", "year": "2000", "desc": "Marjane Satrapi's autobiographical graphic novel masterpiece.", "ext_id": "metron_series_12987"},
+            {"title": "Preacher (1995)", "wiki": "Preacher_(comics)", "year": "1995", "desc": "Garth Ennis and Steve Dillon's subversive Vertigo classic.", "ext_id": "metron_series_9651"},
+            {"title": "The Amazing Spider-Man (1963)", "wiki": "The_Amazing_Spider-Man", "year": "1963", "desc": "Stan Lee and Steve Ditko's legendary flagship superhero series.", "ext_id": "metron_series_10958"},
+            {"title": "Monstress (2015)", "wiki": "Monstress_(comics)", "year": "2015", "desc": "Marjorie Liu and Sana Takeda's award-winning dark fantasy saga.", "ext_id": "metron_series_3742"},
+            {"title": "Blacksad (2000)", "wiki": "Blacksad", "year": "2000", "desc": "Juan Díaz Canales and Juanjo Guarnido's acclaimed anthropomorphic noir.", "ext_id": "metron_series_6178"},
+            {"title": "Sin City (1991)", "wiki": "Sin_City", "year": "1991", "desc": "Frank Miller's definitive neo-noir crime comic masterpiece.", "ext_id": "metron_series_2500"},
+            {"title": "Batman: The Long Halloween (1996)", "wiki": "Batman:_The_Long_Halloween", "year": "1996", "desc": "Jeph Loeb and Tim Sale's iconic Gotham mystery noir.", "ext_id": "metron_series_3200"},
+            {"title": "Y: The Last Man (2002)", "wiki": "Y:_The_Last_Man", "year": "2002", "desc": "Brian K. Vaughan and Pia Guerra's post-apocalyptic Vertigo epic.", "ext_id": "metron_series_3300"},
+            {"title": "Civil War (2006)", "wiki": "Civil_War_(comics)", "year": "2006", "desc": "Mark Millar and Steve McNiven's Marvel crossover blockbuster.", "ext_id": "metron_series_4100"},
+            {"title": "The Infinity Gauntlet (1991)", "wiki": "The_Infinity_Gauntlet", "year": "1991", "desc": "Jim Starlin, George Pérez and Ron Lim's cosmic Marvel epic.", "ext_id": "metron_series_1400"},
+            {"title": "All-Star Superman (2005)", "wiki": "All-Star_Superman", "year": "2005", "desc": "Grant Morrison and Frank Quitely's acclaimed Superman classic.", "ext_id": "metron_series_2200"},
+            {"title": "Paper Girls (2015)", "wiki": "Paper_Girls", "year": "2015", "desc": "Brian K. Vaughan and Cliff Chiang's sci-fi mystery series.", "ext_id": "metron_series_3800"},
+            {"title": "Bone (1991)", "wiki": "Bone_(comics)", "year": "1991", "desc": "Jeff Smith's legendary high fantasy epic.", "ext_id": "metron_series_1600"},
+            {"title": "Ultimate Spider-Man (2000)", "wiki": "Ultimate_Spider-Man", "year": "2000", "desc": "Brian Michael Bendis and Mark Bagley's landmark Marvel reboot.", "ext_id": "metron_series_2100"},
+            {"title": "Daredevil: Born Again (1986)", "wiki": "Born_Again_(comics)", "year": "1986", "desc": "Frank Miller and David Mazzucchelli's definitive Daredevil story.", "ext_id": "metron_series_4500"}
         ]
 
-        def _fetch_pageviews(item: dict) -> Tuple[dict, int]:
+        def _fetch_candidate_data(item: dict) -> Tuple[dict, int]:
             art = item["wiki"]
-            url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{art}/daily/{start_str}/{end_str}"
+            img = None
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    if resp.status == 200:
-                        data = json.loads(resp.read().decode())
-                        items = data.get("items", [])
-                        total_views = sum(x.get("views", 0) for x in items)
-                        return (item, total_views)
+                s_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{art}"
+                req_s = urllib.request.Request(s_url, headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(req_s, timeout=4) as res_s:
+                    if res_s.status == 200:
+                        sd = json.loads(res_s.read().decode())
+                        img = sd.get("thumbnail", {}).get("source")
             except Exception:
                 pass
-            return (item, 0)
 
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            ranked = list(ex.map(_fetch_pageviews, candidates))
+            views = 0
+            try:
+                pv_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{art}/daily/{start_str}/{end_str}"
+                req_p = urllib.request.Request(pv_url, headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(req_p, timeout=4) as res_p:
+                    if res_p.status == 200:
+                        pd = json.loads(res_p.read().decode())
+                        views = sum(x.get("views", 0) for x in pd.get("items", []))
+            except Exception:
+                pass
 
-        # Sort dynamically by real-world readership momentum (highest Wikipedia pageviews first)
-        ranked.sort(key=lambda x: x[1], reverse=True)
+            item_copy = dict(item)
+            item_copy["img"] = img
+            return (item_copy, views)
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            ranked = list(ex.map(_fetch_candidate_data, candidates))
+
+        # Filter strictly to candidates with verified, working covers (eliminates placeholder cards)
+        valid_items = [x for x in ranked if x[0].get("img")]
+        # Sort dynamically by real-world readership momentum (highest 7-day Wikipedia pageviews first)
+        valid_items.sort(key=lambda x: x[1], reverse=True)
 
         results: List[SearchResultItem] = []
-        for it, views in ranked[:24]:
+        for it, views in valid_items[:24]:
             results.append(SearchResultItem(
                 external_id=it["ext_id"],
                 title=it["title"],
@@ -961,7 +767,6 @@ class MetronService:
             _TRENDING_COMICS_CACHE[cache_key] = (now_ts, results)
 
         return results
-
 
 # Backward compatibility alias
 ComicVineService = MetronService
