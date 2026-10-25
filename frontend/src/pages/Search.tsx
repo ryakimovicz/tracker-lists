@@ -153,6 +153,20 @@ export const renderMediaBadge = (
   );
 };
 
+export const formatComicBadgeText = (badge?: string | null, isEs: boolean = true) => {
+  if (!badge) return '';
+  const numMatch = badge.match(/^(\d+)\s*(números?|numeros?|issues?)$/i);
+  if (numMatch) {
+    const count = numMatch[1];
+    return isEs ? `${count} ${count === '1' ? 'Número' : 'Números'}` : `${count} ${count === '1' ? 'Issue' : 'Issues'}`;
+  }
+  const bLower = badge.toLowerCase().trim();
+  if (bLower === 'issue' || bLower === 'número' || bLower === 'numero') {
+    return isEs ? 'Número' : 'Issue';
+  }
+  return badge;
+};
+
 const stripHtml = (html: string) => {
   if (!html) return '';
   const clean = html.replace(/<[^>]*>/g, '');
@@ -275,7 +289,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
           {item.item_type === 'comic' && item.badge && item.badge !== 'series' ? (
             <>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {item.badge}
+                {formatComicBadgeText(item.badge, language === 'es')}
               </div>
               {item.release_date && (
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>

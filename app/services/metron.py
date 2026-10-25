@@ -30,16 +30,36 @@ _ISSUE_DETAIL_CACHE: Dict[str, Tuple[float, Optional[dict]]] = {}
 _NEW_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _TRENDING_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 
-_last_request_ts: float = 0.0
+import threading
+from collections import deque
+_rate_limit_lock = threading.Lock()
+_request_timestamps = deque()
 
 def _rate_limit_metron():
-    """Ensure respectful spacing between requests (min 300ms) to stay well under burst limit."""
-    global _last_request_ts
-    now = time.time()
-    elapsed = now - _last_request_ts
-    if elapsed < 0.35:
-        time.sleep(0.35 - elapsed)
-    _last_request_ts = time.time()
+    """Ensure respectful spacing and strict adherence to Metron's 20 req/min limit."""
+    with _rate_limit_lock:
+        now = time.time()
+        # Remove timestamps older than 60 seconds
+        while _request_timestamps and _request_timestamps[0] <= now - 60.0:
+            _request_timestamps.popleft()
+
+        # If at 18 requests in the last 60 seconds, wait until oldest expires
+        if len(_request_timestamps) >= 18:
+            sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.1
+            if sleep_needed > 0:
+                time.sleep(sleep_needed)
+                now = time.time()
+                while _request_timestamps and _request_timestamps[0] <= now - 60.0:
+                    _request_timestamps.popleft()
+
+        # Also enforce a minimum spacing between consecutive requests
+        if _request_timestamps:
+            elapsed = now - _request_timestamps[-1]
+            if elapsed < 0.4:
+                time.sleep(0.4 - elapsed)
+                now = time.time()
+
+        _request_timestamps.append(now)
 
 def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 8) -> Optional[dict]:
     token = getattr(settings, "METRON_API_TOKEN", None)
@@ -570,21 +590,25 @@ class MetronService:
 
     @classmethod
     def get_new_comics(cls) -> List[SearchResultItem]:
-        cache_key = "metron_new_comics_v1"
+        cache_key = "metron_new_comics_v3"
         now_ts = time.time()
         if cache_key in _NEW_COMICS_CACHE:
             ts, data = _NEW_COMICS_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_EXPLORE:
                 return data
 
-        # Query issues published in the last 60 days
-        date_cutoff = (datetime.date.today() - datetime.timedelta(days=60)).isoformat()
+        today = datetime.date.today()
+        today_str = today.isoformat()
+        date_cutoff = (today - datetime.timedelta(days=45)).isoformat()
+
+        # Query issues published strictly up to today (never in the future)
         res = _metron_request("issue/", {
             "store_date_range_after": date_cutoff,
-            "limit": 35
+            "store_date_range_before": today_str,
+            "limit": 60
         })
 
-        results: List[SearchResultItem] = []
+        raw_results: List[Tuple[SearchResultItem, str]] = []
         seen_ids = set()
 
         if res and res.get("results"):
@@ -595,28 +619,37 @@ class MetronService:
                     continue
                 seen_ids.add(iss_id)
 
-                title = iss.get("issue") or f"Issue #{iss.get('number')}"
                 store_date = iss.get("store_date") or iss.get("cover_date")
-                desc = f"Published: {store_date}." if store_date else "Recent comic release."
+                # Strict check: never allow issues from the future!
+                if not store_date or store_date > today_str:
+                    continue
 
+                title = iss.get("issue") or f"Issue #{iss.get('number')}"
+                desc = f"Published: {store_date}."
                 if not is_safe_media_item(title, desc):
                     continue
 
                 cv_id = iss.get("cv_id")
                 ext_id = f"cv_issue_{cv_id}" if cv_id else f"metron_issue_{iss_id}"
 
-                results.append(SearchResultItem(
+                # Show issue number as badge (e.g. #15, #6), never the generic word "issue"
+                iss_num = iss.get("number")
+                badge_val = f"#{iss_num}" if iss_num else "Número"
+
+                item = SearchResultItem(
                     external_id=ext_id,
                     title=title,
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
-                    badge="issue",
+                    badge=badge_val,
                     release_date=store_date
-                ))
+                )
+                raw_results.append((item, store_date))
 
-                if len(results) >= 24:
-                    break
+        # Sort descending by store_date so the freshest releases come first!
+        raw_results.sort(key=lambda x: x[1], reverse=True)
+        results = [x[0] for x in raw_results[:24]]
 
         if results:
             _NEW_COMICS_CACHE[cache_key] = (now_ts, results)
@@ -625,75 +658,121 @@ class MetronService:
 
     @classmethod
     def get_trending_comics(cls) -> List[SearchResultItem]:
-        cache_key = "metron_trending_comics_v2"
+        cache_key = "metron_trending_comics_v3"
         now_ts = time.time()
         if cache_key in _TRENDING_COMICS_CACHE:
             ts, data = _TRENDING_COMICS_CACHE[cache_key]
             if now_ts - ts < _CACHE_TTL_EXPLORE:
                 return data
 
-        # Query issue #1 releases from the last 18 months to showcase trending/new ongoing series
-        current_year = datetime.datetime.now().year
-        cutoff_date = f"{current_year - 1}-01-01"
+        today = datetime.date.today()
+        today_str = today.isoformat()
+        current_year = today.year
+        cutoff_date = f"{current_year - 2}-01-01"
+
+        # Query recent series debuts from 2024 up to today (never in the future)
         res = _metron_request("issue/", {
             "store_date_range_after": cutoff_date,
+            "store_date_range_before": today_str,
             "number": "1",
-            "limit": 40
+            "limit": 80
         })
 
-        results: List[SearchResultItem] = []
+        # Fetch series counts in bulk by year to cover recent debuts without N individual requests
+        series_counts: Dict[int, int] = {}
+        for y in [current_year, current_year - 1]:
+            series_data = _metron_request("series/", {"year_began": y, "limit": 100})
+            if series_data and series_data.get("results"):
+                for s in series_data["results"]:
+                    sid = s.get("id")
+                    ic = s.get("issue_count")
+                    if sid and ic is not None:
+                        series_counts[sid] = ic
+
+        flagship_keywords = [
+            "batman", "spider-man", "spiderman", "x-men", "superman", "transformers",
+            "ultimates", "daredevil", "wolverine", "avengers", "turtles", "wonder woman",
+            "nightwing", "saga", "flash", "green lantern", "fantastic four", "hulk", "venom",
+            "iron man", "deadpool", "ghost rider", "star wars", "conan", "godzilla"
+        ]
+
+        raw_series: List[dict] = []
         seen_series_ids = set()
 
         if res and res.get("results"):
-            raw_trending = []
-            trending_sids = []
             for iss in res.get("results", []):
                 s_info = iss.get("series") or {}
                 s_id = s_info.get("id")
                 img_url = iss.get("image")
                 if not s_id or not img_url or s_id in seen_series_ids:
                     continue
-                seen_series_ids.add(s_id)
-                trending_sids.append(s_id)
-                raw_trending.append((iss, s_info, s_id, img_url))
-                if len(raw_trending) >= 24:
-                    break
 
-            series_counts: Dict[int, int] = {}
-            def _fetch_series_count(sid: int):
-                s_data = _metron_request(f"series/{sid}/")
-                return sid, s_data.get("issue_count") if s_data else None
-
-            if trending_sids:
-                with ThreadPoolExecutor(max_workers=6) as executor:
-                    for sid, ic in executor.map(_fetch_series_count, trending_sids):
-                        if ic is not None:
-                            series_counts[sid] = ic
-
-            for iss, s_info, s_id, img_url in raw_trending:
-                s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
                 s_year = s_info.get("year_began") or current_year
+                store_date = iss.get("store_date") or iss.get("cover_date") or str(s_year)
+
+                # STRICT FILTER: Never include future solicitations (e.g. 2027)
+                if s_year > current_year:
+                    continue
+                if store_date and store_date > today_str:
+                    continue
+
+                s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
                 title = f"{s_name} ({s_year})" if s_year else s_name
                 desc = iss.get("desc") or f"Comic series begun in {s_year}."
 
                 if not is_safe_media_item(title, desc):
                     continue
 
-                cv_id = s_info.get("cv_id")
-                ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
-                ic = series_counts.get(s_id)
-                badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
+                seen_series_ids.add(s_id)
+                raw_series.append({
+                    "id": s_id,
+                    "title": title,
+                    "name": s_name,
+                    "year": s_year,
+                    "date": store_date,
+                    "img": img_url,
+                    "desc": desc,
+                    "cv_id": s_info.get("cv_id")
+                })
 
-                results.append(SearchResultItem(
-                    external_id=ext_id,
-                    title=title,
-                    image_url=img_url,
-                    description=desc,
-                    item_type="comic",
-                    badge=badge_val,
-                    page_count=ic,
-                    release_date=str(s_year) if s_year else None
-                ))
+        # Score by authentic popularity + recency (so it is a real trending feed, not an alphabetical dump)
+        def _trending_score(item: dict) -> float:
+            score = 0.0
+            name_lower = item["name"].lower()
+            for idx, kw in enumerate(flagship_keywords):
+                if kw in name_lower:
+                    score += (1000.0 - idx * 25.0)
+                    break
+            if item["date"]:
+                try:
+                    dt = datetime.date.fromisoformat(item["date"][:10])
+                    days_ago = (today - dt).days
+                    score += max(0.0, 500.0 - days_ago * 0.8)
+                except Exception:
+                    pass
+            return score
+
+        raw_series.sort(key=_trending_score, reverse=True)
+        top_candidates = raw_series[:24]
+
+        results: List[SearchResultItem] = []
+        for it in top_candidates:
+            s_id = it["id"]
+            cv_id = it["cv_id"]
+            ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+            ic = series_counts.get(s_id)
+            badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else None
+
+            results.append(SearchResultItem(
+                external_id=ext_id,
+                title=it["title"],
+                image_url=it["img"],
+                description=it["desc"],
+                item_type="comic",
+                badge=badge_val,
+                page_count=ic,
+                release_date=str(it["year"]) if it["year"] else None
+            ))
 
         if results:
             _TRENDING_COMICS_CACHE[cache_key] = (now_ts, results)
