@@ -1078,11 +1078,13 @@ class LastFMService(metaclass=LastFMMeta):
 
                         bio_obj = artist.get("bio", {})
                         bio = cls._clean_wiki(bio_obj.get("content") or bio_obj.get("summary"))
+                        bio_source = "lastfm" if bio and len(bio) >= 10 and "Read more on Last.fm" not in bio else None
                         # If Last.fm bio is empty or generic placeholder, try Wikipedia
                         if not bio or len(bio) < 10 or "Read more on Last.fm" in bio:
                             wiki_bio = cls._get_wikipedia_summary(name)
                             if wiki_bio:
                                 bio = wiki_bio
+                                bio_source = "wikipedia"
 
                         tags = [t.get("name") for t in artist.get("tags", {}).get("tag", []) if t.get("name")]
                         stats = artist.get("stats", {})
@@ -1096,6 +1098,7 @@ class LastFMService(metaclass=LastFMMeta):
                             "artist": name,
                             "image": image,
                             "bio": bio,
+                            "bio_source": bio_source,
                             "tags": tags,
                             "listeners": stats.get("listeners"),
                             "playcount": stats.get("playcount"),

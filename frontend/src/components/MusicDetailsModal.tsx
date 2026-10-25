@@ -1083,6 +1083,22 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                             );
                           })()}
                         </div>
+
+                        {details?.bio_source === 'wikipedia' && (
+                          <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>
+                              {isEs ? '* Biografía provista por ' : '* Biography provided by '}
+                              <a 
+                                href={`https://${isEs ? 'es' : 'en'}.wikipedia.org/wiki/${encodeURIComponent(details?.name || '')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}
+                              >
+                                Wikipedia
+                              </a>
+                            </span>
+                          </div>
+                        )}
                       </>
                     );
                   })()}
@@ -1521,6 +1537,34 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
               </div>
             </>
           )}
+
+          {/* Data Provider Attribution Footer */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '1rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {isEs ? 'Datos y recursos provistos por ' : 'Data and resources powered by '}
+            <a href="https://www.last.fm" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+              Last.fm
+            </a>
+            {(() => {
+              const img = (details?.image || activeItem.image || initialImage || '').toLowerCase();
+              let secondaryCover = null;
+              if (img.includes('dzcdn.net') || img.includes('deezer.com')) {
+                secondaryCover = { name: 'Deezer', url: 'https://www.deezer.com' };
+              } else if (img.includes('fanart.tv')) {
+                secondaryCover = { name: 'Fanart.tv', url: 'https://fanart.tv' };
+              } else if (img.includes('commons.wikimedia.org') || img.includes('wikimedia.org') || img.includes('wikipedia.org')) {
+                secondaryCover = { name: 'Wikimedia Commons', url: 'https://commons.wikimedia.org' };
+              }
+              if (!secondaryCover) return null;
+              return (
+                <span>
+                  {isEs ? ' y portada de ' : ' and cover art from '}
+                  <a href={secondaryCover.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    {secondaryCover.name}
+                  </a>
+                </span>
+              );
+            })()}
+          </div>
         </div>
       </div>
 

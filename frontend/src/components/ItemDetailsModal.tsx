@@ -21,6 +21,68 @@ import { MobileProgressPickerModal } from './MobileProgressPickerModal';
 
 
 
+const getSecondaryDescriptionSource = (item: any, notesObj?: any): { name: string; url?: string } | null => {
+  if (!item) return null;
+  const explicitSource = (item.description_source || notesObj?.description_source || '').toLowerCase();
+  const extId = String(item.external_id || '');
+  const itemType = item.item_type;
+
+  if (explicitSource) {
+    if (explicitSource.includes('wiki')) {
+      return { name: 'Wikipedia', url: 'https://www.wikipedia.org' };
+    }
+    if (explicitSource.includes('inventaire') || explicitSource.includes('wikidata')) {
+      return { name: 'Inventaire (Wikidata)', url: 'https://inventaire.io' };
+    }
+    if (explicitSource.includes('openlibrary') && itemType !== 'book') {
+      return { name: 'Open Library', url: 'https://openlibrary.org' };
+    }
+    if (explicitSource.includes('fanart')) {
+      return { name: 'Fanart.tv', url: 'https://fanart.tv' };
+    }
+  }
+
+  if (extId.startsWith('wiki_')) {
+    return { name: 'Wikipedia', url: 'https://www.wikipedia.org' };
+  }
+
+  if (itemType === 'book' && extId.startsWith('inventaire-')) {
+    return { name: 'Inventaire (Wikidata)', url: 'https://inventaire.io' };
+  }
+
+  return null;
+};
+
+const getSecondaryCoverAttribution = (imageUrl?: string, itemType?: string, externalId?: string): { name: string; url: string } | null => {
+  if (!imageUrl) return null;
+  const url = imageUrl.toLowerCase();
+  const extId = String(externalId || '').toLowerCase();
+
+  if (url.includes('fanart.tv')) {
+    return { name: 'Fanart.tv', url: 'https://fanart.tv' };
+  }
+
+  if (url.includes('commons.wikimedia.org') || url.includes('wikimedia.org') || url.includes('wikipedia.org')) {
+    if (!extId.startsWith('wiki_')) {
+      return { name: 'Wikimedia Commons', url: 'https://commons.wikimedia.org' };
+    }
+  }
+
+  if (url.includes('dzcdn.net') || url.includes('deezer.com')) {
+    return { name: 'Deezer', url: 'https://www.deezer.com' };
+  }
+
+  if (itemType === 'book' && !extId.startsWith('inventaire-') && url.includes('inventaire.io')) {
+    return { name: 'Inventaire', url: 'https://inventaire.io' };
+  }
+
+  if (itemType === 'book' && extId.startsWith('inventaire-') && url.includes('openlibrary.org')) {
+    return { name: 'Open Library', url: 'https://openlibrary.org' };
+  }
+
+  return null;
+};
+
 interface ItemDetailsModalProps {
   item: any;
   isOwnProfile: boolean;
@@ -6732,6 +6794,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }
                               </button>
                             )}
+
+                            {(() => {
+                              const secondaryDesc = getSecondaryDescriptionSource(selectedItem, notes);
+                              if (!secondaryDesc) return null;
+                              return (
+                                <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span>
+                                    {language === 'es' ? '* Descripción provista por ' : '* Description provided by '}
+                                    {secondaryDesc.url ? (
+                                      <a href={secondaryDesc.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                                        {secondaryDesc.name}
+                                      </a>
+                                    ) : (
+                                      <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>{secondaryDesc.name}</span>
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                         <div style={{ display: 'flex', gap: '2rem' }}>
@@ -10134,9 +10215,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )
                 )}
                 {selectedItem.item_type === 'movie' && (
-                  <a href="https://trakt.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                    Trakt
-                  </a>
+                  (selectedItem.external_id || '').startsWith('wiki_') ? (
+                    <a href="https://www.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Wikipedia
+                    </a>
+                  ) : (
+                    <a href="https://trakt.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Trakt
+                    </a>
+                  )
                 )}
                 {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'episode' || (selectedItem.external_id || '').startsWith('tvm-ep-')) && (
                   <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
@@ -10158,6 +10245,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     Last.fm
                   </a>
                 )}
+                {(() => {
+                  const secondaryCover = getSecondaryCoverAttribution(
+                    selectedItem.image_url || initialItem.image_url,
+                    selectedItem.item_type,
+                    selectedItem.external_id || initialItem.external_id
+                  );
+                  if (!secondaryCover) return null;
+                  return (
+                    <span>
+                      {language === 'es' ? ' y portada de ' : ' and cover art from '}
+                      <a href={secondaryCover.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                        {secondaryCover.name}
+                      </a>
+                    </span>
+                  );
+                })()}
               </div>
 
             </div>

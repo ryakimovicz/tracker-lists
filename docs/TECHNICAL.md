@@ -12,7 +12,13 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Migraciones de Base de Datos**: Alembic (`alembic/` y `alembic.ini`) para versionado y despliegue formal de esquemas
 - **Autenticación & Criptografía**: OAuth2 Password Bearer con JWT, cifrado irreversible de contraseñas mediante `bcrypt` (`gensalt`), rotación de token de refresco con cookies `HttpOnly`/`Secure` (HTTPS) y bloqueo estricto de tokens de prueba en producción
 - **Monitoreo de Errores & Rendimiento**: Sentry (`sentry-sdk`) con seguimiento de excepciones y transacciones en producción
-- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (Trakt, TVMaze, AniList, IGDB, Last.fm, Deezer, etc.)
+- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (Trakt, TVMaze, AniList, IGDB, Last.fm, Deezer, Open Library, Inventaire, Metron, Fanart.tv, etc.)
+- **Capa de Conocimiento Abierto & Tendencias (Fundación Wikimedia)**:
+  - **Wikimedia Pageviews REST API**: Cálculo en tiempo real de volumen de lectura y tendencias globales de series y cómics
+  - **Wikidata**: Ontología y cruce federado de libros a través de Inventaire (CC0)
+  - **Wikimedia Commons**: Portadas de libros y medios de dominio público en alta definición
+  - **Wikipedia REST API**: Biografías de artistas musicales y sinopsis enciclopédicas de respaldo
+  - **Wikipedia Wikitext**: Calendario comunitario de estrenos cinematográficos
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
 - **Rate Limiting (Protección Anti-Fuerza Bruta & Anti-Spam)**: `slowapi` con límites dinámicos por IP en endpoints sensibles (búsqueda: 60/min, login: 10/min, registro: 5/min, recuperación de contraseña: 5/min, Google auth: 15/min)

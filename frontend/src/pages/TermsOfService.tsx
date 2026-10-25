@@ -334,6 +334,66 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
               </p>
             </div>
 
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Wikimedia Pageviews</span>
+                <a href="https://wikimedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  wikimedia.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Métricas agregadas de lectura e interés en tiempo real utilizadas para el ranking neutral y dinámico de tendencias en series y cómics.' : 'Aggregate readership metrics and real-time pageview statistics used for unbiased, dynamic trending rankings in TV series and comics.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Wikidata</span>
+                <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  wikidata.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Base de conocimiento libre y colaborativa (CC0), base de las relaciones bibliográficas, autores y ediciones abiertas en Inventaire.' : 'Free, collaborative public-domain knowledge base (CC0) powering open bibliographic relations, authors, and editions in Inventaire.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Wikimedia Commons</span>
+                <a href="https://commons.wikimedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  commons.wikimedia.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Repositorio multimedia libre de carátulas, ilustraciones históricas y portadas de obras de dominio público y licencias Creative Commons.' : 'Open multimedia repository of public-domain and Creative Commons cover art, historical illustrations, and edition artwork.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Wikipedia REST API</span>
+                <a href="https://www.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  wikipedia.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'API enciclopédica libre empleada para consultar biografías, sinopsis y extractos descriptivos cuando la fuente primaria no cuenta con información.' : 'Free encyclopedic REST API used for biographies, summaries, and descriptive excerpts when missing from primary data providers.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Wikipedia Wikitext</span>
+                <a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  en.wikipedia.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Tablas comunitarias y cronogramas de estrenos de películas en salas cinematográficas de todo el mundo.' : 'Community-curated theatrical release schedules and annual movie calendars.'}
+              </p>
+            </div>
+
           </div>
         </section>
 
