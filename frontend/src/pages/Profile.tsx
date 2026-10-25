@@ -900,7 +900,8 @@ export const Profile: React.FC = () => {
     }
   }, [musicTypeParam, activeProfileTab]);
 
-  const hasMusic = Boolean(profile?.lastfm_username) || isOwnProfile;
+  // Music integration temporarily paused and hidden
+  const hasMusic = false;
 
   // Compute 0-3 (or 0-2) main tab progress from 0-6 (or 0-3) slide progress
   const computeMainProgress = useCallback((p: number, hasM: boolean): number => {
@@ -1719,12 +1720,14 @@ export const Profile: React.FC = () => {
   });
 
   // Only display extra favorites beyond 1-per-category if user has active Pro, sorted by custom order then newest
+  // Note: music items are strictly excluded while music integration is paused
   const displayedFavorites = React.useMemo(() => {
+    const validFavorites = favorites.filter(item => item.item_type !== 'music' && !item.external_id?.startsWith('artist:'));
     const list = profile?.is_pro
-      ? favorites
+      ? validFavorites
       : (() => {
           const seenCategories = new Set<string>();
-          return favorites.filter(item => {
+          return validFavorites.filter(item => {
             const type = item.item_type;
             if (!seenCategories.has(type)) {
               seenCategories.add(type);
@@ -2675,7 +2678,7 @@ export const Profile: React.FC = () => {
 
       // 4. Fetch Last.fm banner data (Now Playing) immediately in background, and full music stats asynchronously
       const targetLastfmUser = profileRes.data.lastfm_username;
-      if (targetLastfmUser) {
+      if (targetLastfmUser && hasMusic) {
         // Only show spinner in the banner if we don't already have cached nowPlaying
         setNowPlaying((prevNp: any) => {
           if (!prevNp) setIsLastFmLoading(true);
@@ -5129,8 +5132,8 @@ export const Profile: React.FC = () => {
               <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
             
-            {/* Now Playing / Last.fm Widget */}
-            {Boolean(profile?.lastfm_username) && (
+            {/* Now Playing / Last.fm Widget (Hidden while music service is paused) */}
+            {Boolean(hasMusic && profile?.lastfm_username) && (
               <div 
                 className="profile-lastfm-widget"
                 style={{ 
@@ -6335,7 +6338,7 @@ export const Profile: React.FC = () => {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
                 const orderedMedia = getOrderedCategories(profile?.category_order || currentUser?.category_order);
-                const baseTypes = ['all', ...orderedMedia, 'music'] as const;
+                const baseTypes = ['all', ...orderedMedia] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
                   if (type === 'series') return displayedFavorites.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-'));
@@ -6595,7 +6598,7 @@ export const Profile: React.FC = () => {
                       color: 'var(--color-user, #F472B6)',
                       border: '1px solid rgba(244, 114, 182, 0.3)'
                     }}>
-                      {displayedFavorites.length} / {profile?.is_pro ? '80' : '8'} {language === 'es' ? 'destacados' : 'featured'}
+                      {displayedFavorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
                     </span>
 
                     {isOwnProfile && favoritesMediaFilter === 'all' && displayedFavorites.length > 1 && (

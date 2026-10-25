@@ -153,19 +153,8 @@ export const CustomizePage: React.FC = () => {
         setSelectedProfileColor(userRes.value.data.profile_color || 'amber');
         setLocalCategoryOrder(getOrderedCategories(userRes.value.data.category_order));
 
-        if (userRes.value.data.lastfm_username) {
-          setIsLastFmLoading(true);
-          try {
-            const npRes = await apiClient.get(`/users/${userRes.value.data.id}/music/now-playing`);
-            setNowPlaying(npRes.data || null);
-          } catch (e) {
-            setNowPlaying(null);
-          } finally {
-            setIsLastFmLoading(false);
-          }
-        } else {
-          setNowPlaying(null);
-        }
+        // Music service paused: do not initiate now-playing network requests
+        setNowPlaying(null);
       }
       if (libRes.status === 'fulfilled' && Array.isArray(libRes.value.data)) {
         setShelfCount(libRes.value.data.length);
@@ -669,8 +658,8 @@ export const CustomizePage: React.FC = () => {
               <span><strong style={{ color: 'var(--text-primary)' }}>{shelfCount}</strong> {isEs ? 'En Estantería' : 'On Shelf'}</span>
             </div>
 
-            {/* Now Playing / Last.fm Widget */}
-            {Boolean(profile?.lastfm_username) && (
+            {/* Now Playing / Last.fm Widget (Hidden while music service is paused) */}
+            {false && Boolean(profile?.lastfm_username) && (
               <div 
                 className="profile-lastfm-widget"
                 style={{ 
@@ -1441,7 +1430,8 @@ export const CustomizePage: React.FC = () => {
           </div>
         </div>
 
-        {/* 4. Last.fm (Mostrar música escuchada) */}
+        {/* 4. Last.fm (Mostrar música escuchada) - Temporalmente pausado y oculto */}
+        {false && (
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -1511,7 +1501,7 @@ export const CustomizePage: React.FC = () => {
               : 'Connect your Last.fm account to display in real-time what music you are listening to on Spotify, YouTube Music, Apple Music, Tidal, or local players on your profile.'}
           </p>
 
-          {lastfmMsg && (
+          {Boolean(lastfmMsg) && (
             <div
               style={{
                 display: 'flex',
@@ -1521,13 +1511,13 @@ export const CustomizePage: React.FC = () => {
                 borderRadius: '8px',
                 fontSize: '0.85rem',
                 marginBottom: '1rem',
-                background: lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: lastfmMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                background: lastfmMsg?.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: lastfmMsg?.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${lastfmMsg?.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
               }}
             >
-              {lastfmMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{lastfmMsg.text}</span>
+              {lastfmMsg?.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{lastfmMsg?.text}</span>
             </div>
           )}
 
@@ -1581,6 +1571,7 @@ export const CustomizePage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Modales */}

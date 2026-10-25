@@ -394,8 +394,8 @@ class BannerService:
 
     @classmethod
     def _search_music(cls, query: str, target_type: str = "banner") -> List[BannerSearchResult]:
-        if not query or not settings.FANART_API_KEY or not settings.LASTFM_API_KEY:
-            return []
+        # Music banner search disabled to eliminate all Last.fm/Deezer network calls
+        return []
 
         results = []
         seen_images = set()

@@ -253,6 +253,8 @@ def connect_lastfm(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if LastFMService.DISABLED:
+        raise HTTPException(status_code=503, detail="Music integration is currently disabled")
     session_data = LastFMService.get_session(token)
     if not session_data:
         raise HTTPException(status_code=400, detail="Failed to connect to Last.fm")
@@ -366,6 +368,8 @@ def get_music_item_details(
     clean_artist = artist.strip()
     clean_name = (name or "").strip()
     clean_period = period if period in {"7day", "1month", "overall"} else "7day"
+    if LastFMService.DISABLED:
+        raise HTTPException(status_code=503, detail="Music integration is currently disabled")
 
     # 1. Fetch item metadata
     details = None

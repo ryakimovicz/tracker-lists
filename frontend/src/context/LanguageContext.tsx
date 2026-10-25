@@ -31,15 +31,15 @@ const translations: Translations = {
 
 
   // Landing Page
-  heroTitleLine1: { en: 'Everything you watch, read, play, and listen to.', es: 'Todo lo que ves, lees, juegas y escuchas.' },
+  heroTitleLine1: { en: 'Everything you watch, read, and play.', es: 'Todo lo que ves, lees y juegas.' },
   heroTitleLine2: { en: 'In a single place.', es: 'En un solo lugar.' },
-  heroSubtitle: { en: 'Your home for movies, TV shows, anime, books, manga, comics, games, and music. Track your progress, rate with stars, build chronological universes, and discover your next obsession.', es: 'Tu espacio para películas, series, anime, libros, manga, cómics, juegos y música. Registra tu progreso, puntúa con estrellas, crea universos cronológicos y descubre tu próxima obsesión.' },
+  heroSubtitle: { en: 'Your home for movies, TV shows, anime, books, manga, comics, and games. Track your progress, rate with stars, build chronological universes, and discover your next obsession.', es: 'Tu espacio para películas, series, anime, libros, manga, cómics y juegos. Registra tu progreso, puntúa con estrellas, crea universos cronológicos y descubre tu próxima obsesión.' },
   btnStartCollection: { en: 'Get Started for Free', es: 'Empezar gratis' },
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar guías' },
   
   // Features
   featTrackerTitle: { en: 'Universal Tracker', es: 'Tracker todo en uno' },
-  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, manga, comics, games, and music. Log your consumption, rate with stars, record your progress, and view detailed statistics.', es: 'Lleva el control de películas, series, anime, libros, manga, cómics, juegos y música. Registra tu consumo, califica con estrellas, lleva el registro de tu progreso y visualiza tus estadísticas.' },
+  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, manga, comics, and games. Log your consumption, rate with stars, record your progress, and view detailed statistics.', es: 'Lleva el control de películas, series, anime, libros, manga, cómics y juegos. Registra tu consumo, califica con estrellas, lleva el registro de tu progreso y visualiza tus estadísticas.' },
   
   featSearchTitle: { en: 'Guides & Cross-Media Universes', es: 'Guías y universos cronológicos' },
   featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. Organize complex sagas and franchises interleaving books, movies, shows, and games.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta ideal para organizar sagas y franquicias complejas intercalando libros, películas, series y juegos.' },

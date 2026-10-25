@@ -606,11 +606,8 @@ class CharacterService:
 
     @classmethod
     def _search_music(cls, query: str) -> List[CharacterSearchResult]:
-        if not query:
-            return []
-        results = []
-        clean_q = urllib.parse.quote(query.strip())
-        headers = {"User-Agent": settings.USER_AGENT}
+        # Music character/avatar search disabled to eliminate all Deezer/Last.fm network calls
+        return []
 
         # 1. Deezer Artists (1:1 square pictures of musicians)
         try:

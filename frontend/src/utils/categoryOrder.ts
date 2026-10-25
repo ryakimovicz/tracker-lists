@@ -11,7 +11,7 @@ export const DEFAULT_CATEGORY_ORDER = [
   'game'
 ] as const;
 
-export const BLOCKED_CATEGORIES = new Set<string>();
+export const BLOCKED_CATEGORIES = new Set<string>(['music']);
 
 export type CategoryType = typeof DEFAULT_CATEGORY_ORDER[number];
 

@@ -15,21 +15,30 @@ USER_AGENT = settings.USER_AGENT
 class LastFMMeta(type):
     @property
     def API_KEY(cls) -> str:
+        if getattr(cls, 'DISABLED', True):
+            return ""
         return os.getenv("LASTFM_API_KEY") or settings.LASTFM_API_KEY or ""
 
     @property
     def SHARED_SECRET(cls) -> str:
+        if getattr(cls, 'DISABLED', True):
+            return ""
         return os.getenv("LASTFM_SHARED_SECRET") or settings.LASTFM_SHARED_SECRET or ""
 
 class LastFMService(metaclass=LastFMMeta):
     BASE_URL = "https://ws.audioscrobbler.com/2.0/"
+    DISABLED = True  # Circuit breaker: strictly prevent all external network calls to Last.fm and Deezer
 
     @classmethod
     def get_api_key(cls) -> str:
+        if cls.DISABLED:
+            return ""
         return os.getenv("LASTFM_API_KEY") or settings.LASTFM_API_KEY or ""
 
     @classmethod
     def get_shared_secret(cls) -> str:
+        if cls.DISABLED:
+            return ""
         return os.getenv("LASTFM_SHARED_SECRET") or settings.LASTFM_SHARED_SECRET or ""
 
     # In-memory fast cache
@@ -216,7 +225,7 @@ class LastFMService(metaclass=LastFMMeta):
     @classmethod
     def _resolve_deezer_artist(cls, artist_name: str) -> Optional[Dict[str, Any]]:
         """Resolves the exact Deezer artist by comparing Deezer catalog tracks/albums against Last.fm top tracks"""
-        if not artist_name:
+        if cls.DISABLED or not artist_name:
             return None
         key = artist_name.strip().lower()
         now = time.time()
@@ -377,7 +386,7 @@ class LastFMService(metaclass=LastFMMeta):
     @classmethod
     def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
         """Fetches track cover artwork (from its album) via Deezer API with multi-candidate artist matching"""
-        if not track_name:
+        if cls.DISABLED or not track_name:
             return ""
         query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
         key = query_str.lower()
@@ -421,7 +430,7 @@ class LastFMService(metaclass=LastFMMeta):
     @classmethod
     def _fetch_album_image(cls, album_name: str, artist_name: str) -> str:
         """Fetches album cover artwork from Deezer API with multi-candidate artist matching"""
-        if not album_name:
+        if cls.DISABLED or not album_name:
             return ""
         query_str = f"{artist_name} {album_name}".strip() if artist_name else album_name.strip()
         key = query_str.lower()
@@ -882,7 +891,7 @@ class LastFMService(metaclass=LastFMMeta):
     @classmethod
     def get_artist_discography(cls, artist_name: str) -> List[Dict[str, Any]]:
         """Fetches full discography (albums, singles, eps, compilations) for an artist, sorted with newest first"""
-        if not artist_name:
+        if cls.DISABLED or not artist_name:
             return []
         cache_key = artist_name.strip().lower()
         now = time.time()

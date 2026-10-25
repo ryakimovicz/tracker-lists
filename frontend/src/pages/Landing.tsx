@@ -37,13 +37,12 @@ export const Landing: React.FC = () => {
     { key: 'book', label: isEs ? 'Libros' : 'Books', icon: <BookOpen size={15} />, color: 'var(--color-book, #06b6d4)' },
     { key: 'comic', label: isEs ? 'Cómics' : 'Comics', icon: <Book size={15} />, color: 'var(--color-comic, #8b5cf6)' },
     { key: 'manga', label: isEs ? 'Manga' : 'Manga', icon: <Book size={15} />, color: 'var(--color-manga, #ec4899)' },
-    { key: 'game', label: isEs ? 'Juegos' : 'Games', icon: <Gamepad2 size={15} />, color: 'var(--color-game, #8b5cf6)' },
-    { key: 'music', label: isEs ? 'Música' : 'Music', icon: <Music size={15} />, color: 'var(--color-music, #a855f7)' }
+    { key: 'game', label: isEs ? 'Juegos' : 'Games', icon: <Gamepad2 size={15} />, color: 'var(--color-game, #8b5cf6)' }
   ];
 
   const planComparison = [
     {
-      feature: isEs ? '8 Categorías completas (Películas, Series, Anime, Libros, Cómics, Manga, Juegos, Música)' : '8 Full Categories (Movies, TV Shows, Anime, Books, Comics, Manga, Games, Music)',
+      feature: isEs ? '7 Categorías completas (Películas, Series, Anime, Libros, Cómics, Manga, Juegos)' : '7 Full Categories (Movies, TV Shows, Anime, Books, Comics, Manga, Games)',
       free: isEs ? 'Ilimitadas' : 'Unlimited',
       premium: isEs ? 'Ilimitadas' : 'Unlimited'
     },
@@ -219,17 +218,6 @@ export const Landing: React.FC = () => {
           </div>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.92rem' }}>
             {t('featModsDesc')}
-          </p>
-        </div>
-
-        {/* Card 4: Música y Estadísticas */}
-        <div className="glass-card" style={{ padding: '1.8rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ color: '#a855f7', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Music size={26} />
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t('featMusicStatsTitle')}</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.92rem' }}>
-            {t('featMusicStatsDesc')}
           </p>
         </div>
       </section>
