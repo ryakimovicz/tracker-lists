@@ -318,7 +318,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Base de datos comunitaria de cómics, series y números, con datos atribuidos a Grand Comics Database (GCD).' : 'Community comic book database for series and issues, with data attributed to the Grand Comics Database (GCD).'}
+                {isEs ? 'Base de datos comunitaria abierta de cómics, volúmenes, números y portadas.' : 'Open community database for comic series, volumes, issues, and cover artwork.'}
               </p>
             </div>
 

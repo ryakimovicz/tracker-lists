@@ -110,7 +110,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | GET | `/all?q={query}` | Búsqueda global con ranking unificado por tiers y caché en memoria |
 | GET | `/explore/tabs` | Novedades, Tendencias multimedia y Guías comunitarias destacadas |
 | GET | `/game/{game_id}/relations` | Obtener colecciones, ediciones, DLCs, expansiones y juego base (IGDB) |
-| GET | `/comic/volume/{vol_id}` | Detalle de volumen de cómic con metadata de editorial y año (Metron / GCD) |
+| GET | `/comic/volume/{vol_id}` | Detalle de volumen de cómic con metadata de editorial y año (Metron) |
 | GET | `/comic/volume/{vol_id}/issues` | Lista de números / grapas individuales de un volumen de cómic |
 | GET | `/comic/issue/{issue_id}` | Detalle específico de un número / grapa de cómic |
 | GET | `/manga/{manga_id}/relations` | Precuelas, secuelas y spin-offs de un manga (AniList) |
