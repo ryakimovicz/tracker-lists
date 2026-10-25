@@ -10149,8 +10149,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </a>
                 )}
                 {selectedItem.item_type === 'comic' && (
-                  <a href="https://comicvine.gamespot.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                    Comic Vine
+                  <a href="https://metron.cloud" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    Metron
                   </a>
                 )}
                 {selectedItem.item_type === 'music' && (
