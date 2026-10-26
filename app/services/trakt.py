@@ -222,28 +222,16 @@ class TraktService:
 
     @classmethod
     def _get_fanart_fallback(cls, imdb_id: Optional[str]) -> Optional[str]:
-        if not settings.FANART_API_KEY or not imdb_id:
+        if not imdb_id:
             return None
 
-        if imdb_id in cls._fanart_cache:
-            return cls._fanart_cache[imdb_id]
-
-        url = f"https://webservice.fanart.tv/v3/movies/{imdb_id}?api_key={settings.FANART_API_KEY}"
-        req = urllib.request.Request(url, headers={"User-Agent": settings.USER_AGENT})
-
-        poster_url = None
-        try:
-            with urllib.request.urlopen(req, timeout=3) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    posters = data.get("movieposter", [])
-                    if posters:
-                        poster_url = posters[0].get("url")
-        except Exception:
-            pass
-
-        cls._fanart_cache[imdb_id] = poster_url
-        return poster_url
+        from app.services.fanart import FanartService
+        data = FanartService.get_movie_images(imdb_id, timeout=3.0)
+        if data and isinstance(data, dict):
+            posters = data.get("movieposter", [])
+            if posters:
+                return posters[0].get("url")
+        return None
 
     @classmethod
     def _format_movie_item(cls, data: dict, override_external_id: Optional[str] = None) -> SearchResultItem:
@@ -456,35 +444,33 @@ class TraktService:
 
                 # Fanart.tv backgrounds if FANART_API_KEY is present
                 imdb_id = m.get("ids", {}).get("imdb")
-                if settings.FANART_API_KEY and imdb_id:
+                if imdb_id:
                     try:
-                        fan_url = f"https://webservice.fanart.tv/v3/movies/{imdb_id}?api_key={settings.FANART_API_KEY}"
-                        req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
-                        with urllib.request.urlopen(req_fan, timeout=2.0) as resp_f:
-                            if resp_f.status == 200:
-                                fan_data = json.loads(resp_f.read().decode())
-                                for bg in fan_data.get("moviebackground", [])[:3]:
-                                    bg_url = bg.get("url")
-                                    if bg_url and bg_url not in seen:
-                                        seen.add(bg_url)
-                                        results.append({
-                                            "title": title,
-                                            "image_url": bg_url,
-                                            "category": "movie",
-                                            "origin": title,
-                                            "kind": "wallpaper"
-                                        })
-                                for mb in fan_data.get("moviebanner", [])[:2]:
-                                    mb_url = mb.get("url")
-                                    if mb_url and mb_url not in seen:
-                                        seen.add(mb_url)
-                                        results.append({
-                                            "title": title,
-                                            "image_url": mb_url,
-                                            "category": "movie",
-                                            "origin": title,
-                                            "kind": "banner"
-                                        })
+                        from app.services.fanart import FanartService
+                        fan_data = FanartService.get_movie_images(imdb_id, timeout=2.0)
+                        if fan_data and isinstance(fan_data, dict):
+                            for bg in fan_data.get("moviebackground", [])[:3]:
+                                bg_url = bg.get("url")
+                                if bg_url and bg_url not in seen:
+                                    seen.add(bg_url)
+                                    results.append({
+                                        "title": title,
+                                        "image_url": bg_url,
+                                        "category": "movie",
+                                        "origin": title,
+                                        "kind": "wallpaper"
+                                    })
+                            for mb in fan_data.get("moviebanner", [])[:2]:
+                                mb_url = mb.get("url")
+                                if mb_url and mb_url not in seen:
+                                    seen.add(mb_url)
+                                    results.append({
+                                        "title": title,
+                                        "image_url": mb_url,
+                                        "category": "movie",
+                                        "origin": title,
+                                        "kind": "banner"
+                                    })
                     except Exception:
                         pass
 

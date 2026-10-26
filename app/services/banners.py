@@ -250,34 +250,32 @@ class BannerService:
             show_res = []
 
             # 1. Fanart.tv Series Backgrounds
-            if settings.FANART_API_KEY and (thetvdb_id or imdb_id):
+            if thetvdb_id or imdb_id:
                 lookup_id = thetvdb_id or imdb_id
-                fan_url = f"https://webservice.fanart.tv/v3/tv/{lookup_id}?api_key={settings.FANART_API_KEY}"
                 try:
-                    req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
-                    with urllib.request.urlopen(req_fan, timeout=1.8) as r_fan:
-                        if r_fan.status == 200:
-                            fan_data = json.loads(r_fan.read().decode())
-                            for bg in (fan_data.get("showbackground") or [])[:3]:
-                                bg_url = bg.get("url")
-                                if bg_url:
-                                    show_res.append(BannerSearchResult(
-                                        title=sname,
-                                        image_url=bg_url,
-                                        category="series",
-                                        origin=sname,
-                                        kind="wallpaper"
-                                    ))
-                            for tb in (fan_data.get("tvthumb") or [])[:2]:
-                                tb_url = tb.get("url")
-                                if tb_url:
-                                    show_res.append(BannerSearchResult(
-                                        title=sname,
-                                        image_url=tb_url,
-                                        category="series",
-                                        origin=sname,
-                                        kind="banner"
-                                    ))
+                    from app.services.fanart import FanartService
+                    fan_data = FanartService.get_tv_images(str(lookup_id), timeout=1.8)
+                    if fan_data and isinstance(fan_data, dict):
+                        for bg in (fan_data.get("showbackground") or [])[:3]:
+                            bg_url = bg.get("url")
+                            if bg_url:
+                                show_res.append(BannerSearchResult(
+                                    title=sname,
+                                    image_url=bg_url,
+                                    category="series",
+                                    origin=sname,
+                                    kind="wallpaper"
+                                ))
+                        for tb in (fan_data.get("tvthumb") or [])[:2]:
+                            tb_url = tb.get("url")
+                            if tb_url:
+                                show_res.append(BannerSearchResult(
+                                    title=sname,
+                                    image_url=tb_url,
+                                    category="series",
+                                    origin=sname,
+                                    kind="banner"
+                                ))
                 except Exception:
                     pass
 
@@ -401,14 +399,11 @@ class BannerService:
 
                     if mbid:
                         # 2. Query Fanart.tv for widescreen music banners and artist wallpapers
-                        fan_url = f"https://webservice.fanart.tv/v3/music/{mbid}?api_key={settings.FANART_API_KEY}"
                         try:
-                            req_fan = urllib.request.Request(fan_url, headers={"User-Agent": settings.USER_AGENT})
-                            with urllib.request.urlopen(req_fan, timeout=3.0) as fan_resp:
-                                if fan_resp.status == 200:
-                                    fan_data = json.loads(fan_resp.read().decode('utf-8', errors='replace'))
-                                    
-                                    # Horizontal banners (for banner modal)
+                            from app.services.fanart import FanartService
+                            fan_data = FanartService.get_music_images(mbid, timeout=3.0)
+                            if fan_data and isinstance(fan_data, dict):
+                                # Horizontal banners (for banner modal)
                                     if target_type == "banner":
                                         for b in fan_data.get("musicbanner", [])[:3]:
                                             b_url = b.get("url")
