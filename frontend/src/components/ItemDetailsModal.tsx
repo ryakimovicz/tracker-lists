@@ -3163,7 +3163,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       // 1. Render item immediately with whatever data we already have
       setSelectedItem(item);
-      setUserRating(0);
+      setUserRating(Number(item.rating) || 0);
       setUserComment('');
       setPagesReadVal(item.pages_read || 0);
       setTotalPagesVal(item.total_pages || item.page_count || '');
@@ -3792,7 +3792,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       image_url: validNewPoster ? found.image_url : prev.image_url,
                       description: found.description || prev.description,
                       release_date: found.release_date || prev.release_date,
-                      external_id: found.external_id || prev.external_id
+                      external_id: found.external_id || prev.external_id,
+                      rating: prev.rating ?? item.rating
                     } : null);
 
                     if (item.id && (validNewPoster || (found.external_id && found.external_id !== item.external_id))) {
@@ -3822,7 +3823,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       image_url: validNewPoster ? found.image_url : prev.image_url,
                       description: found.description || prev.description,
                       release_date: found.release_date || prev.release_date,
-                      external_id: found.external_id || prev.external_id
+                      external_id: found.external_id || prev.external_id,
+                      rating: prev.rating ?? item.rating
                     } : null);
 
                     if (item.id && validNewPoster) {

@@ -784,22 +784,72 @@ def get_library(
             hundred_counts_map[ext_id] = int(h_c or 0)
             max_consumed_map[ext_id] = max_c
 
-        # Batch query user ratings for these items from MediaReview
+        # Batch query user ratings for these items from MediaReview across all known aliases
         from app.models.review import MediaReview
+        candidate_eids = set(ext_ids)
+        for it in items:
+            if it.imdb_id:
+                clean_im = str(it.imdb_id).replace("omdb_", "").strip()
+                candidate_eids.add(clean_im)
+                candidate_eids.add(f"omdb_{clean_im}")
+            if it.external_id:
+                if str(it.external_id).startswith("omdb_"):
+                    candidate_eids.add(str(it.external_id).replace("omdb_", "").strip())
+                elif str(it.external_id).startswith("tt"):
+                    candidate_eids.add(f"omdb_{it.external_id}")
+                elif str(it.external_id).startswith("cv_vol_") or str(it.external_id).startswith("metron_series_"):
+                    c_num = str(it.external_id).replace("cv_vol_", "").replace("metron_series_", "")
+                    candidate_eids.add(f"cv_vol_{c_num}")
+                    candidate_eids.add(f"metron_series_{c_num}")
+
         user_reviews = db.query(
+            MediaReview.id,
             MediaReview.external_id,
             MediaReview.item_type,
             MediaReview.rating
         ).filter(
             MediaReview.user_id == target_user_id,
-            MediaReview.external_id.in_(ext_ids),
+            MediaReview.external_id.in_(list(candidate_eids)),
             MediaReview.parent_id.is_(None),
             MediaReview.rating.isnot(None)
         ).all()
-        for r_eid, r_type, r_val in user_reviews:
+
+        needs_commit = False
+        for r_id, r_eid, r_type, r_val in user_reviews:
             if r_val is not None and r_val > 0:
                 ratings_map[(str(r_type).lower(), str(r_eid))] = float(r_val)
                 ratings_map[str(r_eid)] = float(r_val)
+
+                # Also map to all library items whose aliases match this review
+                for it in items:
+                    it_aliases = {it.external_id}
+                    if it.imdb_id:
+                        clean_im = str(it.imdb_id).replace("omdb_", "").strip()
+                        it_aliases.add(clean_im)
+                        it_aliases.add(f"omdb_{clean_im}")
+                    if it.external_id and str(it.external_id).startswith("omdb_"):
+                        it_aliases.add(str(it.external_id).replace("omdb_", "").strip())
+                    elif it.external_id and str(it.external_id).startswith("tt"):
+                        it_aliases.add(f"omdb_{it.external_id}")
+                    if it.external_id and (str(it.external_id).startswith("cv_vol_") or str(it.external_id).startswith("metron_series_")):
+                        c_num = str(it.external_id).replace("cv_vol_", "").replace("metron_series_", "")
+                        it_aliases.add(f"cv_vol_{c_num}")
+                        it_aliases.add(f"metron_series_{c_num}")
+
+                    if r_eid in it_aliases:
+                        ratings_map[(str(it.item_type).lower(), str(it.external_id))] = float(r_val)
+                        ratings_map[str(it.external_id)] = float(r_val)
+                        # Auto-heal: If review is under an old alias and item has canonical trakt_ ID, migrate review
+                        if it.external_id and str(it.external_id).startswith("trakt_") and r_eid != it.external_id:
+                            rev_row = db.query(MediaReview).filter(MediaReview.id == r_id).first()
+                            if rev_row:
+                                rev_row.external_id = it.external_id
+                                needs_commit = True
+        if needs_commit:
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
 
     # For series, anime, and tracked comic volumes, query episode/issue consumption counts if tracked to get accurate completions and last seen episode/issue count
     series_items = [it for it in items if it.item_type in ("series", "anime", "comic") and it.tracking_list_id]
@@ -1272,7 +1322,32 @@ def update_library_item(
     if item_in.image_url is not None:
         lib_item.image_url = item_in.image_url
     if item_in.external_id is not None:
-        lib_item.external_id = item_in.external_id
+        if item_in.external_id != lib_item.external_id:
+            old_eid = lib_item.external_id
+            new_eid = item_in.external_id
+            lib_item.external_id = new_eid
+
+            # Migrate user's reviews, consumption history, and activity logs to new external_id
+            from app.models.review import MediaReview
+            from app.models.consumption import ConsumptionHistory
+            from app.models.activity import UserActivityLog
+
+            db.query(MediaReview).filter(
+                MediaReview.user_id == current_user.id,
+                MediaReview.external_id == old_eid
+            ).update({MediaReview.external_id: new_eid}, synchronize_session=False)
+
+            db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == old_eid
+            ).update({ConsumptionHistory.external_id: new_eid}, synchronize_session=False)
+
+            db.query(UserActivityLog).filter(
+                UserActivityLog.user_id == current_user.id,
+                UserActivityLog.external_id == old_eid
+            ).update({UserActivityLog.external_id: new_eid}, synchronize_session=False)
+        else:
+            lib_item.external_id = item_in.external_id
     if item_in.imdb_id is not None:
         lib_item.imdb_id = item_in.imdb_id
     

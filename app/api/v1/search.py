@@ -1076,16 +1076,90 @@ def lookup_media_item(
                         "release_date": getattr(m_detail, "release_date", None),
                         "imdb_id": getattr(m_detail, "imdb_id", None)
                     }
-                    if existing and resolved_ext and existing.external_id != resolved_ext:
-                        try:
-                            existing.external_id = resolved_ext
-                            if m_detail.imdb_id:
-                                existing.imdb_id = m_detail.imdb_id
-                            if m_detail.image_url:
-                                existing.image_url = m_detail.image_url
-                            db.commit()
-                        except Exception as e:
-                            db.rollback()
+                    if resolved_ext and resolved_ext.startswith("trakt_"):
+                        all_old_aliases = {ext_id_clean}
+                        if ext_id_clean.startswith("omdb_"):
+                            all_old_aliases.add(ext_id_clean.replace("omdb_", "").strip())
+                        elif ext_id_clean.startswith("tt"):
+                            all_old_aliases.add(f"omdb_{ext_id_clean}")
+                        if m_detail.imdb_id:
+                            all_old_aliases.add(m_detail.imdb_id)
+                            all_old_aliases.add(f"omdb_{m_detail.imdb_id}")
+                        all_old_aliases.discard(resolved_ext)
+
+                        if all_old_aliases:
+                            try:
+                                from app.models.review import MediaReview
+                                from app.models.consumption import ConsumptionHistory
+                                from app.models.activity import UserActivityLog
+                                from app.models.list_item import ListItem
+                                from app.models.social import BlockedMediaItem
+
+                                # 1. UserLibraryItem: update or remove duplicate if already added under resolved_ext
+                                old_lib_items = db.query(UserLibraryItem).filter(UserLibraryItem.external_id.in_(list(all_old_aliases))).all()
+                                for old_it in old_lib_items:
+                                    existing_new = db.query(UserLibraryItem).filter(
+                                        UserLibraryItem.user_id == old_it.user_id,
+                                        UserLibraryItem.item_type == old_it.item_type,
+                                        UserLibraryItem.external_id == resolved_ext
+                                    ).first()
+                                    if existing_new:
+                                        if not existing_new.completed_at and old_it.completed_at:
+                                            existing_new.completed_at = old_it.completed_at
+                                        if old_it.is_favorite:
+                                            existing_new.is_favorite = True
+                                        db.delete(old_it)
+                                    else:
+                                        old_it.external_id = resolved_ext
+                                        if m_detail.imdb_id:
+                                            old_it.imdb_id = m_detail.imdb_id
+                                        if m_detail.image_url:
+                                            old_it.image_url = m_detail.image_url
+
+                                # 2. MediaReview: migrate reviews and ratings
+                                old_revs = db.query(MediaReview).filter(MediaReview.external_id.in_(list(all_old_aliases))).all()
+                                for rev in old_revs:
+                                    existing_new_rev = db.query(MediaReview).filter(
+                                        MediaReview.user_id == rev.user_id,
+                                        MediaReview.external_id == resolved_ext,
+                                        MediaReview.parent_id == rev.parent_id
+                                    ).first()
+                                    if existing_new_rev:
+                                        if not existing_new_rev.rating and rev.rating:
+                                            existing_new_rev.rating = rev.rating
+                                        if not existing_new_rev.content and rev.content:
+                                            existing_new_rev.content = rev.content
+                                        db.delete(rev)
+                                    else:
+                                        rev.external_id = resolved_ext
+
+                                # 3. ConsumptionHistory
+                                db.query(ConsumptionHistory).filter(
+                                    ConsumptionHistory.external_id.in_(list(all_old_aliases))
+                                ).update({ConsumptionHistory.external_id: resolved_ext}, synchronize_session=False)
+
+                                # 4. UserActivityLog
+                                act_q = db.query(UserActivityLog).filter(UserActivityLog.external_id.in_(list(all_old_aliases)))
+                                if m_detail.image_url:
+                                    act_q.update({UserActivityLog.external_id: resolved_ext, UserActivityLog.image_url: m_detail.image_url}, synchronize_session=False)
+                                else:
+                                    act_q.update({UserActivityLog.external_id: resolved_ext}, synchronize_session=False)
+
+                                # 5. ListItem
+                                list_q = db.query(ListItem).filter(ListItem.external_id.in_(list(all_old_aliases)))
+                                if m_detail.image_url:
+                                    list_q.update({ListItem.external_id: resolved_ext, ListItem.image_url: m_detail.image_url}, synchronize_session=False)
+                                else:
+                                    list_q.update({ListItem.external_id: resolved_ext}, synchronize_session=False)
+
+                                # 6. BlockedMediaItem
+                                db.query(BlockedMediaItem).filter(
+                                    BlockedMediaItem.external_id.in_(list(all_old_aliases))
+                                ).update({BlockedMediaItem.external_id: resolved_ext}, synchronize_session=False)
+
+                                db.commit()
+                            except Exception as e:
+                                db.rollback()
             elif ext_id_clean.startswith("wiki_"):
                 # If we have an existing database record, attempt to resolve via title in Trakt
                 search_title = existing.title if existing else None

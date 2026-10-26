@@ -74,13 +74,15 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     if (!candidate || !id) return false;
     const cleanCand = String(candidate.external_id || candidate.id || '')
       .replace('cv_issue_metron_issue_', '')
-      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]/, '');
+      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]|^omdb_|^trakt_/, '');
     const cleanRouteId = String(id)
       .replace('cv_issue_metron_issue_', '')
-      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]/, '');
+      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]|^omdb_|^trakt_/, '');
+    const candImdb = String(candidate.imdb_id || '').replace(/^omdb_/, '').trim();
     return (
       candidate.external_id === id ||
       String(candidate.id) === id ||
+      (candImdb && (id === candImdb || id === `omdb_${candImdb}` || cleanRouteId === candImdb)) ||
       (cleanCand && cleanRouteId && cleanCand === cleanRouteId) ||
       (type === 'game' && (String(candidate.external_id) === String(id) || String(candidate.id) === String(id)))
     );
@@ -158,9 +160,22 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
           setLoading(false);
           // Auto-redirect URL if external_id was resolved or upgraded (e.g. wiki_... -> trakt_...)
           if (res.data?.external_id && res.data.external_id !== id) {
+            const currentItem = (location.state as any)?.item || item || {};
+            const mergedItem = {
+              ...currentItem,
+              ...(res.data || {}),
+              external_id: res.data.external_id,
+              rating: currentItem.rating,
+              status: currentItem.status,
+              id: currentItem.id,
+              completed_at: currentItem.completed_at
+            };
             navigate(`/item/${res.data.item_type || type}/${res.data.external_id}`, {
               replace: true,
-              state: location.state
+              state: {
+                ...(location.state || {}),
+                item: mergedItem
+              }
             });
           }
         }

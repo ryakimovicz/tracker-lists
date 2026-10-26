@@ -248,6 +248,67 @@ def report_review_or_comment(
     db.commit()
     return {"message": "Report submitted successfully"}
 
+def resolve_equivalent_external_ids(item_type: str, external_id: str, db: Session) -> tuple[List[str], Optional[str]]:
+    type_lower = item_type.lower().strip()
+    clean_id = str(external_id).strip()
+    candidates = {clean_id}
+    canonical_id = None
+
+    if type_lower == "movie":
+        # 1. Expand IMDb / OMDB variations
+        if clean_id.startswith("omdb_"):
+            raw_imdb = clean_id.replace("omdb_", "").strip()
+            candidates.add(raw_imdb)
+        elif clean_id.startswith("tt"):
+            candidates.add(f"omdb_{clean_id}")
+
+        # 2. Check UserLibraryItem database records for known mappings
+        matched_items = db.query(UserLibraryItem).filter(
+            UserLibraryItem.item_type == "movie",
+            (UserLibraryItem.external_id.in_(list(candidates)) | UserLibraryItem.imdb_id.in_(list(candidates)))
+        ).all()
+        for it in matched_items:
+            if it.external_id:
+                candidates.add(it.external_id)
+                if it.external_id.startswith("trakt_"):
+                    canonical_id = it.external_id
+            if it.imdb_id:
+                candidates.add(it.imdb_id)
+                candidates.add(f"omdb_{it.imdb_id}")
+
+        # 3. Check TraktService detail lookup/cache
+        try:
+            from app.services.trakt import TraktService
+            m_detail = TraktService.get_movie_detail(clean_id)
+            if m_detail:
+                if m_detail.external_id:
+                    candidates.add(m_detail.external_id)
+                    if m_detail.external_id.startswith("trakt_"):
+                        canonical_id = m_detail.external_id
+                if m_detail.imdb_id:
+                    candidates.add(m_detail.imdb_id)
+                    candidates.add(f"omdb_{m_detail.imdb_id}")
+        except Exception:
+            pass
+
+        if clean_id.startswith("trakt_"):
+            canonical_id = clean_id
+
+    elif type_lower == "comic":
+        clean_num = clean_id.replace("cv_issue_metron_issue_", "").replace("cv_vol_", "").replace("metron_series_", "").replace("cv_issue_", "").replace("metron_issue_", "").replace("cv_", "")
+        if clean_id.startswith("cv_vol_") or clean_id.startswith("metron_series_"):
+            candidates.add(f"cv_vol_{clean_num}")
+            candidates.add(f"metron_series_{clean_num}")
+            candidates.add(f"cv_{clean_num}")
+            candidates.add(clean_num)
+        elif clean_id.startswith("cv_issue_") or clean_id.startswith("metron_issue_"):
+            candidates.add(f"cv_issue_{clean_num}")
+            candidates.add(f"metron_issue_{clean_num}")
+            candidates.add(f"cv_issue_metron_issue_{clean_num}")
+            candidates.add(clean_num)
+
+    return list(candidates), canonical_id
+
 @router.get("/{item_type}/{external_id}", response_model=List[MediaReviewResponse])
 def get_item_reviews(
     item_type: str,
@@ -258,10 +319,25 @@ def get_item_reviews(
     db: Session = Depends(get_db)
 ):
     item_type_lower = item_type.lower()
+    candidates, canonical_id = resolve_equivalent_external_ids(item_type_lower, external_id, db)
+
     reviews = db.query(MediaReview).filter(
         MediaReview.item_type == item_type_lower,
-        MediaReview.external_id == external_id
+        MediaReview.external_id.in_(candidates)
     ).order_by(MediaReview.created_at.asc()).offset(skip).limit(limit).all()
+
+    # Auto-heal: If any reviews were saved under legacy aliases and we have a canonical_id, migrate them
+    target_ext = canonical_id or external_id
+    needs_commit = False
+    for r in reviews:
+        if canonical_id and r.external_id != canonical_id:
+            r.external_id = canonical_id
+            needs_commit = True
+    if needs_commit:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
     response_list = []
     for r in reviews:
@@ -280,7 +356,7 @@ def get_item_reviews(
                 username=r.user.username if r.user else "Deleted User",
                 photo_url=r.user.photo_url if (r.user and not r.is_deleted) else None,
                 item_type=r.item_type,
-                external_id=r.external_id,
+                external_id=external_id,
                 rating=r.rating if not r.is_deleted else None,
                 content=r.content,
                 media_url=r.media_url if not r.is_deleted else None,
@@ -312,6 +388,9 @@ def create_or_update_review(
             detail=f"Invalid media type. Must be one of {valid_types}"
         )
 
+    candidates, canonical_id = resolve_equivalent_external_ids(item_type_lower, external_id, db)
+    target_external_id = canonical_id or external_id
+
     # Find the title and image if it exists in the library, otherwise use a placeholder or provided fields
     resolved_title = review_in.item_title
     resolved_image = review_in.image_url
@@ -327,7 +406,7 @@ def create_or_update_review(
         lib_item = db.query(UserLibraryItem).filter(
             UserLibraryItem.user_id == current_user.id,
             UserLibraryItem.item_type == item_type_lower,
-            UserLibraryItem.external_id == external_id
+            UserLibraryItem.external_id.in_(candidates)
         ).first()
         if lib_item:
             if not resolved_title:
@@ -338,7 +417,7 @@ def create_or_update_review(
     # If still not resolved and it's an episode or comic issue, check ListItem
     if not resolved_title or not resolved_image:
         from app.models.list import ListItem
-        li = db.query(ListItem).filter(ListItem.external_id == external_id).first()
+        li = db.query(ListItem).filter(ListItem.external_id.in_(candidates)).first()
         if li:
             if not resolved_title:
                 resolved_title = li.title
@@ -346,13 +425,13 @@ def create_or_update_review(
                 resolved_image = li.image_url
 
     if not resolved_title:
-        resolved_title = f"{item_type_lower.capitalize()} ({external_id})"
+        resolved_title = f"{item_type_lower.capitalize()} ({target_external_id})"
 
     # Handle Threaded Replies (when parent_id is provided)
     if review_in.parent_id:
         parent_rev = db.query(MediaReview).filter(
             MediaReview.id == review_in.parent_id,
-            MediaReview.external_id == external_id
+            MediaReview.external_id.in_(candidates)
         ).first()
         if not parent_rev:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent comment not found")
@@ -370,7 +449,7 @@ def create_or_update_review(
             user_id=current_user.id,
             parent_id=effective_parent_id,
             item_type=item_type_lower,
-            external_id=external_id,
+            external_id=target_external_id,
             rating=None,
             content=review_in.content,
             media_url=review_in.media_url,
@@ -387,8 +466,8 @@ def create_or_update_review(
                 actor_id=current_user.id,
                 notification_type="comment_reply",
                 entity_type="item",
-                entity_id=f"{item_type_lower}/{external_id}",
-                extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+                entity_id=f"{item_type_lower}/{target_external_id}",
+                extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or target_external_id, "item_type": item_type_lower, "external_id": target_external_id})
             )
             db.add(reply_notif)
 
@@ -405,8 +484,8 @@ def create_or_update_review(
                             actor_id=current_user.id,
                             notification_type="mention",
                             entity_type="item",
-                            entity_id=f"{item_type_lower}/{external_id}",
-                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+                            entity_id=f"{item_type_lower}/{target_external_id}",
+                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or target_external_id, "item_type": item_type_lower, "external_id": target_external_id})
                         )
                         db.add(mention_notif)
 
@@ -419,7 +498,7 @@ def create_or_update_review(
             username=current_user.username,
             photo_url=current_user.photo_url,
             item_type=reply_review.item_type,
-            external_id=reply_review.external_id,
+            external_id=external_id,
             rating=None,
             content=reply_review.content,
             media_url=reply_review.media_url,
@@ -436,7 +515,7 @@ def create_or_update_review(
             user_id=current_user.id,
             parent_id=None,
             item_type=item_type_lower,
-            external_id=external_id,
+            external_id=target_external_id,
             rating=None,
             content=review_in.content,
             media_url=review_in.media_url,
@@ -458,8 +537,8 @@ def create_or_update_review(
                             actor_id=current_user.id,
                             notification_type="mention",
                             entity_type="item",
-                            entity_id=f"{item_type_lower}/{external_id}",
-                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+                            entity_id=f"{item_type_lower}/{target_external_id}",
+                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or target_external_id, "item_type": item_type_lower, "external_id": target_external_id})
                         )
                         db.add(mention_notif)
 
@@ -472,7 +551,7 @@ def create_or_update_review(
             username=current_user.username,
             photo_url=current_user.photo_url,
             item_type=comment_record.item_type,
-            external_id=comment_record.external_id,
+            external_id=external_id,
             rating=None,
             content=comment_record.content,
             media_url=comment_record.media_url,
@@ -489,7 +568,7 @@ def create_or_update_review(
     review = db.query(MediaReview).filter(
         MediaReview.user_id == current_user.id,
         MediaReview.item_type == item_type_lower,
-        MediaReview.external_id == external_id,
+        MediaReview.external_id.in_(candidates),
         MediaReview.parent_id.is_(None),
         MediaReview.rating.isnot(None)
     ).first()
@@ -499,13 +578,14 @@ def create_or_update_review(
         review = db.query(MediaReview).filter(
             MediaReview.user_id == current_user.id,
             MediaReview.item_type == item_type_lower,
-            MediaReview.external_id == external_id,
+            MediaReview.external_id.in_(candidates),
             MediaReview.parent_id.is_(None)
         ).first()
 
     fields_set = review_in.model_fields_set if hasattr(review_in, 'model_fields_set') else set(getattr(review_in, '__fields_set__', []))
 
     if review:
+        review.external_id = target_external_id
         if "rating" in fields_set:
             review.rating = review_in.rating
         if "content" in fields_set:
@@ -521,7 +601,7 @@ def create_or_update_review(
             user_id=current_user.id,
             parent_id=None,
             item_type=item_type_lower,
-            external_id=external_id,
+            external_id=target_external_id,
             rating=review_in.rating,
             content=review_in.content,
             media_url=review_in.media_url,

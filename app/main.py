@@ -328,19 +328,31 @@ def migrate_legacy_omdb_items():
 
         db = SessionLocal()
         try:
-            # 1. Collect all distinct omdb_ external IDs across all relevant tables
+            # 1. Collect all distinct omdb_ and tt external IDs across all relevant tables
             unique_legacy_ids = set()
-            for (eid,) in db.query(UserLibraryItem.external_id).filter(UserLibraryItem.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(UserLibraryItem.external_id).filter(
+                (UserLibraryItem.external_id.like("omdb_%")) | ((UserLibraryItem.item_type == "movie") & (UserLibraryItem.external_id.like("tt%")))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
-            for (eid,) in db.query(UserActivityLog.external_id).filter(UserActivityLog.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(MediaReview.external_id).filter(
+                (MediaReview.external_id.like("omdb_%")) | ((MediaReview.item_type == "movie") & (MediaReview.external_id.like("tt%")))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
-            for (eid,) in db.query(ListItem.external_id).filter(ListItem.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(UserActivityLog.external_id).filter(
+                (UserActivityLog.external_id.like("omdb_%")) | ((UserActivityLog.item_type == "movie") & (UserActivityLog.external_id.like("tt%")))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
-            for (eid,) in db.query(ConsumptionHistory.external_id).filter(ConsumptionHistory.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(ListItem.external_id).filter(
+                (ListItem.external_id.like("omdb_%")) | (ListItem.external_id.like("tt%"))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
-            for (eid,) in db.query(BlockedMediaItem.external_id).filter(BlockedMediaItem.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(ConsumptionHistory.external_id).filter(
+                (ConsumptionHistory.external_id.like("omdb_%")) | ((ConsumptionHistory.item_type == "movie") & (ConsumptionHistory.external_id.like("tt%")))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
-            for (eid,) in db.query(MediaReview.external_id).filter(MediaReview.external_id.like("omdb_%")).all():
+            for (eid,) in db.query(BlockedMediaItem.external_id).filter(
+                (BlockedMediaItem.external_id.like("omdb_%")) | (BlockedMediaItem.external_id.like("tt%"))
+            ).all():
                 if eid: unique_legacy_ids.add(eid)
 
             if not unique_legacy_ids:
@@ -358,8 +370,15 @@ def migrate_legacy_omdb_items():
                 if not new_ext:
                     continue
 
+                aliases = {old_ext, clean_imdb, f"omdb_{clean_imdb}"}
+                if imdb_id:
+                    aliases.add(imdb_id)
+                    aliases.add(f"omdb_{imdb_id}")
+                aliases.discard(new_ext)
+                alias_list = list(aliases)
+
                 # 1. UserLibraryItem: update or remove duplicate if already added under new_ext
-                lib_items = db.query(UserLibraryItem).filter(UserLibraryItem.external_id == old_ext).all()
+                lib_items = db.query(UserLibraryItem).filter(UserLibraryItem.external_id.in_(alias_list)).all()
                 for lib_it in lib_items:
                     existing_new = db.query(UserLibraryItem).filter(
                         UserLibraryItem.user_id == lib_it.user_id,
@@ -367,6 +386,10 @@ def migrate_legacy_omdb_items():
                         UserLibraryItem.external_id == new_ext
                     ).first()
                     if existing_new:
+                        if not existing_new.completed_at and lib_it.completed_at:
+                            existing_new.completed_at = lib_it.completed_at
+                        if lib_it.is_favorite:
+                            existing_new.is_favorite = True
                         db.delete(lib_it)
                     else:
                         lib_it.external_id = new_ext
@@ -375,39 +398,52 @@ def migrate_legacy_omdb_items():
                             lib_it.image_url = new_poster
 
                 # 2. UserActivityLog
-                act_q = db.query(UserActivityLog).filter(UserActivityLog.external_id == old_ext)
+                act_q = db.query(UserActivityLog).filter(UserActivityLog.external_id.in_(alias_list))
                 if new_poster:
                     act_q.update({UserActivityLog.external_id: new_ext, UserActivityLog.image_url: new_poster}, synchronize_session=False)
                 else:
                     act_q.update({UserActivityLog.external_id: new_ext}, synchronize_session=False)
 
                 # 3. ListItem
-                list_q = db.query(ListItem).filter(ListItem.external_id == old_ext)
+                list_q = db.query(ListItem).filter(ListItem.external_id.in_(alias_list))
                 if new_poster:
                     list_q.update({ListItem.external_id: new_ext, ListItem.image_url: new_poster}, synchronize_session=False)
                 else:
                     list_q.update({ListItem.external_id: new_ext}, synchronize_session=False)
 
                 # 4. ConsumptionHistory
-                db.query(ConsumptionHistory).filter(ConsumptionHistory.external_id == old_ext).update(
+                db.query(ConsumptionHistory).filter(ConsumptionHistory.external_id.in_(alias_list)).update(
                     {ConsumptionHistory.external_id: new_ext}, synchronize_session=False
                 )
 
                 # 5. BlockedMediaItem
-                db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id == old_ext).update(
+                db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id.in_(alias_list)).update(
                     {BlockedMediaItem.external_id: new_ext}, synchronize_session=False
                 )
 
-                # 6. MediaReview
-                db.query(MediaReview).filter(MediaReview.external_id == old_ext).update(
-                    {MediaReview.external_id: new_ext}, synchronize_session=False
-                )
+                # 6. MediaReview: safely migrate reviews handling any duplicate root review
+                old_revs = db.query(MediaReview).filter(MediaReview.external_id.in_(alias_list)).all()
+                for rev in old_revs:
+                    existing_new_rev = db.query(MediaReview).filter(
+                        MediaReview.user_id == rev.user_id,
+                        MediaReview.external_id == new_ext,
+                        MediaReview.parent_id == rev.parent_id
+                    ).first()
+                    if existing_new_rev:
+                        if not existing_new_rev.rating and rev.rating:
+                            existing_new_rev.rating = rev.rating
+                        if not existing_new_rev.content and rev.content:
+                            existing_new_rev.content = rev.content
+                        db.delete(rev)
+                    else:
+                        rev.external_id = new_ext
 
                 # 7. ReadingList section_descriptions JSON
-                reading_lists = db.query(ReadingList).filter(ReadingList.section_descriptions.like(f"%{old_ext}%")).all()
-                for rlist in reading_lists:
-                    if rlist.section_descriptions:
-                        rlist.section_descriptions = rlist.section_descriptions.replace(old_ext, new_ext)
+                for al in alias_list:
+                    reading_lists = db.query(ReadingList).filter(ReadingList.section_descriptions.like(f"%{al}%")).all()
+                    for rlist in reading_lists:
+                        if rlist.section_descriptions:
+                            rlist.section_descriptions = rlist.section_descriptions.replace(al, new_ext)
 
             db.commit()
             logger.info("Auto-migration: Successfully upgraded all legacy omdb_ items to Trakt.")
