@@ -3179,27 +3179,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         (item.external_id && (item.external_id.startsWith('tvm-ep-') || item.external_id.startsWith('cv_issue_'))) ||
         item.item_type === 'episode'
       );
-      const isComicIssueInit = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')) || item.issue_number != null);
+      const isComicIssueInit = item.item_type === 'comic' && (isActualEpisode || (item.external_id && (item.external_id.startsWith('cv_issue_') || item.external_id.startsWith('metron_issue_'))) || item.issue_number != null);
 
       if (isComicIssueInit && item.external_id) {
-        const cleanId = String(item.external_id).replace('cv_issue_', '').replace('cv_', '');
-        const extId = `cv_issue_${cleanId}`;
+        const rawExtId = String(item.external_id);
+        const cleanId = rawExtId
+          .replace('cv_issue_metron_issue_', '')
+          .replace('cv_issue_cv_issue_', '')
+          .replace('metron_issue_', '')
+          .replace('metron_', '')
+          .replace('cv_issue_', '')
+          .replace('cv_', '');
+        const extId = rawExtId.startsWith('cv_') || rawExtId.startsWith('metron_') ? rawExtId : `metron_issue_${cleanId}`;
         const effectiveTrackingListId = item.tracking_list_id || item.parent_series?.tracking_list_id;
 
         // 1. Check local list cache for completion
-        let isReadFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId]);
+        let isReadFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId] || globalProgress[`metron_issue_${cleanId}`] || globalProgress[`cv_issue_${cleanId}`]);
         if (!isReadFromList && effectiveTrackingListId) {
           const cachedList = getCachedSeries(`list_${effectiveTrackingListId}`);
           if (Array.isArray(cachedList)) {
             const found = cachedList.find((it: any) => {
-              const cId = String(it.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-              return (cId === cleanId || it.external_id === extId) && it.is_completed;
+              const cId = String(it.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+              return (cId === cleanId || it.external_id === extId || it.external_id === `metron_issue_${cleanId}` || it.external_id === `cv_issue_${cleanId}`) && it.is_completed;
             });
             if (found) isReadFromList = true;
           }
         }
 
-        const cachedIssueState = getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_${extId}`);
+        const cachedIssueState = getCachedSeries(`issue_state_${extId}`)
+          || getCachedSeries(`issue_state_metron_issue_${cleanId}`)
+          || getCachedSeries(`issue_state_cv_issue_${cleanId}`)
+          || getCachedSeries(`issue_state_${cleanId}`)
+          || (cleanId && getCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`))
+          || (cleanId && getCachedSeries(`issue_state_cv_issue_cv_issue_${cleanId}`));
 
         if (isReadFromList || (cachedIssueState && cachedIssueState.status === 'read')) {
           item = {
@@ -3235,16 +3247,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 is_completed: true,
                 pages_read: prev.total_pages || prev.page_count || prev.pages_read
               } : null);
-              setCachedSeries(`issue_state_${extId}`, {
+              const readSync = {
                 status: 'read',
                 pages_read: item.total_pages || item.page_count || 0,
                 total_pages: item.total_pages || item.page_count
-              });
-              setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
-                status: 'read',
-                pages_read: item.total_pages || item.page_count || 0,
-                total_pages: item.total_pages || item.page_count
-              });
+              };
+              setCachedSeries(`issue_state_${extId}`, readSync);
+              setCachedSeries(`issue_state_metron_issue_${cleanId}`, readSync);
+              setCachedSeries(`issue_state_cv_issue_${cleanId}`, readSync);
+              setCachedSeries(`issue_state_${cleanId}`, readSync);
+              if (rawExtId && rawExtId !== extId) setCachedSeries(`issue_state_${rawExtId}`, readSync);
             }
           })
           .catch(() => {});
@@ -5282,7 +5294,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         total_pages: totalP || null
       };
       setCachedSeries(`issue_state_${extId}`, readState);
+      setCachedSeries(`issue_state_metron_issue_${cleanId}`, readState);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, readState);
+      setCachedSeries(`issue_state_${cleanId}`, readState);
+      setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, readState);
       setGlobalProgress(prev => ({ ...prev, [extId]: true }));
       setSelectedItem((prev: any) => prev ? {
         ...prev,
@@ -5299,7 +5314,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         total_pages: totalP || null
       };
       setCachedSeries(`issue_state_${extId}`, emptyState);
+      setCachedSeries(`issue_state_metron_issue_${cleanId}`, emptyState);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, emptyState);
+      setCachedSeries(`issue_state_${cleanId}`, emptyState);
+      setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, emptyState);
       setGlobalProgress(prev => ({ ...prev, [extId]: false }));
       setSelectedItem((prev: any) => prev ? {
         ...prev,
@@ -5360,7 +5378,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || null)
     };
     setCachedSeries(`issue_state_${extId}`, stateToSave);
+    setCachedSeries(`issue_state_metron_issue_${cleanId}`, stateToSave);
     setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+    setCachedSeries(`issue_state_${cleanId}`, stateToSave);
+    setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, stateToSave);
 
     setSelectedItem((prev: any) => prev ? {
       ...prev,
@@ -5392,8 +5413,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleToggleComicIssueStatus = async (newStatus: 'read' | 'reading' | 'dropped', bypassPrompt = false) => {
     if (!selectedItem) return;
 
-    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '');
-    const extId = `cv_issue_${cleanId}`;
+    const rawExtId = String(selectedItem.external_id || selectedItem.id || '');
+    const cleanId = rawExtId
+      .replace('cv_issue_metron_issue_', '')
+      .replace('cv_issue_cv_issue_', '')
+      .replace('metron_issue_', '')
+      .replace('metron_', '')
+      .replace('cv_issue_', '')
+      .replace('cv_', '');
+    const extId = rawExtId.startsWith('cv_') || rawExtId.startsWith('metron_') ? rawExtId : `metron_issue_${cleanId}`;
     const issueNum = selectedItem.episode_number ?? selectedItem.issue_number ?? (cleanId.match(/\d+$/)?.[0] ? parseInt(cleanId.match(/\d+$/)![0]) : 1);
     const effectiveListId = selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
 
@@ -5519,7 +5547,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null)
     };
     setCachedSeries(`issue_state_${extId}`, stateToSave);
+    setCachedSeries(`issue_state_metron_issue_${cleanId}`, stateToSave);
     setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+    setCachedSeries(`issue_state_${cleanId}`, stateToSave);
+    setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, stateToSave);
+    if (rawExtId && rawExtId !== extId) setCachedSeries(`issue_state_${rawExtId}`, stateToSave);
 
     // 5. Update local selectedItem state
     if (newStatus === 'read') {
@@ -5896,18 +5928,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleSavePagesRead = async (pages: number) => {
     if (!selectedItem) return;
-    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '');
+    const rawExtId = String(selectedItem.external_id || selectedItem.id || '');
+    const cleanId = rawExtId
+      .replace('cv_issue_metron_issue_', '')
+      .replace('cv_issue_cv_issue_', '')
+      .replace('metron_issue_', '')
+      .replace('metron_', '')
+      .replace('cv_issue_', '')
+      .replace('cv_', '')
+      .replace('tvm-ep-', '');
     const isEpisodeOnly = isEpisode && !isComicIssue;
 
     if (isComicIssue) {
-      const extId = `cv_issue_${cleanId}`;
+      const extId = rawExtId.startsWith('cv_') || rawExtId.startsWith('metron_') ? rawExtId : `metron_issue_${cleanId}`;
       const stateToSave = {
         status: selectedItem.status || 'reading',
         pages_read: pages,
         total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null)
       };
       setCachedSeries(`issue_state_${extId}`, stateToSave);
+      setCachedSeries(`issue_state_metron_issue_${cleanId}`, stateToSave);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+      setCachedSeries(`issue_state_${cleanId}`, stateToSave);
+      setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, stateToSave);
+      if (rawExtId && rawExtId !== extId) setCachedSeries(`issue_state_${rawExtId}`, stateToSave);
       setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();
@@ -5976,8 +6020,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const valToSave = newTotal !== undefined ? newTotal : totalPagesVal;
     const finalTotal = (valToSave === '' || valToSave === 0) ? null : valToSave;
     setTotalPagesVal(valToSave);
-    const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_issue_', '').replace('cv_', '');
-    const extId = `cv_issue_${cleanId}`;
+    const rawExtId = String(selectedItem?.external_id || selectedItem?.id || '');
+    const cleanId = rawExtId
+      .replace('cv_issue_metron_issue_', '')
+      .replace('cv_issue_cv_issue_', '')
+      .replace('metron_issue_', '')
+      .replace('metron_', '')
+      .replace('cv_issue_', '')
+      .replace('cv_', '');
+    const extId = rawExtId.startsWith('cv_') || rawExtId.startsWith('metron_') ? rawExtId : `metron_issue_${cleanId}`;
 
     if (isComicIssue) {
       const stateToSave = {
@@ -5986,7 +6037,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         total_pages: finalTotal
       };
       setCachedSeries(`issue_state_${extId}`, stateToSave);
+      setCachedSeries(`issue_state_metron_issue_${cleanId}`, stateToSave);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+      setCachedSeries(`issue_state_${cleanId}`, stateToSave);
+      setCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`, stateToSave);
+      if (rawExtId && rawExtId !== extId) setCachedSeries(`issue_state_${rawExtId}`, stateToSave);
       setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();

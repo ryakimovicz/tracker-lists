@@ -9,11 +9,11 @@ const getLangPrefix = () => {
   }
 };
 
-export const getCachedSeries = (key: string) => {
-  const lang = getLangPrefix();
-  const fullKey = `${lang}_${key}`;
+const isLanguageSpecificKey = (key: string): boolean => {
+  return key.startsWith('desc_') || key.startsWith('series_') || key.endsWith('_metadata');
+};
 
-  // 1. Check in-memory cache first
+const readRaw = (fullKey: string) => {
   const mem = memoryCache.get(fullKey);
   if (mem) {
     if (Date.now() - mem.timestamp < 24 * 60 * 60 * 1000) {
@@ -23,12 +23,10 @@ export const getCachedSeries = (key: string) => {
     }
   }
 
-  // 2. Fallback to localStorage
   try {
     const item = localStorage.getItem(`series_cache_v2_${fullKey}`);
     if (item) {
       const parsed = JSON.parse(item);
-      // Cache expires after 24h
       if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
         memoryCache.set(fullKey, parsed);
         return parsed.data;
@@ -39,6 +37,38 @@ export const getCachedSeries = (key: string) => {
   } catch (e) {
     // ignore read errors
   }
+  return null;
+};
+
+export const getCachedSeries = (key: string) => {
+  if (!key) return null;
+  const lang = getLangPrefix();
+
+  if (isLanguageSpecificKey(key)) {
+    const localized = readRaw(`${lang}_${key}`);
+    if (localized !== null) return localized;
+    const fallbackLang = lang === 'es' ? 'en' : 'es';
+    const fallback = readRaw(`${fallbackLang}_${key}`);
+    if (fallback !== null) return fallback;
+    return readRaw(key);
+  }
+
+  // Language-independent key: check direct key first
+  const direct = readRaw(key);
+  if (direct !== null) return direct;
+
+  // Fallback / auto-migration: check legacy prefixed keys (es_... or en_...)
+  const esVal = readRaw(`es_${key}`);
+  if (esVal !== null) {
+    setCachedSeries(key, esVal);
+    return esVal;
+  }
+  const enVal = readRaw(`en_${key}`);
+  if (enVal !== null) {
+    setCachedSeries(key, enVal);
+    return enVal;
+  }
+
   return null;
 };
 
@@ -66,37 +96,44 @@ const pruneLocalStorage = () => {
 };
 
 export const setCachedSeries = (key: string, data: any) => {
+  if (!key) return;
   const lang = getLangPrefix();
-  const fullKey = `${lang}_${key}`;
 
-  const entry = {
-    timestamp: Date.now(),
-    data
-  };
-
-  // Always store in memory cache
-  memoryCache.set(fullKey, entry);
-
-  // Attempt to persist to localStorage safely
-  try {
-    localStorage.setItem(`series_cache_v2_${fullKey}`, JSON.stringify(entry));
-  } catch (e: any) {
-    if (e?.name === 'QuotaExceededError' || e?.code === 22 || e?.number === -2147024882) {
-      // Quota exceeded: prune localStorage and try once more
-      pruneLocalStorage();
-      try {
-        localStorage.setItem(`series_cache_v2_${fullKey}`, JSON.stringify(entry));
-      } catch (retryErr) {
-        // If still failing, memoryCache already holds it safely
+  const writeRaw = (fullKey: string) => {
+    const entry = {
+      timestamp: Date.now(),
+      data
+    };
+    memoryCache.set(fullKey, entry);
+    try {
+      localStorage.setItem(`series_cache_v2_${fullKey}`, JSON.stringify(entry));
+    } catch (e: any) {
+      if (e?.name === 'QuotaExceededError' || e?.code === 22 || e?.number === -2147024882) {
+        pruneLocalStorage();
+        try {
+          localStorage.setItem(`series_cache_v2_${fullKey}`, JSON.stringify(entry));
+        } catch (retryErr) {
+          // memoryCache already holds it safely
+        }
       }
     }
+  };
+
+  if (isLanguageSpecificKey(key)) {
+    writeRaw(`${lang}_${key}`);
+  } else {
+    // Store globally so it is available regardless of UI language
+    writeRaw(key);
+    // Also keep es_ and en_ in sync for backwards compatibility
+    writeRaw(`es_${key}`);
+    writeRaw(`en_${key}`);
   }
 };
 
 export const removeCachedSeries = (key: string) => {
-  const languages = ['es', 'en'];
-  languages.forEach(lang => {
-    const fullKey = `${lang}_${key}`;
+  if (!key) return;
+  const keysToRemove = [key, `es_${key}`, `en_${key}`];
+  keysToRemove.forEach(fullKey => {
     memoryCache.delete(fullKey);
     try {
       localStorage.removeItem(`series_cache_v2_${fullKey}`);

@@ -977,11 +977,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       } else {
         const allEpsCount = Array.isArray(allEps) ? allEps.length : 0;
-        if (allEpsCount > 0) {
+        if (allEpsCount > 0 && Array.isArray(currentTracked) && currentTracked.length > 0) {
           setIsCaughtUp(true);
+          setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
+        } else {
+          setIsCaughtUp(false);
         }
         setNextEp(null);
-        setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       }
     } catch (e) {
       console.error("Failed to load next episode/issue for card", e);
@@ -1334,11 +1336,30 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
   let seasonText = '';
   let epName = '';
+  let comicPagesRead = 0;
+
   if (nextEp) {
     if (isComic) {
       const issueNum = nextEp.issue_number || nextEp.episode_number;
       seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
-      epName = cleanComicIssueName(nextEp.name || nextEp.title, issueNum);
+
+      // Look up pages_read for this comic issue from trackedEpisodes or cache
+      const cleanId = String(nextEp.id || nextEp.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+      const extIdKey = String(nextEp.external_id || nextEp.id).startsWith('cv_') || String(nextEp.external_id || nextEp.id).startsWith('metron_') ? String(nextEp.external_id || nextEp.id) : `metron_issue_${cleanId}`;
+      const trackedMatch = (trackedEpisodes || []).find((t: any) => {
+        const tClean = String(t.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+        return (tClean && tClean === cleanId) || t.external_id === extIdKey || (issueNum && t.title && (t.title.includes(`#${issueNum}`) || t.episode_number == issueNum));
+      });
+      const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`);
+
+      const rawPages = (trackedMatch && (trackedMatch.pages_read ?? trackedMatch.total_pages))
+        ?? (cachedState && (cachedState.pages_read ?? cachedState.total_pages))
+        ?? nextEp.pages_read
+        ?? 0;
+
+      comicPagesRead = parseInt(String(rawPages), 10) || 0;
+      // For comics, never repeat the series name or issue title under seasonText
+      epName = '';
     } else {
       const isNextSpecial = isSpecialEpisode(nextEp);
       if (isNextSpecial) {
@@ -1472,7 +1493,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           ) : seasonText ? (
             <>
               <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{seasonText}</div>
-              {epName ? (
+              {isComic ? (
+                comicPagesRead > 0 ? (
+                  <div style={{ fontSize: isPoster ? "0.78rem" : "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, paddingRight: isPoster ? undefined : "36px" }}>
+                    {comicPagesRead} {language === 'es' ? 'págs.' : 'pages'}
+                  </div>
+                ) : null
+              ) : epName ? (
                 <div style={{ fontSize: isPoster ? "0.78rem" : "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: isPoster ? undefined : "36px" }}>{epName}</div>
               ) : null}
             </>
@@ -2783,12 +2810,14 @@ export const Home: React.FC = () => {
 
     window.addEventListener('upcoming-updated', handleUpcomingUpdate);
     window.addEventListener('library-updated', handleLibraryUpdate);
+    window.addEventListener('language-updated', handleLanguageUpdate);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
     return () => {
       window.removeEventListener('upcoming-updated', handleUpcomingUpdate);
       window.removeEventListener('library-updated', handleLibraryUpdate);
+      window.removeEventListener('language-updated', handleLanguageUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
@@ -2928,11 +2957,6 @@ export const Home: React.FC = () => {
 
       // For series, anime, and tracked comics in 'watching' / 'reading', only show if there is at least one issue/episode waiting
       if (i.item_type === "series" || i.item_type === "anime" || (i.item_type === "comic" && i.tracking_list_id)) {
-        // Instant check: if this device already determined that the work is caught up (no pending episodes/issues), exclude immediately
-        const savedCandidate = getCachedSeries(`next_candidate_${i.id}`);
-        if (savedCandidate?.isCaughtUp) {
-          return false;
-        }
 
         const isComic = i.item_type === "comic";
         const cacheKeyAll = `${i.external_id}_all_episodes`;
