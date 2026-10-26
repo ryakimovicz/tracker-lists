@@ -46,9 +46,11 @@ class LastFMService(metaclass=LastFMMeta):
     _cache_top_albums: Dict[str, tuple] = {}   # key -> (timestamp, data)
     _cache_top_artists: Dict[str, tuple] = {}  # key -> (timestamp, data)
     _cache_top_tracks: Dict[str, tuple] = {}   # key -> (timestamp, data)
+    _wiki_bio_cache: Dict[str, tuple] = {}     # artist_lower -> (timestamp, extract)
 
     NOW_PLAYING_TTL = 15   # 15 seconds cache for live scrobbles
     TOP_MUSIC_TTL = 300    # 5 minutes cache for top stats
+    WIKI_BIO_TTL = 86400   # 24 hours cache for Wikipedia artist bios
 
     @classmethod
     def _generate_signature(cls, params: dict) -> str:
@@ -778,9 +780,18 @@ class LastFMService(metaclass=LastFMMeta):
 
     @classmethod
     def _get_wikipedia_summary(cls, artist_name: str) -> str:
-        """Fetches artist bio summary from Wikipedia if Last.fm bio is empty or generic"""
+        """Fetches artist bio summary from Wikipedia if Last.fm bio is empty or generic, cached for 24 hours."""
         if not artist_name:
             return ""
+
+        norm_key = artist_name.strip().lower()
+        now = time.time()
+        if norm_key in cls._wiki_bio_cache:
+            ts, bio = cls._wiki_bio_cache[norm_key]
+            if now - ts < cls.WIKI_BIO_TTL:
+                return bio
+
+        extract_result = ""
         for lang in ["es", "en"]:
             for cand in [artist_name, f"{artist_name} (rapero)", f"{artist_name} (cantante)", f"{artist_name} (músico)", f"{artist_name} (banda)"]:
                 try:
@@ -792,9 +803,13 @@ class LastFMService(metaclass=LastFMMeta):
                             d = json.loads(res.read().decode('utf-8', errors='replace'))
                             extract = d.get("extract")
                             if extract and len(extract) > 40:
-                                return extract.strip()
+                                extract_result = extract.strip()
+                                break
                 except Exception:
                     pass
+            if extract_result:
+                break
+
             # Search via API
             try:
                 q = urllib.parse.quote(artist_name)
@@ -817,12 +832,18 @@ class LastFMService(metaclass=LastFMMeta):
                                         s_d = json.loads(s_res.read().decode('utf-8', errors='replace'))
                                         extract = s_d.get("extract")
                                         if extract and any(k in extract.lower() for k in ["rapero", "cantante", "músic", "álbum", "disco", "cancion", "band", "artist", "singer", "rapper", "mc"]):
-                                            return extract.strip()
+                                            extract_result = extract.strip()
+                                            break
                             except Exception:
                                 pass
+                        if extract_result:
+                            break
             except Exception:
                 pass
-        return ""
+
+        if extract_result:
+            cls._wiki_bio_cache[norm_key] = (now, extract_result)
+        return extract_result
 
     @classmethod
     def _get_lastfm_top_albums_discography(cls, artist_name: str) -> List[Dict[str, Any]]:
