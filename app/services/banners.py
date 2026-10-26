@@ -82,59 +82,45 @@ class BannerService:
         if not query or not settings.TWITCH_CLIENT_ID:
             return []
         
-        token = IGDBService._get_access_token()
-        if not token:
-            return []
-        
         results = []
         seen_images = set()
         variants = cls._generate_query_variants(query)[:2]
 
         for term in variants:
-            safe_query = term.replace('"', '\\"')
-            # Search games with 1080p screenshots and artworks
-            body = f'search "{safe_query}"; fields id, name, artworks.image_id, screenshots.image_id; limit 15;'
-            req = urllib.request.Request(
-                "https://api.igdb.com/v4/games",
-                data=body.encode("utf-8"),
-                headers={"Client-ID": settings.TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}", "Accept": "application/json"}
-            )
             try:
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    if resp.status == 200:
-                        games = json.loads(resp.read().decode())
-                        for g in games:
-                            gname = g.get("name") or "Video Game"
-                            
-                            # Artworks in 1080p (up to 3 per game)
-                            for art in g.get("artworks", [])[:3]:
-                                img_id = art.get("image_id")
-                                if img_id:
-                                    url = f"https://images.igdb.com/igdb/image/upload/t_1080p/{img_id}.jpg"
-                                    if url not in seen_images:
-                                        seen_images.add(url)
-                                        results.append(BannerSearchResult(
-                                            title=gname,
-                                            image_url=url,
-                                            category="game",
-                                            origin=gname,
-                                            kind="artwork"
-                                        ))
-                            
-                            # Screenshots in 1080p (up to 3 per game)
-                            for sc in g.get("screenshots", [])[:3]:
-                                img_id = sc.get("image_id")
-                                if img_id:
-                                    url = f"https://images.igdb.com/igdb/image/upload/t_1080p/{img_id}.jpg"
-                                    if url not in seen_images:
-                                        seen_images.add(url)
-                                        results.append(BannerSearchResult(
-                                            title=gname,
-                                            image_url=url,
-                                            category="game",
-                                            origin=gname,
-                                            kind="screenshot"
-                                        ))
+                games = IGDBService.search_game_artworks_and_screenshots(term, limit=15)
+                for g in games:
+                    gname = g.get("name") or "Video Game"
+                    
+                    # Artworks in 1080p (up to 3 per game)
+                    for art in g.get("artworks", [])[:3]:
+                        img_id = art.get("image_id")
+                        if img_id:
+                            url = f"https://images.igdb.com/igdb/image/upload/t_1080p/{img_id}.jpg"
+                            if url not in seen_images:
+                                seen_images.add(url)
+                                results.append(BannerSearchResult(
+                                    title=gname,
+                                    image_url=url,
+                                    category="game",
+                                    origin=gname,
+                                    kind="artwork"
+                                ))
+                    
+                    # Screenshots in 1080p (up to 3 per game)
+                    for sc in g.get("screenshots", [])[:3]:
+                        img_id = sc.get("image_id")
+                        if img_id:
+                            url = f"https://images.igdb.com/igdb/image/upload/t_1080p/{img_id}.jpg"
+                            if url not in seen_images:
+                                seen_images.add(url)
+                                results.append(BannerSearchResult(
+                                    title=gname,
+                                    image_url=url,
+                                    category="game",
+                                    origin=gname,
+                                    kind="screenshot"
+                                ))
             except Exception as e:
                 print(f"IGDB Banner Search Error: {e}")
             

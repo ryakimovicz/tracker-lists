@@ -282,55 +282,36 @@ class CharacterService:
         if not query or not settings.TWITCH_CLIENT_ID:
             return []
         
-        token = IGDBService._get_access_token()
-        if not token:
-            return []
-        
         results = []
         seen_ids = set()
         variants = cls._generate_query_variants(query)
 
         # 1. Direct character search
         for term in variants[:5]:
-            safe_query = term.replace('"', '\\"')
-            body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 12;'
-            
-            req = urllib.request.Request(
-                "https://api.igdb.com/v4/characters",
-                data=body.encode("utf-8"),
-                headers={
-                    "Client-ID": settings.TWITCH_CLIENT_ID,
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/json"
-                }
-            )
-
             try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for ch in data:
-                            ch_id = ch.get("id")
-                            if ch_id in seen_ids:
-                                continue
-                            seen_ids.add(ch_id)
+                data = IGDBService.search_characters(term, limit=12)
+                for ch in data:
+                    ch_id = ch.get("id")
+                    if ch_id in seen_ids:
+                        continue
+                    seen_ids.add(ch_id)
 
-                            name = ch.get("name") or "Unknown Character"
-                            mug_shot = ch.get("mug_shot")
-                            img_url = None
-                            if mug_shot and mug_shot.get("image_id"):
-                                img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg"
-                            
-                            games = ch.get("games") or []
-                            origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
-                            
-                            if img_url:
-                                results.append(CharacterSearchResult(
-                                    name=name,
-                                    image_url=img_url,
-                                    category="game",
-                                    origin=origin
-                                ))
+                    name = ch.get("name") or "Unknown Character"
+                    mug_shot = ch.get("mug_shot")
+                    img_url = None
+                    if mug_shot and mug_shot.get("image_id"):
+                        img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg"
+                    
+                    games = ch.get("games") or []
+                    origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
+                    
+                    if img_url:
+                        results.append(CharacterSearchResult(
+                            name=name,
+                            image_url=img_url,
+                            category="game",
+                            origin=origin
+                        ))
             except Exception as e:
                 print(f"IGDB Character Search Error: {e}")
 
@@ -340,79 +321,63 @@ class CharacterService:
         for term in game_terms:
             safe_game_query = term.replace('"', '\\"')
             body_game = f'search "{safe_game_query}"; fields id, name, cover.image_id, artworks.image_id; limit 6;'
-            req_g = urllib.request.Request(
-                "https://api.igdb.com/v4/games",
-                data=body_game.encode("utf-8"),
-                headers={"Client-ID": settings.TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}", "Accept": "application/json"}
-            )
             try:
-                with urllib.request.urlopen(req_g, timeout=5) as resp_g:
-                    if resp_g.status == 200:
-                        games_data = json.loads(resp_g.read().decode())
-                        for g in games_data:
-                            g_id = g.get('id')
-                            if g_id:
-                                all_game_ids.append(str(g_id))
-                            
-                            gname = g.get('name') or "Video Game"
-                            cover = g.get('cover')
-                            if cover and cover.get('image_id'):
-                                c_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
-                                if c_url not in seen_ids:
-                                    seen_ids.add(c_url)
-                                    results.append(CharacterSearchResult(
-                                        name=gname,
-                                        image_url=c_url,
-                                        category="game",
-                                        origin=gname
-                                    ))
-                            
-                            artworks = g.get('artworks') or []
-                            for art in artworks[:3]:
-                                if art.get('image_id'):
-                                    a_url = f"https://images.igdb.com/igdb/image/upload/t_720p/{art['image_id']}.jpg"
-                                    if a_url not in seen_ids:
-                                        seen_ids.add(a_url)
-                                        results.append(CharacterSearchResult(
-                                            name=f"{gname} (Art)",
-                                            image_url=a_url,
-                                            category="game",
-                                            origin=gname
-                                        ))
+                games_data = IGDBService.apicalypse_request("games", body_game, timeout=5.0, use_cache=True, cache_ttl=1800) or []
+                for g in games_data:
+                    g_id = g.get('id')
+                    if g_id:
+                        all_game_ids.append(str(g_id))
+                    
+                    gname = g.get('name') or "Video Game"
+                    cover = g.get('cover')
+                    if cover and cover.get('image_id'):
+                        c_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
+                        if c_url not in seen_ids:
+                            seen_ids.add(c_url)
+                            results.append(CharacterSearchResult(
+                                name=gname,
+                                image_url=c_url,
+                                category="game",
+                                origin=gname
+                            ))
+                    
+                    artworks = g.get('artworks') or []
+                    for art in artworks[:3]:
+                        if art.get('image_id'):
+                            a_url = f"https://images.igdb.com/igdb/image/upload/t_720p/{art['image_id']}.jpg"
+                            if a_url not in seen_ids:
+                                seen_ids.add(a_url)
+                                results.append(CharacterSearchResult(
+                                    name=f"{gname} (Art)",
+                                    image_url=a_url,
+                                    category="game",
+                                    origin=gname
+                                ))
             except Exception:
                 pass
 
         if all_game_ids:
-            unique_gids = list(dict.fromkeys(all_game_ids))[:15]
-            body_gc = f'where games = ({",".join(unique_gids)}); fields id, name, mug_shot.image_id, games.name; limit 20;'
-            req_gc = urllib.request.Request(
-                "https://api.igdb.com/v4/characters",
-                data=body_gc.encode("utf-8"),
-                headers={"Client-ID": settings.TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}", "Accept": "application/json"}
-            )
             try:
-                with urllib.request.urlopen(req_gc, timeout=5) as resp_gc:
-                    if resp_gc.status == 200:
-                        g_chars = json.loads(resp_gc.read().decode())
-                        for ch in g_chars:
-                            ch_id = ch.get("id")
-                            if ch_id in seen_ids:
-                                continue
-                            seen_ids.add(ch_id)
-                            
-                            name = ch.get("name") or "Unknown Character"
-                            mug_shot = ch.get("mug_shot")
-                            img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg" if mug_shot and mug_shot.get("image_id") else None
-                            games = ch.get("games") or []
-                            origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
-                            
-                            if img_url:
-                                results.append(CharacterSearchResult(
-                                    name=name,
-                                    image_url=img_url,
-                                    category="game",
-                                    origin=origin
-                                ))
+                g_chars = IGDBService.get_characters_for_games(all_game_ids, limit=20)
+                for ch in g_chars:
+                    ch_id = ch.get("id")
+                    if ch_id in seen_ids:
+                        continue
+                    seen_ids.add(ch_id)
+                    
+                    name = ch.get("name") or "Unknown Character"
+                    mug_shot = ch.get("mug_shot")
+                    img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg" if mug_shot and mug_shot.get("image_id") else None
+                    games = ch.get("games") or []
+                    origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
+                    
+                    if img_url:
+                        results.append(CharacterSearchResult(
+                            name=name,
+                            image_url=img_url,
+                            category="game",
+                            origin=origin
+                        ))
             except Exception as e:
                 print(f"IGDB Game Cast Search Error: {e}")
 
