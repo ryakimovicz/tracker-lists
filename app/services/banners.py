@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
 from app.services.trakt import TraktService
+from app.services.anilist import AnilistService
 
 import re
 import time
@@ -147,7 +148,6 @@ class BannerService:
         results = []
         seen_images = set()
         variants = cls._generate_query_variants(query)[:2]
-        url = "https://graphql.anilist.co"
 
         graphql_banner = """
         query ($search: String) {
@@ -164,37 +164,24 @@ class BannerService:
         """
 
         for term in variants:
-            payload = json.dumps({"query": graphql_banner, "variables": {"search": term}}).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    "Origin": "https://anilist.co",
-                    "Referer": "https://anilist.co/"
-                }
-            )
             try:
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    if resp.status == 200:
-                        data = json.loads(resp.read().decode())
-                        for m in data.get("data", {}).get("Page", {}).get("media", []):
-                            if m.get("isAdult") or "Hentai" in m.get("genres", []) or "Ecchi" in m.get("genres", []):
-                                continue
-                            b_url = m.get("bannerImage")
-                            m_type = (m.get("type") or "ANIME").lower()
-                            cat = "manga" if m_type == "manga" else "anime"
-                            t = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or ("Manga" if cat == "manga" else "Anime")
-                            if b_url and b_url not in seen_images:
-                                seen_images.add(b_url)
-                                results.append(BannerSearchResult(
-                                    title=t,
-                                    image_url=b_url,
-                                    category=cat,
-                                    origin=t
-                                ))
+                data = AnilistService._graphql_request(graphql_banner, {"search": term}, timeout=5)
+                if data and isinstance(data, dict):
+                    for m in data.get("data", {}).get("Page", {}).get("media", []):
+                        if m.get("isAdult") or "Hentai" in m.get("genres", []) or "Ecchi" in m.get("genres", []):
+                            continue
+                        b_url = m.get("bannerImage")
+                        m_type = (m.get("type") or "ANIME").lower()
+                        cat = "manga" if m_type == "manga" else "anime"
+                        t = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or ("Manga" if cat == "manga" else "Anime")
+                        if b_url and b_url not in seen_images:
+                            seen_images.add(b_url)
+                            results.append(BannerSearchResult(
+                                title=t,
+                                image_url=b_url,
+                                category=cat,
+                                origin=t
+                            ))
             except Exception as e:
                 print(f"AniList Banner Search Error: {e}")
             

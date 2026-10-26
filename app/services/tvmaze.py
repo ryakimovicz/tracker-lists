@@ -781,7 +781,7 @@ class TVMazeService:
         # 1. Fetch current trending anime from AniList (pure community trending algorithm)
         anilist_norms = []
         try:
-            url_al = "https://graphql.anilist.co"
+            from app.services.anilist import AnilistService
             graphql_query = """
             query {
               Page(page: 1, perPage: 35) {
@@ -793,27 +793,17 @@ class TVMazeService:
               }
             }
             """
-            payload = json.dumps({"query": graphql_query}).encode("utf-8")
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Origin": "https://anilist.co",
-                "Referer": "https://anilist.co/"
-            }
-            req_al = urllib.request.Request(url_al, data=payload, headers=headers)
-            with urllib.request.urlopen(req_al, timeout=5) as resp_al:
-                if resp_al.status == 200:
-                    al_data = json.loads(resp_al.read().decode())
-                    al_media = al_data.get("data", {}).get("Page", {}).get("media", [])
-                    for item in al_media:
-                        t_obj = item.get("title") or {}
-                        syns = item.get("synonyms") or []
-                        for raw_t in [t_obj.get("english"), t_obj.get("romaji")] + syns:
-                            if raw_t:
-                                norm = re.sub(r'[^a-z0-9]', '', raw_t.lower())
-                                if len(norm) >= 4 and norm not in anilist_norms:
-                                    anilist_norms.append(norm)
+            al_data = AnilistService._graphql_request(graphql_query, timeout=5)
+            if al_data and isinstance(al_data, dict):
+                al_media = al_data.get("data", {}).get("Page", {}).get("media", [])
+                for item in al_media:
+                    t_obj = item.get("title") or {}
+                    syns = item.get("synonyms") or []
+                    for raw_t in [t_obj.get("english"), t_obj.get("romaji")] + syns:
+                        if raw_t:
+                            norm = re.sub(r'[^a-z0-9]', '', raw_t.lower())
+                            if len(norm) >= 4 and norm not in anilist_norms:
+                                anilist_norms.append(norm)
         except Exception as e:
             print(f"Error fetching AniList trending anime: {e}")
 

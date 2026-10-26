@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.services.igdb import IGDBService
 from app.services.trakt import TraktService
 from app.services.books import BookSearchService
+from app.services.anilist import AnilistService
 
 class CharacterSearchResult:
     def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
@@ -169,102 +170,66 @@ class CharacterService:
 
         for term in variants[:3]:
             # Direct character query
-            payload_char = json.dumps({
-                "query": graphql_char_query,
-                "variables": {"search": term}
-            }).encode("utf-8")
-
-            req_char = urllib.request.Request(
-                url,
-                data=payload_char,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    "Origin": "https://anilist.co",
-                    "Referer": "https://anilist.co/"
-                }
-            )
-
             try:
-                with urllib.request.urlopen(req_char, timeout=5) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        characters = data.get("data", {}).get("Page", {}).get("characters", [])
-                        for ch in characters:
-                            name_obj = ch.get("name", {})
-                            full_name = name_obj.get("full") or name_obj.get("native") or "Unknown Character"
-                            if full_name in seen_names:
-                                continue
-                            seen_names.add(full_name)
+                data = AnilistService._graphql_request(graphql_char_query, {"search": term}, timeout=5)
+                if data and isinstance(data, dict):
+                    characters = data.get("data", {}).get("Page", {}).get("characters", [])
+                    for ch in characters:
+                        name_obj = ch.get("name", {})
+                        full_name = name_obj.get("full") or name_obj.get("native") or "Unknown Character"
+                        if full_name in seen_names:
+                            continue
+                        seen_names.add(full_name)
 
-                            img_obj = ch.get("image", {})
-                            img_url = img_obj.get("large") or img_obj.get("medium")
-                            
-                            origin = ""
-                            media_nodes = ch.get("media", {}).get("nodes", [])
-                            if media_nodes:
-                                first_media = media_nodes[0]
-                                title_obj = first_media.get("title", {})
-                                origin = title_obj.get("english") or title_obj.get("romaji") or ""
+                        img_obj = ch.get("image", {})
+                        img_url = img_obj.get("large") or img_obj.get("medium")
+                        
+                        origin = ""
+                        media_nodes = ch.get("media", {}).get("nodes", [])
+                        if media_nodes:
+                            first_media = media_nodes[0]
+                            title_obj = first_media.get("title", {})
+                            origin = title_obj.get("english") or title_obj.get("romaji") or ""
 
-                            if img_url and not img_url.endswith("default.jpg"):
-                                results.append(CharacterSearchResult(
-                                    name=full_name,
-                                    image_url=img_url,
-                                    category="anime",
-                                    origin=origin
-                                ))
+                        if img_url and not img_url.endswith("default.jpg"):
+                            results.append(CharacterSearchResult(
+                                name=full_name,
+                                image_url=img_url,
+                                category="anime",
+                                origin=origin
+                            ))
             except Exception as e:
                 print(f"AniList Character Search Error: {e}")
 
             # Media cast query (when searching anime titles like "Death Note", "Attack on Titan", "Bleach")
-            payload_media = json.dumps({
-                "query": graphql_media_query,
-                "variables": {"search": term}
-            }).encode("utf-8")
-
-            req_media = urllib.request.Request(
-                url,
-                data=payload_media,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    "Origin": "https://anilist.co",
-                    "Referer": "https://anilist.co/"
-                }
-            )
-
             try:
-                with urllib.request.urlopen(req_media, timeout=5) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        media_list = data.get("data", {}).get("Page", {}).get("media", [])
-                        for m in media_list:
-                            m_title = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or "Anime"
-                            cover_url = m.get("coverImage", {}).get("large")
-                            if cover_url and m_title not in seen_names:
-                                seen_names.add(m_title)
+                data = AnilistService._graphql_request(graphql_media_query, {"search": term}, timeout=5)
+                if data and isinstance(data, dict):
+                    media_list = data.get("data", {}).get("Page", {}).get("media", [])
+                    for m in media_list:
+                        m_title = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or "Anime"
+                        cover_url = m.get("coverImage", {}).get("large")
+                        if cover_url and m_title not in seen_names:
+                            seen_names.add(m_title)
+                            results.append(CharacterSearchResult(
+                                name=m_title,
+                                image_url=cover_url,
+                                category="anime",
+                                origin=m_title
+                            ))
+
+                        cast_chars = m.get("characters", {}).get("nodes", [])
+                        for c in cast_chars:
+                            c_name = c.get("name", {}).get("full") or c.get("name", {}).get("native")
+                            c_img = c.get("image", {}).get("large")
+                            if c_name and c_img and c_name not in seen_names:
+                                seen_names.add(c_name)
                                 results.append(CharacterSearchResult(
-                                    name=m_title,
-                                    image_url=cover_url,
+                                    name=c_name,
+                                    image_url=c_img,
                                     category="anime",
                                     origin=m_title
                                 ))
-
-                            cast_chars = m.get("characters", {}).get("nodes", [])
-                            for c in cast_chars:
-                                c_name = c.get("name", {}).get("full") or c.get("name", {}).get("native")
-                                c_img = c.get("image", {}).get("large")
-                                if c_name and c_img and c_name not in seen_names:
-                                    seen_names.add(c_name)
-                                    results.append(CharacterSearchResult(
-                                        name=c_name,
-                                        image_url=c_img,
-                                        category="anime",
-                                        origin=m_title
-                                    ))
             except Exception as e:
                 print(f"AniList Media Cast Search Error: {e}")
                 
