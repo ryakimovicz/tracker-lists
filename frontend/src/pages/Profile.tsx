@@ -6029,6 +6029,17 @@ export const Profile: React.FC = () => {
                           if (releasedIssues.length > 0 && completedIssues >= releasedIssues.length && completedIssues > 0) {
                             isUpToDate = true;
                           }
+
+                          // If ANY issue is currently in progress (reading or pages_read > 0), the comic is NOT up to date!
+                          const hasIssueInProgress = allEps.some((e: any) => {
+                            const cleanId = String(e.id || e.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+                            const extIdKey = String(e.external_id || e.id).startsWith('cv_') || String(e.external_id || e.id).startsWith('metron_') ? String(e.external_id || e.id) : `metron_issue_${cleanId}`;
+                            const cached = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`) || getCachedSeries(`issue_state_${cleanId}`) || getCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`);
+                            return cached && cached.status !== 'read' && (cached.status === 'reading' || (cached.pages_read && cached.pages_read > 0));
+                          });
+                          if (hasIssueInProgress) {
+                            isUpToDate = false;
+                          }
                         }
                         if (isUpToDate) {
                           badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });

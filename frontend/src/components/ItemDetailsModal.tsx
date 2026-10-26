@@ -5448,6 +5448,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
+    // 0. Optimistic instant visual feedback for button state
+    setSelectedItem((prev: any) => prev ? {
+      ...prev,
+      status: newStatus,
+      is_completed: newStatus === 'read'
+    } : null);
+
     // 1. Resolve parent volume
     let parentVol = selectedItem.parent_series;
     if (!parentVol && selectedItem.external_id) {

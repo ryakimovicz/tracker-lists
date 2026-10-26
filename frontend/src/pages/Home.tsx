@@ -807,7 +807,64 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       const now = Date.now();
       const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
       const sortedValidEps = sortEpisodesChronologically(validEps);
+
+      const getTracked = (ep: any) => (trackedList || []).find((t: any) => {
+        if (isComic) {
+          const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_', '');
+          const tCleanId = String(t.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_', '');
+          return (
+            t.external_id === `cv_issue_${cleanId}` ||
+            t.external_id === `metron_issue_${cleanId}` ||
+            tCleanId === cleanId ||
+            (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
+          );
+        }
+        const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
+        const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
+        return (
+          t.external_id === `tvm-ep-${cleanTvmId}` ||
+          tCleanTvmId === cleanTvmId ||
+          (ep.season_number != null && ep.episode_number != null && t.season_number === ep.season_number && t.episode_number === ep.episode_number) ||
+          (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+          (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+        );
+      });
+
+      const getIssueCachedState = (ep: any) => {
+        const cleanId = String(ep.id || ep.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+        const extIdKey = String(ep.external_id || ep.id).startsWith('cv_') || String(ep.external_id || ep.id).startsWith('metron_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanId}`;
+        return getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`) || getCachedSeries(`issue_state_${cleanId}`) || getCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`);
+      };
+
+      // 1. Prioritize any issue/episode explicitly currently in progress (reading/watching or pages_read > 0 and not complete)
+      const inProgressCandidate = sortedValidEps.find((ep: any) => {
+        const t = getTracked(ep);
+        if (t && t.is_completed) return false;
+        const cached = isComic ? getIssueCachedState(ep) : null;
+        if (cached && cached.status === 'read') return false;
+        if (cached && (cached.status === 'reading' || (cached.pages_read && cached.pages_read > 0))) {
+          return true;
+        }
+        if (t && (t.status === 'reading' || (t.pages_read && t.pages_read > 0))) {
+          return true;
+        }
+        return false;
+      });
+
+      if (inProgressCandidate) {
+        return { nextEp: inProgressCandidate, isCaughtUp: false, initialLoad: false };
+      }
+
       const aired = sortedValidEps.filter((ep: any) => {
+        const t = getTracked(ep);
+        if (t && (t.is_completed || t.status === 'reading' || (t.pages_read && t.pages_read > 0))) {
+          return true;
+        }
+        const cached = isComic ? getIssueCachedState(ep) : null;
+        if (cached && (cached.status === 'read' || cached.status === 'reading' || (cached.pages_read && cached.pages_read > 0))) {
+          return true;
+        }
+
         if (isComic) {
           if (ep.air_date || ep.airdate) {
             const ad = ep.air_date || ep.airdate;
@@ -824,27 +881,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         return true;
       });
       if (aired.length > 0) {
-        const getTracked = (ep: any) => (trackedList || []).find((t: any) => {
-          if (isComic) {
-            const cleanId = String(ep.id).replace('cv_issue_', '').replace('metron_issue_', '');
-            const tCleanId = String(t.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '');
-            return (
-              t.external_id === `cv_issue_${cleanId}` ||
-              t.external_id === `metron_issue_${cleanId}` ||
-              tCleanId === cleanId ||
-              (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
-            );
-          }
-          const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
-          const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
-          return (
-            t.external_id === `tvm-ep-${cleanTvmId}` ||
-            tCleanTvmId === cleanTvmId ||
-            (ep.season_number != null && ep.episode_number != null && t.season_number === ep.season_number && t.episode_number === ep.episode_number) ||
-            (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-            (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
-          );
-        });
         const airedCounts = aired.map((ep: any) => {
           const t = getTracked(ep);
           return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
@@ -886,7 +922,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const initialSavedNext = getCachedSeries(`next_candidate_${item.id}`);
 
   const initialNextEp = initialComputed.nextEp || initialSavedNext?.nextEp || null;
-  const initialIsCaughtUp = initialComputed.isCaughtUp || initialSavedNext?.isCaughtUp || false;
+  const initialIsCaughtUp = initialComputed.nextEp ? false : (initialComputed.isCaughtUp || initialSavedNext?.isCaughtUp || false);
   const initialIsLoading = (initialComputed.initialLoad && !initialSavedNext) ? true : false;
 
   const [nextEp, setNextEp] = useState<any>(initialNextEp);
@@ -1350,7 +1386,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         const tClean = String(t.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
         return (tClean && tClean === cleanId) || t.external_id === extIdKey || (issueNum && t.title && (t.title.includes(`#${issueNum}`) || t.episode_number == issueNum));
       });
-      const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`);
+      const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`) || getCachedSeries(`issue_state_${cleanId}`) || getCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`);
 
       const rawPages = (trackedMatch && (trackedMatch.pages_read ?? trackedMatch.total_pages))
         ?? (cachedState && (cachedState.pages_read ?? cachedState.total_pages))
@@ -1803,22 +1839,26 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/);
         const issueNum = issueMatch ? issueMatch[1] : null;
         const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
-        const epName = cleanComicIssueName(item.last_seen_episode, issueNum);
-        return { seasonText, epName };
+        let comicPagesRead = 0;
+        const cached = getCachedSeries(`dropped_last_${item.id}`);
+        if (cached && typeof cached.comicPagesRead === 'number') {
+          comicPagesRead = cached.comicPagesRead;
+        }
+        return { seasonText, epName: '', comicPagesRead };
       } else {
         const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
         if (match) {
           const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
           const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
           const epName = nameMatch ? nameMatch[1].trim() : '';
-          return { seasonText, epName };
+          return { seasonText, epName, comicPagesRead: 0 };
         }
       }
     }
     return getCachedSeries(`dropped_last_${item.id}`) || null;
   };
 
-  const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(parseInitialLastSeen);
+  const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string; comicPagesRead?: number } | null>(parseInitialLastSeen);
   const [isLoading, setIsLoading] = useState(false);
   const [isJustPlayed, setIsJustPlayed] = useState(false);
   const justPlayedTimerRef = useRef<any>(null);
@@ -1854,10 +1894,20 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
           if (isComic) {
             const issueNum = last.issue_number || last.episode_number || (last.title ? (last.title.match(/#(\d+(\.\d+)?)/)?.[1]) : null);
             const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
-            const epName = cleanComicIssueName(last.name || last.title || '', issueNum);
+            
+            const cleanId = String(last.id || last.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+            const extIdKey = String(last.external_id || last.id).startsWith('cv_') || String(last.external_id || last.id).startsWith('metron_') ? String(last.external_id || last.id) : `metron_issue_${cleanId}`;
+            const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`);
+
+            const rawPages = (last && (last.pages_read ?? last.total_pages))
+              ?? (cachedState && (cachedState.pages_read ?? cachedState.total_pages))
+              ?? 0;
+
+            const comicPagesRead = parseInt(String(rawPages), 10) || 0;
+
             if (isMounted) {
-              setLastEpInfo({ seasonText, epName });
-              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName });
+              setLastEpInfo({ seasonText, epName: '', comicPagesRead });
+              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName: '', comicPagesRead });
             }
           } else {
             const sStr = pad(last.season);
@@ -1872,8 +1922,8 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
               epName = last.title || (language === 'es' ? 'Episodio' : 'Episode');
             }
             if (isMounted) {
-              setLastEpInfo({ seasonText, epName });
-              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName });
+              setLastEpInfo({ seasonText, epName, comicPagesRead: 0 });
+              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName, comicPagesRead: 0 });
             }
           }
         } else if (item.last_seen_episode) {
@@ -1881,15 +1931,28 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
             const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/);
             const issueNum = issueMatch ? issueMatch[1] : null;
             const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
-            const epName = cleanComicIssueName(item.last_seen_episode, issueNum);
-            if (isMounted) setLastEpInfo({ seasonText, epName });
+            const matchedItem = trackedEpisodes.find((t: any) => issueNum && t.title && (t.title.includes(`#${issueNum}`) || t.episode_number == issueNum));
+            let comicPagesRead = 0;
+            if (matchedItem) {
+              const cleanId = String(matchedItem.id || matchedItem.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+              const extIdKey = String(matchedItem.external_id || matchedItem.id).startsWith('cv_') || String(matchedItem.external_id || matchedItem.id).startsWith('metron_') ? String(matchedItem.external_id || matchedItem.id) : `metron_issue_${cleanId}`;
+              const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`);
+              const rawPages = (matchedItem && (matchedItem.pages_read ?? matchedItem.total_pages))
+                ?? (cachedState && (cachedState.pages_read ?? cachedState.total_pages))
+                ?? 0;
+              comicPagesRead = parseInt(String(rawPages), 10) || 0;
+            }
+            if (isMounted) {
+              setLastEpInfo({ seasonText, epName: '', comicPagesRead });
+              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName: '', comicPagesRead });
+            }
           } else {
             const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
             if (match) {
               const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
               const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
               const epName = nameMatch ? nameMatch[1].trim() : '';
-              if (isMounted) setLastEpInfo({ seasonText, epName });
+              if (isMounted) setLastEpInfo({ seasonText, epName, comicPagesRead: 0 });
             }
           }
         }
@@ -1966,7 +2029,13 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         {lastEpInfo ? (
           <>
             <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{lastEpInfo.seasonText}</div>
-            {lastEpInfo.epName ? (
+            {isComic ? (
+              lastEpInfo.comicPagesRead && lastEpInfo.comicPagesRead > 0 ? (
+                <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2 }}>
+                  {lastEpInfo.comicPagesRead} {language === 'es' ? 'págs.' : 'pages'}
+                </div>
+              ) : null
+            ) : lastEpInfo.epName ? (
               <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{lastEpInfo.epName}</div>
             ) : null}
           </>
@@ -2597,7 +2666,7 @@ export const Home: React.FC = () => {
 
       // 2. Non-blocking background auto-sync of series/anime & metadata enrichment for standalone works
       const nowMs = Date.now();
-      const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
+      const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime' || (i.item_type === 'comic' && i.tracking_list_id)) && i.tracking_list_id);
       const standaloneItems = currentLib.filter((i: any) => ['movie', 'game', 'book', 'comic', 'manga'].includes(i.item_type) && !i.tracking_list_id);
 
       // Fetch release dates / metadata for standalone works with missing dates (cached or throttled)
@@ -2655,11 +2724,12 @@ export const Home: React.FC = () => {
         setIsSyncingEpisodes(true);
         Promise.allSettled(
           trackingSeries.map(async (item: any) => {
+            const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_') || String(item.external_id || '').startsWith('metron_series_');
             const cacheKeyAll = `${item.external_id}_all_episodes`;
             let allEps = getCachedSeries(cacheKeyAll);
             if (!allEps) {
               try {
-                const epRes = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+                const epRes = await apiClient.get(isComic ? `/search/comic/volume/${item.external_id}/issues` : `/search/series/${item.external_id}/episodes`);
                 allEps = epRes.data;
                 setCachedSeries(cacheKeyAll, allEps);
               } catch (e) {
@@ -2680,6 +2750,14 @@ export const Home: React.FC = () => {
 
               const pad = (n: number) => String(n).padStart(2, '0');
               const getEpTracked = (ep: any) => {
+                if (isComic) {
+                  const cleanId = String(ep.id || ep.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+                  const extIdKey = String(ep.external_id || ep.id).startsWith('cv_') || String(ep.external_id || ep.id).startsWith('metron_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanId}`;
+                  return trackedEps.find((t: any) => {
+                    const tCleanId = String(t.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+                    return t.external_id === extIdKey || tCleanId === cleanId || (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number));
+                  });
+                }
                 const epIdStr = String(ep.id || '');
                 return trackedEps.find((t: any) => {
                   if (t.external_id === `tvm-ep-${ep.id}` || t.external_id === epIdStr || t.id === ep.id) return true;
@@ -2694,7 +2772,7 @@ export const Home: React.FC = () => {
                 });
               };
 
-              // Extract future unwatched episodes for Upcoming tab
+              // Extract future unwatched episodes / unread issues for Upcoming tab
               allEps.forEach(ep => {
                 let epTimestamp = 0;
                 if (ep.airstamp) {
@@ -2706,21 +2784,40 @@ export const Home: React.FC = () => {
                 }
                 const isFuture = epTimestamp > nowMs;
                 if (isFuture) {
-                  const t = getEpTracked(ep);
-                  const isWatched = t && t.is_completed;
-                  if (!isWatched) {
+                  let isConsumedOrReading = false;
+                  if (isComic) {
+                    const cleanId = String(ep.id || ep.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+                    const extIdKey = String(ep.external_id || ep.id).startsWith('cv_') || String(ep.external_id || ep.id).startsWith('metron_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanId}`;
+                    const t = getEpTracked(ep);
+                    const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`) || getCachedSeries(`issue_state_${cleanId}`) || getCachedSeries(`issue_state_cv_issue_metron_issue_${cleanId}`);
+
+                    const isRead = (t && t.is_completed) || (cachedState && cachedState.status === 'read');
+                    const isReading = (t && (t.status === 'reading' || (t.pages_read && t.pages_read > 0))) || (cachedState && (cachedState.status === 'reading' || (cachedState.pages_read && cachedState.pages_read > 0)));
+
+                    if (isRead || isReading) {
+                      isConsumedOrReading = true;
+                    }
+                  } else {
+                    const t = getEpTracked(ep);
+                    if (t && t.is_completed) {
+                      isConsumedOrReading = true;
+                    }
+                  }
+
+                  if (!isConsumedOrReading) {
+                    const issueOrEpNum = ep.issue_number ?? ep.episode_number;
                     futureEps.push({
-                      id: `ep-${ep.id || ep.external_id}-${ep.season_number}-${ep.episode_number}`,
+                      id: isComic ? `issue-${ep.id || ep.external_id}-${issueOrEpNum}` : `ep-${ep.id || ep.external_id}-${ep.season_number}-${ep.episode_number}`,
                       title: item.title,
-                      coverUrl: ep.image_url || ep.still_path || ep.image?.medium || ep.image?.original || item.image_url,
+                      coverUrl: ep.still_path || ep.image_url || ep.image?.medium || ep.image?.original || item.image_url,
                       themeColor: `var(--color-${item.item_type})`,
                       themeTextColor: `var(--color-text-${item.item_type})`,
-                      season_number: ep.season_number,
-                      episode_number: ep.episode_number,
-                      airdate: ep.airdate || ep.air_date,
+                      season_number: isComic ? 1 : ep.season_number,
+                      episode_number: issueOrEpNum,
+                      airdate: ep.air_date || ep.airdate,
                       airstamp: ep.airstamp,
                       timestamp: epTimestamp,
-                      name: ep.name,
+                      name: isComic ? cleanComicIssueName(ep.name || ep.title || '', issueOrEpNum) : ep.name,
                       item_type: item.item_type,
                       parent_series: item,
                       rawEpisode: ep
@@ -3114,7 +3211,7 @@ export const Home: React.FC = () => {
   let tbaAllItems: any[] = [];
   // 1. Standalone library works (movies, games, manga, books, comics)
   libraryItems.forEach(item => {
-      if (item.item_type !== 'series' && item.item_type !== 'anime') {
+      if (item.item_type !== 'series' && item.item_type !== 'anime' && !(item.item_type === 'comic' && item.tracking_list_id)) {
         // Resolve release_date from item or cached metadata
         const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
         const cachedDesc = getCachedSeries(descCacheKey);
@@ -3283,7 +3380,9 @@ export const Home: React.FC = () => {
                           {group.items.map(uItem => {
                             const isEpisodeItem = uItem.season_number != null && uItem.episode_number != null;
                             const epLabel = isEpisodeItem
-                              ? (language === 'es' ? `T${uItem.season_number} E${uItem.episode_number}` : `S${uItem.season_number} E${uItem.episode_number}`)
+                              ? (uItem.item_type === 'comic'
+                                  ? `#${uItem.episode_number}`
+                                  : (language === 'es' ? `T${uItem.season_number} E${uItem.episode_number}` : `S${uItem.season_number} E${uItem.episode_number}`))
                               : '';
                             const formattedDate = formatUpcomingDate(uItem.airdate || uItem.release_date, uItem.airstamp);
                             const catLabel = getTypeCat(uItem.item_type);
@@ -3292,8 +3391,54 @@ export const Home: React.FC = () => {
                               <div
                                 key={uItem.id}
                                 onClick={() => {
-                                  if (uItem.rawItem) handleOpenItem(uItem.rawItem);
-                                  else if (uItem.external_id && uItem.item_type) {
+                                  if (uItem.rawItem) {
+                                    handleOpenItem(uItem.rawItem);
+                                  } else if (uItem.item_type === 'comic' && uItem.rawEpisode) {
+                                    const ep = uItem.rawEpisode;
+                                    const parent = uItem.parent_series;
+                                    const issueNum = uItem.episode_number;
+                                    handleOpenItem({
+                                      id: ep.id,
+                                      rawEpisodeId: ep.id,
+                                      list_id: parent?.tracking_list_id,
+                                      tracking_list_id: parent?.tracking_list_id,
+                                      item_type: 'comic',
+                                      title: `${parent?.title || uItem.title} #${issueNum}`,
+                                      episode_name: ep.name || `#${issueNum}`,
+                                      issue_number: issueNum,
+                                      season_number: 1,
+                                      episode_number: issueNum,
+                                      external_id: String(ep.id).startsWith('cv_') || String(ep.id).startsWith('metron_') ? ep.id : `metron_issue_${ep.id}`,
+                                      image_url: uItem.coverUrl,
+                                      custom_notes: JSON.stringify({ description: ep.overview || '', release_date: uItem.airdate || null }),
+                                      release_date: uItem.airdate || null,
+                                      parent_series: parent
+                                    });
+                                  } else if (uItem.rawEpisode && uItem.parent_series) {
+                                    const ep = uItem.rawEpisode;
+                                    const parent = uItem.parent_series;
+                                    const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && (ep.season_number || 0) > 0);
+                                    const padTwo = (n: any) => String(n || 0).padStart(2, '0');
+                                    handleOpenItem({
+                                      id: ep.id,
+                                      rawEpisodeId: ep.id,
+                                      list_id: parent.tracking_list_id,
+                                      tracking_list_id: parent.tracking_list_id,
+                                      item_type: 'episode',
+                                      title: isSpecial
+                                        ? `${parent.title} - ${language === 'es' ? 'Especial' : 'Special'} - ${ep.name || 'Untitled'}`
+                                        : `${parent.title} - S${padTwo(ep.season_number)}E${padTwo(ep.episode_number)} - ${ep.name || 'Untitled'}`,
+                                      episode_name: isSpecial ? (ep.name || (language === 'es' ? 'Especial' : 'Special')) : (ep.name || `Episode ${ep.episode_number}`),
+                                      season_number: ep.season_number,
+                                      episode_number: ep.episode_number,
+                                      is_significant_special: isSpecial,
+                                      external_id: `tvm-ep-${ep.id}`,
+                                      image_url: ep.image_url || ep.still_path || ep.image?.original || ep.image?.medium || parent.image_url,
+                                      custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || ep.airdate || null }),
+                                      release_date: ep.air_date || ep.airdate || null,
+                                      parent_series: parent
+                                    });
+                                  } else if (uItem.external_id && uItem.item_type) {
                                     handleOpenItem({
                                       id: uItem.id,
                                       external_id: uItem.external_id,
