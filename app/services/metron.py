@@ -901,6 +901,3 @@ class MetronService:
             _TRENDING_COMICS_CACHE[cache_key] = (now_ts, results)
 
         return results
-
-# Backward compatibility alias
-ComicVineService = MetronService

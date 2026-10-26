@@ -305,7 +305,7 @@ class BannerService:
         return results
 
     @classmethod
-    def _search_comicvine(cls, query: str) -> List[BannerSearchResult]:
+    def _search_metron(cls, query: str) -> List[BannerSearchResult]:
         if not query:
             return []
         from app.services.metron import _metron_request
@@ -589,7 +589,7 @@ class BannerService:
             f_movies = executor.submit(cls._search_fanart_movies, search_term)
             f_tv = executor.submit(cls._search_tvmaze, clean_query, raw_query)
             f_books = executor.submit(cls._search_books, search_term)
-            f_comic = executor.submit(cls._search_comicvine, search_term)
+            f_comic = executor.submit(cls._search_metron, search_term)
             f_music = executor.submit(cls._search_music, search_term, target_type)
 
             for future in (f_igdb, f_ani, f_movies, f_tv, f_books, f_comic, f_music):

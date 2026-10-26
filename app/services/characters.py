@@ -240,7 +240,7 @@ class CharacterService:
 
 
     @classmethod
-    def _search_comicvine(cls, query: str) -> List[CharacterSearchResult]:
+    def _search_metron(cls, query: str) -> List[CharacterSearchResult]:
         if not query:
             return []
         from app.services.metron import _metron_request
@@ -730,10 +730,10 @@ class CharacterService:
             f_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
             f_movies = executor.submit(cls._search_movies, search_term)
             f_books = executor.submit(cls._search_books, search_term)
-            f_comicvine = executor.submit(cls._search_comicvine, search_term)
+            f_metron = executor.submit(cls._search_metron, search_term)
             f_music = executor.submit(cls._search_music, search_term)
 
-            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_books, f_comicvine, f_music):
+            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_books, f_metron, f_music):
                 try:
                     res = future.result()
                     all_results.extend(res)

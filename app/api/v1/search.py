@@ -7,7 +7,6 @@ from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
 from app.services.metron import MetronService
-from app.services.comicvine import ComicVineService
 from app.services.tvmaze import TVMazeService
 from app.services.trakt import TraktService
 from app.services.books import BookSearchService

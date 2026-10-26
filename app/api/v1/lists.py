@@ -2100,8 +2100,8 @@ def bulk_toggle_season(
         if lib_item and lib_item.external_id:
             try:
                 if is_comic:
-                    from app.services.comicvine import ComicVineService
-                    episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
+                    from app.services.metron import MetronService
+                    episodes_list = MetronService.get_comic_volume_issues(lib_item.external_id) or []
                 else:
                     clean_id = lib_item.external_id
                     if clean_id.startswith('tvm_'):
@@ -2362,8 +2362,8 @@ def bulk_toggle_season(
                             if not lib_it:
                                 return
                             if lib_it.item_type == "comic":
-                                from app.services.comicvine import ComicVineService
-                                cv_issues = ComicVineService.get_comic_volume_issues(ext_id)
+                                from app.services.metron import MetronService
+                                cv_issues = MetronService.get_comic_volume_issues(ext_id)
                                 total_episodes = len(cv_issues) if cv_issues else 99999
                                 if completed_eps >= total_episodes:
                                     lib_it.status = UserLibraryStatusEnum.READ
@@ -2455,8 +2455,8 @@ def bulk_toggle_all_seasons(
             if lib_item and lib_item.external_id:
                 try:
                     if is_comic:
-                        from app.services.comicvine import ComicVineService
-                        episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
+                        from app.services.metron import MetronService
+                        episodes_list = MetronService.get_comic_volume_issues(lib_item.external_id) or []
                     else:
                         clean_id = lib_item.external_id
                         if clean_id.startswith('tvm_'):
@@ -2978,11 +2978,11 @@ def bulk_toggle_episodes(
         if lib_item:
             if req.completed:
                 if is_comic:
-                    from app.services.comicvine import ComicVineService
+                    from app.services.metron import MetronService
                     total_vol_issues = 0
                     if lib_item.external_id:
                         try:
-                            cv_issues = ComicVineService.get_comic_volume_issues(lib_item.external_id)
+                            cv_issues = MetronService.get_comic_volume_issues(lib_item.external_id)
                             total_vol_issues = len(cv_issues) if cv_issues else 0
                         except Exception:
                             pass

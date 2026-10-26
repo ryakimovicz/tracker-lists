@@ -226,7 +226,7 @@ def admin_search_franchises(
     current_admin: User = Depends(get_current_admin)
 ):
     """
-    Searches sagas/volumes and publishers by name in external APIs (ComicVine)
+    Searches sagas/volumes and publishers by name in external APIs (Metron)
     to allow the admin to select and ban by ID.
     """
     import urllib.request, urllib.parse, json

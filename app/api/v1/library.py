@@ -223,12 +223,12 @@ def get_library_item_consumption_history(
                 print(f"Failed to fetch TVMaze episodes for history calculation: {e}")
         elif resolved_type == "comic":
             try:
-                from app.services.comicvine import ComicVineService
-                cv_issues = ComicVineService.get_comic_volume_issues(external_id)
+                from app.services.metron import MetronService
+                cv_issues = MetronService.get_comic_volume_issues(external_id)
                 if cv_issues:
                     all_canonical_ids = [f"cv_issue_{i['id']}" for i in cv_issues if i.get('id')]
             except Exception as e:
-                print(f"Failed to fetch ComicVine issues for history calculation: {e}")
+                print(f"Failed to fetch Metron comic issues for history calculation: {e}")
 
         # Fallback to tracking list items only if canonical items could not be fetched AND item is marked completed
         if not all_canonical_ids and tracking_list_id and (item and item.completed_at):
@@ -1379,8 +1379,8 @@ def delete_from_library(
         # If it was a comic volume, fetch all issues to wipe their history & progress
         if item_type == "comic" or (ext_id and ("cv_vol_" in str(ext_id) or "4050-" in str(ext_id))):
             try:
-                from app.services.comicvine import ComicVineService
-                cv_issues = ComicVineService.get_comic_volume_issues(ext_id)
+                from app.services.metron import MetronService
+                cv_issues = MetronService.get_comic_volume_issues(ext_id)
                 if cv_issues:
                     for iss in cv_issues:
                         i_id = iss.get("id")
