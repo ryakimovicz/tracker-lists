@@ -5,36 +5,6 @@ import { useTranslation } from '../context/LanguageContext';
 import { getKlipyFavorites, isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
 import type { KlipyFavoriteItem } from '../utils/klipyFavorites';
 
-// Official Klipy Ribbon/K Symbol SVG
-const KlipyLogo = ({ size = 20 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    style={{ display: 'block', flexShrink: 0 }}
-  >
-    <path
-      d="M5.5 3.5C4.39543 3.5 3.5 4.39543 3.5 5.5V18.5C3.5 19.6046 4.39543 20.5 5.5 20.5H7.5C8.60457 20.5 9.5 19.6046 9.5 18.5V5.5C9.5 4.39543 8.60457 3.5 7.5 3.5H5.5Z"
-      fill="url(#klipy_gradient_1)"
-    />
-    <path
-      d="M10.8 11.2L16.2 4.6C16.9 3.7 18.3 3.7 19 4.6C19.7 5.4 19.6 6.7 18.8 7.4L13.8 12L19.2 18.6C20 19.4 19.9 20.7 19.1 21.4C18.3 22.1 17 22 16.3 21.1L10.8 12.8V11.2Z"
-      fill="url(#klipy_gradient_2)"
-    />
-    <defs>
-      <linearGradient id="klipy_gradient_1" x1="3.5" y1="3.5" x2="9.5" y2="20.5" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#FF007A" />
-        <stop offset="1" stopColor="#7928CA" />
-      </linearGradient>
-      <linearGradient id="klipy_gradient_2" x1="10.8" y1="3.5" x2="20" y2="21.5" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#FF007A" />
-        <stop offset="1" stopColor="#7928CA" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
 interface KlipyMediaItem {
   id: number | string;
@@ -658,6 +628,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       setUnmutedClipId(null);
       setFavoritesList(getKlipyFavorites());
     } else {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       setUnmutedClipId(null);
       setViewFavorites(false);
     }
@@ -679,10 +652,55 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   const categoriesCacheRef = useRef<{ [key: string]: { data: any[]; timestamp: number } }>({});
   const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitCooldown, setRateLimitCooldown] = useState<number>(0);
+  const blockedUntilRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Helper to trigger rate-limiting cooldown circuit breaker
+  const handleRateLimit = (res?: Response) => {
+    let waitSeconds = 45; // Default 45s cooldown
+    try {
+      if (res) {
+        const retryHeader = res.headers.get('Retry-After');
+        if (retryHeader) {
+          const parsed = parseInt(retryHeader, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            waitSeconds = Math.min(Math.max(parsed, 10), 300);
+          }
+        }
+      }
+    } catch (_) {}
+
+    blockedUntilRef.current = Date.now() + waitSeconds * 1000;
+    setRateLimited(true);
+    setRateLimitCooldown(waitSeconds);
+  };
+
+  // Cooldown countdown effect
+  useEffect(() => {
+    if (!rateLimited || rateLimitCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setRateLimitCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          blockedUntilRef.current = 0;
+          setRateLimited(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rateLimited, rateLimitCooldown]);
 
   // Fetch Categories for current tab (cached in memory for 10 minutes to avoid redundant API hits)
   const loadCategories = async (tab: string) => {
     if (!KLIPY_API_KEY) return;
+    if (Date.now() < blockedUntilRef.current) {
+      setRateLimited(true);
+      return;
+    }
+
     const segment = tab === 'memes' ? 'static-memes' : tab;
     const localeParam = language === 'es' ? 'es' : 'en';
     const cacheKey = `${segment}-${localeParam}`;
@@ -697,7 +715,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     try {
       const res = await fetch(`${BASE_URL}/${KLIPY_API_KEY}/${segment}/categories?locale=${localeParam}`);
       if (res.status === 429) {
-        setRateLimited(true);
+        handleRateLimit(res);
         setCategories([]);
         return;
       }
@@ -723,6 +741,21 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   // Fetch Media Items
   const fetchMedia = async (tab: string, query: string, pageNum: number, append: boolean = false) => {
     if (!KLIPY_API_KEY) return;
+    if (Date.now() < blockedUntilRef.current) {
+      setRateLimited(true);
+      if (!append) setItems([]);
+      return;
+    }
+
+    // Cancel any previous in-flight request to save KLIPY quota & prevent race conditions
+    if (!append && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    if (!append) {
+      abortControllerRef.current = controller;
+    }
+
     setLoading(true);
     try {
       const segment = tab === 'memes' ? 'static-memes' : tab;
@@ -733,9 +766,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         url += `&q=${encodeURIComponent(query)}`;
       }
 
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
       if (res.status === 429) {
-        setRateLimited(true);
+        handleRateLimit(res);
         if (!append) setItems([]);
         return;
       }
@@ -765,11 +798,16 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       } else {
         if (!append) setItems([]);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
       console.error('Failed to fetch media from KLIPY', err);
       if (!append) setItems([]);
     } finally {
-      setLoading(false);
+      if (!abortControllerRef.current || abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1379,12 +1417,12 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               {rateLimited ? (
                 <div>
                   <p style={{ margin: '0 0 0.35rem', fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                    {language === 'es' ? 'Servicio no disponible temporalmente' : 'Service temporarily unavailable'}
+                    {language === 'es' ? 'Límite de solicitudes de KLIPY alcanzado' : 'KLIPY request limit reached'}
                   </p>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {language === 'es'
-                      ? 'Por favor intenta de nuevo en unos minutos.'
-                      : 'Please try again in a few minutes.'}
+                      ? (rateLimitCooldown > 0 ? `Por favor espera ${rateLimitCooldown}s antes de reintentar.` : 'Por favor intenta de nuevo en unos minutos.')
+                      : (rateLimitCooldown > 0 ? `Please wait ${rateLimitCooldown}s before trying again.` : 'Please try again in a few minutes.')}
                   </p>
                 </div>
               ) : (
