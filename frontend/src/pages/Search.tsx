@@ -29,6 +29,7 @@ interface SearchResultItem {
   imdb_id?: string;
   status?: string;
   badge?: string;
+  page_count?: number;
 }
 
 export const renderMediaBadge = (
@@ -239,7 +240,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
         {/* Title */}
         {(() => {
           const displayTitle = item.item_type === 'comic' 
-            ? item.title.replace(/\s*#\d+\s*$/, '') 
+            ? item.title.replace(/\s*#\d+\s*$/, '').replace(/\s*\(\d{4}\)$/, '') 
             : item.title;
           return (
             <div 
@@ -2163,28 +2164,34 @@ export const Search: React.FC = () => {
               const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
 
+              const isComicIssue = item.item_type === 'comic' && (String(item.external_id || '').startsWith('cv_issue_') || String(item.external_id || '').startsWith('metron_issue_') || item.badge === 'issue' || item.badge === 'número' || item.badge === 'numero');
+              const isComicVolume = item.item_type === 'comic' && !isComicIssue;
+              const displayTitle = isComicVolume ? item.title.replace(/\s*\(\d{4}\)$/, '') : item.title;
+              const effectiveBadge = (isComicVolume && (item.badge === 'Volumen' || item.badge === 'volume') && item.page_count)
+                ? `${item.page_count} ${language === 'es' ? (item.page_count === 1 ? 'Número' : 'Números') : (item.page_count === 1 ? 'Issue' : 'Issues')}`
+                : item.badge;
+
               return (
                 <div key={`${item.external_id}-${item.item_type}`} className="glass-card search-item-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
 
                   <div className="card-media-cover search-media-cover" style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
                     <MediaPoster
                       src={item.image_url}
-                      title={item.title}
+                      title={displayTitle}
                       itemType={item.item_type}
                       height="100%"
                       width="100%"
                       borderRadius="8px"
                     />
-                    {item.badge !== 'series' && renderMediaBadge(item.badge, language)}
+                    {effectiveBadge !== 'series' && renderMediaBadge(effectiveBadge, language)}
                   </div>
 
                   {(() => {
-                    const isComicIssue = item.item_type === 'comic' && (String(item.external_id || '').startsWith('cv_issue_') || String(item.external_id || '').startsWith('metron_issue_') || item.badge === 'issue');
                     return (
                       <>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left', paddingRight: (user && !isComicIssue) ? '36px' : 0 }}>
-                          <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                            {item.title}
+                          <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayTitle}>
+                            {displayTitle}
                           </h4>
                           {item.release_date && (
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>

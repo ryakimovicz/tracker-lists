@@ -244,6 +244,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               return filtered.map((media) => {
                 const isExpanded = expandedMediaId === media.external_id;
                 const isAlreadyAdded = media.external_id && addedIds.includes(media.external_id);
+                const isComicIssue = media.item_type === 'comic' && (String(media.external_id || '').startsWith('cv_issue_') || String(media.external_id || '').startsWith('metron_issue_') || media.badge === 'issue' || media.badge === 'número' || media.badge === 'numero');
+                const isComicVolume = media.item_type === 'comic' && !isComicIssue;
+                const displayTitle = isComicVolume ? media.title.replace(/\s*\(\d{4}\)$/, '') : media.title;
                 
                 return (
                   <div
@@ -263,7 +266,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                         style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
+                        <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayTitle}</h5>
                         {media.release_date && (
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.1rem' }}>
                             {formatReleaseDate(media.release_date)}

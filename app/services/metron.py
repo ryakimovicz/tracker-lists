@@ -333,13 +333,25 @@ class MetronService:
                             release_date=iss.get("store_date") or iss.get("cover_date")
                         ))
 
-        # 2. General series search via issue #1 (fetches title, year, series ID, and issue #1 cover in 1 single call)
+        # 2. General series search: fetch issue #1 (for covers) AND series (for issue_count) in 2 list calls
         if not results:
             issue1_data = _metron_request("issue/", {
                 "series_name": cleaned_query,
                 "number": "1",
                 "limit": 30
             })
+            series_data = _metron_request("series/", {
+                "name": cleaned_query,
+                "limit": 30
+            })
+
+            series_counts_map = {}
+            if series_data and series_data.get("results"):
+                for s in series_data["results"]:
+                    sid = s.get("id")
+                    if sid and s.get("issue_count") is not None:
+                        series_counts_map[sid] = s.get("issue_count")
+
             if issue1_data and issue1_data.get("results"):
                 for iss in issue1_data["results"]:
                     s_info = iss.get("series", {})
@@ -349,60 +361,60 @@ class MetronService:
                     seen_ids.add(f"series_{s_id}")
 
                     s_name = s_info.get("name") or iss.get("issue", "").split("#")[0].strip()
+                    clean_name = re.sub(r'\s*\(\d{4}\)$', '', s_name).strip()
                     s_year = s_info.get("year_began")
-                    full_title = f"{s_name} ({s_year})" if s_year else s_name
                     img_url = iss.get("image")
                     desc = iss.get("desc") or f"Comic series started in {s_year}."
 
-                    if not is_safe_media_item(full_title, desc):
+                    if not is_safe_media_item(clean_name, desc):
                         continue
 
                     cv_id = s_info.get("cv_id")
                     ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
 
+                    ic = series_counts_map.get(s_id)
+                    badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
+
                     results.append(SearchResultItem(
                         external_id=ext_id,
-                        title=full_title,
+                        title=clean_name,
                         image_url=img_url,
                         description=desc,
                         item_type="comic",
-                        badge="Volumen",
+                        badge=badge_val,
+                        page_count=ic,
                         release_date=str(s_year) if s_year else None
                     ))
 
-            # 3. Fallback: only if issue #1 query returned no results
-            if len(results) < 3:
-                series_data = _metron_request("series/", {
-                    "name": cleaned_query,
-                    "limit": 20
-                })
-                if series_data and series_data.get("results"):
-                    for s in series_data["results"]:
-                        s_id = s.get("id")
-                        if not s_id or f"series_{s_id}" in seen_ids:
-                            continue
-                        seen_ids.add(f"series_{s_id}")
+            # 3. Fallback: if issue #1 query returned few results, use series_data (already fetched above)
+            if len(results) < 3 and series_data and series_data.get("results"):
+                for s in series_data["results"]:
+                    s_id = s.get("id")
+                    if not s_id or f"series_{s_id}" in seen_ids:
+                        continue
+                    seen_ids.add(f"series_{s_id}")
 
-                        s_title = s.get("series") or s.get("name")
-                        s_year = s.get("year_began")
-                        publisher = s.get("publisher", {}).get("name") if isinstance(s.get("publisher"), dict) else None
-                        desc = f"Publisher: {publisher}. Started in {s_year}." if publisher else f"Started in {s_year}."
+                    raw_title = s.get("series") or s.get("name") or ""
+                    clean_title = re.sub(r'\s*\(\d{4}\)$', '', raw_title).strip()
+                    s_year = s.get("year_began")
+                    publisher = s.get("publisher", {}).get("name") if isinstance(s.get("publisher"), dict) else None
+                    desc = f"Publisher: {publisher}. Started in {s_year}." if publisher else f"Started in {s_year}."
 
-                        cv_id = s.get("cv_id")
-                        ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
-                        ic = s.get("issue_count")
-                        badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
+                    cv_id = s.get("cv_id")
+                    ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+                    ic = s.get("issue_count")
+                    badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
 
-                        results.append(SearchResultItem(
-                            external_id=ext_id,
-                            title=s_title,
-                            image_url=None,
-                            description=desc,
-                            item_type="comic",
-                            badge=badge_val,
-                            page_count=ic,
-                            release_date=str(s_year) if s_year else None
-                        ))
+                    results.append(SearchResultItem(
+                        external_id=ext_id,
+                        title=clean_title,
+                        image_url=None,
+                        description=desc,
+                        item_type="comic",
+                        badge=badge_val,
+                        page_count=ic,
+                        release_date=str(s_year) if s_year else None
+                    ))
 
         if results:
             def _comic_sort_key(item: SearchResultItem) -> float:
@@ -422,7 +434,7 @@ class MetronService:
                         score += 800.0
                     else:
                         score -= 400.0
-                m = re.search(r'\b(19\d\d|20\d\d)\b', item.title)
+                m = re.search(r'\b(19\d\d|20\d\d)\b', item.release_date or item.title or '')
                 if m:
                     score += min(50.0, max(0.0, (int(m.group(1)) - 1930) * 0.5))
                 return score
@@ -477,7 +489,8 @@ class MetronService:
         if not s:
             return None
 
-        vol_name = s.get("name") or s.get("series") or "Untitled Series"
+        raw_vol_name = s.get("name") or s.get("series") or "Untitled Series"
+        vol_name = re.sub(r'\s*\(\d{4}\)$', '', raw_vol_name).strip()
         start_yr = s.get("year_began")
         issue_count = s.get("issue_count") or 0
         desc = _clean_html(s.get("desc"))
