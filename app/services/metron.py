@@ -346,11 +346,15 @@ class MetronService:
             })
 
             series_counts_map = {}
+            series_cv_map = {}
             if series_data and series_data.get("results"):
                 for s in series_data["results"]:
                     sid = s.get("id")
-                    if sid and s.get("issue_count") is not None:
-                        series_counts_map[sid] = s.get("issue_count")
+                    if sid:
+                        if s.get("issue_count") is not None:
+                            series_counts_map[sid] = s.get("issue_count")
+                        if s.get("cv_id"):
+                            series_cv_map[sid] = s.get("cv_id")
 
             if issue1_data and issue1_data.get("results"):
                 for iss in issue1_data["results"]:
@@ -369,8 +373,9 @@ class MetronService:
                     if not is_safe_media_item(clean_name, desc):
                         continue
 
-                    cv_id = s_info.get("cv_id")
-                    ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+                    cv_id = s_info.get("cv_id") or series_cv_map.get(s_id)
+                    ext_id = f"metron_series_{s_id}"
+                    cv_ext_id = f"cv_vol_{cv_id}" if cv_id else None
 
                     ic = series_counts_map.get(s_id)
                     badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
@@ -383,7 +388,9 @@ class MetronService:
                         item_type="comic",
                         badge=badge_val,
                         page_count=ic,
-                        release_date=str(s_year) if s_year else None
+                        release_date=str(s_year) if s_year else None,
+                        cv_id=cv_ext_id,
+                        metron_id=ext_id
                     ))
 
             # 3. Fallback: if issue #1 query returned few results, use series_data (already fetched above)
@@ -401,7 +408,8 @@ class MetronService:
                     desc = f"Publisher: {publisher}. Started in {s_year}." if publisher else f"Started in {s_year}."
 
                     cv_id = s.get("cv_id")
-                    ext_id = f"cv_vol_{cv_id}" if cv_id else f"metron_series_{s_id}"
+                    ext_id = f"metron_series_{s_id}"
+                    cv_ext_id = f"cv_vol_{cv_id}" if cv_id else None
                     ic = s.get("issue_count")
                     badge_val = f"{ic} {'Número' if ic == 1 else 'Números'}" if (ic is not None and ic > 0) else "Volumen"
 
@@ -413,7 +421,9 @@ class MetronService:
                         item_type="comic",
                         badge=badge_val,
                         page_count=ic,
-                        release_date=str(s_year) if s_year else None
+                        release_date=str(s_year) if s_year else None,
+                        cv_id=cv_ext_id,
+                        metron_id=ext_id
                     ))
 
         if results:
@@ -434,9 +444,11 @@ class MetronService:
                         score += 800.0
                     else:
                         score -= 400.0
+                if item.page_count:
+                    score += min(150.0, math.log10(max(1, item.page_count) + 1) * 50.0)
                 m = re.search(r'\b(19\d\d|20\d\d)\b', item.release_date or item.title or '')
                 if m:
-                    score += min(50.0, max(0.0, (int(m.group(1)) - 1930) * 0.5))
+                    score += min(30.0, max(0.0, (int(m.group(1)) - 1930) * 0.3))
                 return score
 
             results.sort(key=_comic_sort_key, reverse=True)
@@ -518,7 +530,11 @@ class MetronService:
         }]
 
         vol_result = {
-            "id": f"cv_vol_{s.get('cv_id')}" if s.get("cv_id") else f"metron_series_{s_id}",
+            "id": f"metron_series_{s_id}",
+            "external_id": f"metron_series_{s_id}",
+            "metron_id": f"metron_series_{s_id}",
+            "cv_id": f"cv_vol_{s.get('cv_id')}" if s.get("cv_id") else None,
+            "aliases": [f"metron_series_{s_id}"] + ([f"cv_vol_{s.get('cv_id')}"] if s.get("cv_id") else []),
             "name": vol_name,
             "volume_name": vol_name,
             "start_year": start_yr,

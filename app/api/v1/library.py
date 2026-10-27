@@ -461,6 +461,24 @@ def add_to_library(
         UserLibraryItem.item_type == item_in.item_type,
         UserLibraryItem.external_id == item_in.external_id
     ).first()
+
+    if not existing and item_in.item_type == "comic" and item_in.external_id:
+        alias_eids = []
+        try:
+            d = MetronService.get_comic_volume_detail(str(item_in.external_id))
+            if d:
+                if d.get("cv_id") and d["cv_id"] != item_in.external_id:
+                    alias_eids.append(d["cv_id"])
+                if d.get("metron_id") and d["metron_id"] != item_in.external_id:
+                    alias_eids.append(d["metron_id"])
+        except Exception:
+            pass
+        if alias_eids:
+            existing = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.item_type == item_in.item_type,
+                UserLibraryItem.external_id.in_(alias_eids)
+            ).first()
     
     if existing and existing.tracking_list_id is not None:
         # If already tracked, gracefully return existing or update its status

@@ -30,6 +30,8 @@ interface SearchResultItem {
   status?: string;
   badge?: string;
   page_count?: number;
+  cv_id?: string;
+  metron_id?: string;
 }
 
 export const renderMediaBadge = (
@@ -2159,7 +2161,7 @@ export const Search: React.FC = () => {
                 );
               }
 
-              const shelfItem = findInShelfMap(shelfMap, item.item_type, item.external_id);
+              const shelfItem = findInShelfMap(shelfMap, item.item_type, item.external_id) || (item.cv_id ? findInShelfMap(shelfMap, item.item_type, item.cv_id) : undefined);
               const onShelf = Boolean(shelfItem);
               const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;

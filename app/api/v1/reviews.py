@@ -301,6 +301,16 @@ def resolve_equivalent_external_ids(item_type: str, external_id: str, db: Sessio
             candidates.add(f"metron_series_{clean_num}")
             candidates.add(f"cv_{clean_num}")
             candidates.add(clean_num)
+            try:
+                from app.services.metron import MetronService
+                d = MetronService.get_comic_volume_detail(clean_id)
+                if d:
+                    if d.get("metron_id"):
+                        candidates.add(d["metron_id"])
+                    if d.get("cv_id"):
+                        candidates.add(d["cv_id"])
+            except Exception:
+                pass
         elif clean_id.startswith("cv_issue_") or clean_id.startswith("metron_issue_"):
             candidates.add(f"cv_issue_{clean_num}")
             candidates.add(f"metron_issue_{clean_num}")

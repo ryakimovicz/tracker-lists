@@ -243,7 +243,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               
               return filtered.map((media) => {
                 const isExpanded = expandedMediaId === media.external_id;
-                const isAlreadyAdded = media.external_id && addedIds.includes(media.external_id);
+                const isAlreadyAdded = media.external_id && (addedIds.includes(media.external_id) || (media.cv_id && addedIds.includes(media.cv_id)));
                 const isComicIssue = media.item_type === 'comic' && (String(media.external_id || '').startsWith('cv_issue_') || String(media.external_id || '').startsWith('metron_issue_') || media.badge === 'issue' || media.badge === 'número' || media.badge === 'numero');
                 const isComicVolume = media.item_type === 'comic' && !isComicIssue;
                 const displayTitle = isComicVolume ? media.title.replace(/\s*\(\d{4}\)$/, '') : media.title;

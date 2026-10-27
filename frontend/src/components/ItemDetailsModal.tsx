@@ -1386,7 +1386,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     try {
       const cached = getCachedShelfItems();
       const map = createShelfMap(cached);
-      const matched = findInShelfMap(map, initialItem.item_type, initialItem.external_id || initialItem.id);
+      const matched = findInShelfMap(map, initialItem.item_type, initialItem.external_id || initialItem.id)
+        || (initialItem.cv_id ? findInShelfMap(map, initialItem.item_type, initialItem.cv_id) : undefined)
+        || (initialItem.metron_id ? findInShelfMap(map, initialItem.item_type, initialItem.metron_id) : undefined);
       if (matched && matched.id) {
         return {
           ...initialItem,
@@ -3167,7 +3169,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         try {
           const cached = getCachedShelfItems();
           const map = createShelfMap(cached);
-          const matched = findInShelfMap(map, item.item_type, item.external_id || item.id);
+          const matched = findInShelfMap(map, item.item_type, item.external_id || item.id)
+            || (item.cv_id ? findInShelfMap(map, item.item_type, item.cv_id) : undefined)
+            || (item.metron_id ? findInShelfMap(map, item.item_type, item.metron_id) : undefined);
           if (matched && matched.id) {
             item = {
               ...item,
@@ -3714,6 +3718,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               const isEndedVal = volData.is_ended !== undefined ? volData.is_ended : (startYrInt > 0 && startYrInt < currentYear - 1);
               const statusVal = volData.status || (isEndedVal ? 'Ended' : 'Running');
               const fullMeta = { ...volData, seasons: rawSeasons, is_ended: isEndedVal, status: statusVal };
+              if (volData.cv_id || volData.metron_id) {
+                try {
+                  const cachedItems = getCachedShelfItems();
+                  const shelfMap = createShelfMap(cachedItems);
+                  const matchedShelf = (volData.cv_id ? findInShelfMap(shelfMap, 'comic', volData.cv_id) : undefined)
+                    || (volData.metron_id ? findInShelfMap(shelfMap, 'comic', volData.metron_id) : undefined);
+                  if (matchedShelf && matchedShelf.id) {
+                    setSelectedItem((prev: any) => prev ? {
+                      ...prev,
+                      ...matchedShelf,
+                      id: matchedShelf.id,
+                      status: matchedShelf.status || prev.status,
+                      is_favorite: matchedShelf.is_favorite ?? prev.is_favorite,
+                      tracking_list_id: matchedShelf.tracking_list_id ?? prev.tracking_list_id,
+                      completed_at: matchedShelf.completed_at ?? prev.completed_at
+                    } : null);
+                  }
+                } catch (_) {}
+              }
               
               setCachedSeries(cacheKeyMeta, fullMeta);
               setCachedSeries(`comic_vol_${volId}`, fullMeta);

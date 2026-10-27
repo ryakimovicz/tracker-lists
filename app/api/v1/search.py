@@ -19,6 +19,7 @@ from app.core.popular_cache import popular_cache
 from app.core.config import settings
 
 import re
+import math
 import concurrent.futures
 
 import urllib.request
@@ -219,6 +220,10 @@ def rank_search_results(
         if getattr(item, "badge", None) == "dlc":
             score -= 300.0
 
+        # For comics: significant runs with many issues should rank ahead of minor 1-shots or minis
+        if item.item_type == "comic" and item.page_count:
+            score += min(150.0, math.log10(max(1, item.page_count) + 1) * 50.0)
+
         # For movies: Give full-length feature films a priority boost over minor shorts/clips in general searches
         if item.item_type == "movie":
             if item.page_count and item.page_count >= 40:
@@ -251,7 +256,8 @@ def rank_search_results(
         t_base = re.sub(r'\s*\(\d{4}\)$', '', (it.title or "").lower().strip()).strip()
         key = (getattr(it, "item_type", "") or "", t_base)
         seen_type_title_count[key] = seen_type_title_count.get(key, 0) + 1
-        if seen_type_title_count[key] <= 3:
+        max_allowed = 6 if (getattr(it, "item_type", "") == "comic" or t_base == query_clean) else 3
+        if seen_type_title_count[key] <= max_allowed:
             primary_items.append(it)
         else:
             secondary_items.append(it)

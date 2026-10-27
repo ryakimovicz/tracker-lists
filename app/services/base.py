@@ -17,4 +17,6 @@ class SearchResultItem(BaseModel):
     badge: Optional[str] = None
     description_source: Optional[str] = None
     image_source: Optional[str] = None
+    cv_id: Optional[str] = None
+    metron_id: Optional[str] = None
 

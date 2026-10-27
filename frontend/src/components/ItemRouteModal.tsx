@@ -83,6 +83,8 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     return (
       candidate.external_id === id ||
       String(candidate.id) === id ||
+      (candidate.cv_id && (candidate.cv_id === id || candidate.cv_id === `cv_vol_${cleanRouteId}`)) ||
+      (candidate.metron_id && (candidate.metron_id === id || candidate.metron_id === `metron_series_${cleanRouteId}`)) ||
       (candImdb && (id === candImdb || id === `omdb_${candImdb}` || cleanRouteId === candImdb)) ||
       (cleanCand && cleanRouteId && cleanCand === cleanRouteId) ||
       (type === 'game' && (String(candidate.external_id) === String(id) || String(candidate.id) === String(id)))
