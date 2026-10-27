@@ -10669,9 +10669,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </a>
                 )}
                 {selectedItem.item_type === 'comic' && (
-                  <a href="https://metron.cloud" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                    Metron
-                  </a>
+                  <>
+                    <a href="https://metron.cloud" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Metron
+                    </a>
+                    <a
+                      href="https://creativecommons.org/licenses/by-sa/4.0/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Creative Commons Attribution-ShareAlike 4.0 International"
+                      style={{ color: 'var(--text-muted)', textDecoration: 'none', marginLeft: '0.25rem', fontSize: '0.7rem' }}
+                    >
+                      (CC BY-SA 4.0)
+                    </a>
+                  </>
                 )}
                 {selectedItem.item_type === 'music' && (
                   <a href="https://www.last.fm" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>

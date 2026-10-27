@@ -196,8 +196,8 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Pathd indexa, organiza y muestra información descriptiva, sinopsis y portadas de medios mediante APIs y fuentes públicas de terceros. Pathd es un cliente independiente y no reclama propiedad sobre las obras con derechos de autor mostradas. Expresamos nuestro agradecimiento y crédito a las siguientes plataformas:'
-              : 'Pathd indexes, organizes, and presents descriptive metadata, synopses, and artwork using public third-party APIs and sources. Pathd is an independent service and does not claim ownership over the copyrighted media displayed. We acknowledge and credit the following data providers:'}
+              ? 'Pathd indexa, organiza y muestra información descriptiva, sinopsis y portadas de medios mediante APIs y fuentes públicas de terceros. Pathd es un cliente independiente y no reclama propiedad sobre las obras con derechos de autor mostradas. Todas las marcas registradas, nombres de personajes, logotipos y portadas pertenecen exclusivamente a sus respectivos creadores y editoriales, mostrándose únicamente con fines identificatorios y de catalogación personal bajo uso legítimo (Fair Use / derecho de cita). Expresamos nuestro agradecimiento y crédito a las siguientes plataformas:'
+              : 'Pathd indexes, organizes, and presents descriptive metadata, synopses, and artwork using public third-party APIs and sources. Pathd is an independent service and does not claim ownership over the copyrighted media displayed. All trademarks, character names, logos, and cover artwork belong exclusively to their respective creators and publishers, displayed strictly for identification and personal cataloging purposes under Fair Use. We acknowledge and credit the following data providers:'}
           </p>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
@@ -296,8 +296,20 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Base de datos comunitaria abierta de cómics, volúmenes, números y portadas.' : 'Open community database for comic series, volumes, issues, and cover artwork.'}
+                {isEs 
+                  ? 'Datos de cómics provistos por Metron bajo licencia CC BY-SA 4.0. Las imágenes de portadas pertenecen a sus respectivas editoriales y creadores, mostradas exclusivamente con fines de identificación bajo la doctrina de Fair Use.' 
+                  : 'Comic data from Metron, licensed under CC BY-SA 4.0. Cover images are the property of their respective publishers or creators and are displayed solely for identification purposes under fair use.'}
               </p>
+              <div style={{ marginTop: '0.5rem' }}>
+                <a
+                  href="https://creativecommons.org/licenses/by-sa/4.0/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--accent-primary)', fontSize: '0.78rem', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                >
+                  CC BY-SA 4.0 <ExternalLink size={11} />
+                </a>
+              </div>
             </div>
 
             <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
@@ -353,6 +365,11 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
               {isEs
                 ? 'Las cuentas que de manera reiterada creen guías, comentarios, reseñas o elementos personalizados con contenido explícito o prohibido, o que generen reportes falsos o abusivos, podrán ser suspendidas o canceladas por el equipo de moderación.'
                 : 'Accounts that repeatedly create guides, comments, reviews, or custom items containing explicit or prohibited content, or that submit false or abusive reports, may be suspended or permanently terminated by the moderation team.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Aviso de Retiro y Derechos de Autor (DMCA / Takedown):' : 'Copyright Notice & DMCA Takedown:'}</strong> {isEs
+                ? 'Pathd opera como un catálogo referencial y respeta plenamente los derechos de propiedad intelectual. Si eres titular de derechos de autor o representante legal de cualquier obra, portada o material indexado y consideras que su inclusión vulnera tus derechos o deseas su retiro inmediato, puedes contactarnos a contact@pathd.net indicando la obra afectada. Procesaremos la solicitud y desindexaremos el material a la mayor brevedad.'
+                : 'Pathd operates as a reference catalog and fully respects intellectual property rights. If you are a copyright owner or authorized representative of any work, cover image, or indexed material and believe its inclusion infringes your rights or wish for its prompt removal, please contact us at contact@pathd.net identifying the affected work. We will review and de-index the content promptly.'}
             </li>
           </ul>
         </section>
