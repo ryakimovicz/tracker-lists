@@ -39,6 +39,8 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const [results, setResults] = useState<Character[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMoreComics, setIsLoadingMoreComics] = useState(false);
+  const [noMoreComics, setNoMoreComics] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentPhotoUrl || null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,11 +52,15 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
   const fetchCharacters = async (searchTerm: string) => {
     const trimmed = searchTerm.trim().toLowerCase();
+    setNoMoreComics(false);
 
     // Instant cache hit
     if (avatarClientCache.has(trimmed)) {
-      setResults(avatarClientCache.get(trimmed)!);
+      const cached = avatarClientCache.get(trimmed)!;
+      setResults(cached);
       setVisibleCount(24);
+      const initialComics = cached.filter(c => c.category === 'comic').length;
+      if (initialComics < 4) setNoMoreComics(true);
       setIsLoading(false);
       return;
     }
@@ -83,8 +89,11 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
       // Only update state if this is still the latest active request
       if (currentRequestId === activeRequestIdRef.current) {
-        setResults(res.data || []);
+        const loaded: Character[] = res.data || [];
+        setResults(loaded);
         setVisibleCount(24);
+        const comicCount = loaded.filter(c => c.category === 'comic').length;
+        if (comicCount < 4) setNoMoreComics(true);
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -95,6 +104,45 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         console.error('Character search error:', err);
         setIsLoading(false);
       }
+    }
+  };
+
+  const handleLoadMoreComics = async () => {
+    if (isLoadingMoreComics || noMoreComics) return;
+    setIsLoadingMoreComics(true);
+    try {
+      const currentComicCount = results.filter(c => c.category === 'comic').length;
+      const res = await apiClient.get('/users/characters/search', {
+        params: {
+          query: query.trim(),
+          category: 'comic',
+          offset: currentComicCount,
+          limit: 4,
+        },
+      });
+      const newItems: Character[] = res.data || [];
+      if (newItems.length < 4) {
+        setNoMoreComics(true);
+      }
+      if (newItems.length > 0) {
+        setResults(prev => {
+          const existingUrls = new Set(prev.map(p => p.image_url));
+          const existingNames = new Set(prev.map(p => p.name.toLowerCase()));
+          const dedupedNew = newItems.filter(
+            item => !existingUrls.has(item.image_url) && !existingNames.has(item.name.toLowerCase())
+          );
+          if (dedupedNew.length === 0) {
+            setNoMoreComics(true);
+            return prev;
+          }
+          return [...prev, ...dedupedNew];
+        });
+        setVisibleCount(prev => prev + newItems.length);
+      }
+    } catch (err) {
+      console.error('Error fetching more comic characters:', err);
+    } finally {
+      setIsLoadingMoreComics(false);
     }
   };
 
@@ -600,6 +648,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           });
 
           const hasMore = filteredResults.length > visibleCount;
+          const showLoadMoreComics = !hasMore && !noMoreComics && query.trim().length >= 2 && (selectedCategory === 'comic' || selectedCategory === 'all');
 
           return (
             <>
@@ -622,6 +671,36 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                     }}
                   >
                     {isEs ? 'Mostrar más avatares' : 'Load more avatars'} ({filteredResults.length - visibleCount} {isEs ? 'más' : 'more'})
+                  </button>
+                </div>
+              )}
+              {showLoadMoreComics && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+                  <button
+                    type="button"
+                    disabled={isLoadingMoreComics}
+                    onClick={handleLoadMoreComics}
+                    className="secondary-button"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '10px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: isLoadingMoreComics ? 'default' : 'pointer',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      opacity: isLoadingMoreComics ? 0.7 : 1,
+                    }}
+                  >
+                    {isLoadingMoreComics ? (
+                      <span>{isEs ? 'Cargando...' : 'Loading...'}</span>
+                    ) : (
+                      <span>{isEs ? 'Mostrar más...' : 'Show more...'}</span>
+                    )}
                   </button>
                 </div>
               )}

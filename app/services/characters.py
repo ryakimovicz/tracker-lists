@@ -240,39 +240,128 @@ class CharacterService:
 
 
     @classmethod
-    def _search_metron(cls, query: str) -> List[CharacterSearchResult]:
+    def _search_metron(cls, query: str, offset: int = 0, limit: int = 4) -> List[CharacterSearchResult]:
         if not query:
             return []
-        from app.services.metron import _metron_request
+        from app.services.metron import _metron_request, _get_persistent_cache, _set_persistent_cache
         
-        variants = cls._generate_query_variants(query)
-        results = []
+        q_clean = query.strip()
+        q_lower = q_clean.lower()
+        results: List[CharacterSearchResult] = []
         seen_names = set()
+        candidates: List[dict] = []
 
-        for term in variants[:2]:
+        # 1. Search primary query term and common comic alias if applicable
+        terms = [q_clean]
+        alter_egos = {
+            "flash": ["wally west"],
+            "batman": ["bruce wayne"],
+            "superman": ["clark kent"],
+            "spider-man": ["peter parker", "miles morales"],
+            "spiderman": ["peter parker", "miles morales"],
+            "wolverine": ["logan"],
+            "iron man": ["tony stark"],
+            "ironman": ["tony stark"],
+            "captain america": ["steve rogers"],
+            "green lantern": ["hal jordan"],
+            "robin": ["dick grayson"],
+            "nightwing": ["dick grayson"],
+            "daredevil": ["matt murdock"],
+            "hulk": ["bruce banner"]
+        }
+        if q_lower in alter_egos:
+            terms.extend(alter_egos[q_lower])
+
+        for term in terms[:2]:
             try:
-                data = _metron_request("character/", {"name": term, "limit": 6})
-                if data and data.get("results"):
-                    for ch in data["results"][:4]:
-                        cid = ch.get("id")
-                        cname = ch.get("name")
-                        if not cid or not cname or cname.lower() in seen_names:
-                            continue
-                        seen_names.add(cname.lower())
-                        
-                        detail = _metron_request(f"character/{cid}/")
-                        img_url = detail.get("image") if detail else None
-                        if img_url:
-                            results.append(CharacterSearchResult(
-                                name=cname,
-                                image_url=img_url,
-                                category="comic",
-                                origin="Comic"
-                            ))
-            except Exception as e:
-                print(f"Metron Character Search Error: {e}")
+                cache_key = f"metron_char_list_{term.lower()}"
+                data = _get_persistent_cache(cache_key, ttl=86400 * 7)
+                if not data:
+                    data = _metron_request("character/", {"name": term})
+                    if data:
+                        _set_persistent_cache(cache_key, data)
 
-            if len(results) >= 6:
+                if data and data.get("results"):
+                    candidates.extend(data["results"])
+            except Exception as e:
+                print(f"Metron Character Search List Error: {e}")
+
+        if not candidates:
+            return []
+
+        def score_candidate(ch: dict) -> int:
+            name = (ch.get("name") or "").strip()
+            name_lower = name.lower()
+            score = 0
+            if name_lower == q_lower:
+                score += 1000
+            elif name_lower.startswith(f"{q_lower} (") or name_lower.startswith(f"{q_lower} /"):
+                score += 900
+            elif name_lower.startswith(f"{q_lower} "):
+                score += 800
+            elif name_lower.startswith(q_lower):
+                score += 700
+            elif re.search(r'\b' + re.escape(q_lower) + r'\b', name_lower):
+                if f"({q_lower}" in name_lower or f"({q_lower})" in name_lower:
+                    score += 200
+                else:
+                    score += 500
+            elif q_lower in name_lower:
+                score += 100
+
+            # Bonus for foundational/classic characters (lower IDs in Metron)
+            cid = ch.get("id") or 999999
+            if cid < 200:
+                score += 80
+            elif cid < 1000:
+                score += 40
+            elif cid < 10000:
+                score += 20
+
+            # Bonus for iconic definitive alter egos
+            if "barry allen" in name_lower or "bruce wayne" in name_lower or "peter parker" in name_lower or "clark kent" in name_lower or "logan" in name_lower:
+                score += 150
+            if "wally west" in name_lower or "jay garrick" in name_lower or "miles morales" in name_lower:
+                score += 100
+            return score
+
+        # Sort all candidates by relevance score descending
+        unique_candidates = {c.get("id"): c for c in candidates if c.get("id")}
+        sorted_candidates = sorted(unique_candidates.values(), key=score_candidate, reverse=True)
+
+        if offset >= len(sorted_candidates):
+            return []
+
+        target_slice = sorted_candidates[offset : offset + (limit * 3)]
+        for ch in target_slice:
+            cid = ch.get("id")
+            cname = ch.get("name")
+            if not cid or not cname or cname.lower() in seen_names:
+                continue
+            seen_names.add(cname.lower())
+
+            try:
+                detail_cache_key = f"metron_char_{cid}"
+                detail = _get_persistent_cache(detail_cache_key, ttl=86400 * 30)
+                if not detail:
+                    detail = _metron_request(f"character/{cid}/")
+                    if detail:
+                        _set_persistent_cache(detail_cache_key, detail)
+
+                img_url = detail.get("image") if detail else None
+                if img_url:
+                    cand_score = score_candidate(ch)
+                    results.append(CharacterSearchResult(
+                        name=cname,
+                        image_url=img_url,
+                        category="comic",
+                        origin="Comic",
+                        score=cand_score
+                    ))
+            except Exception as e:
+                print(f"Metron Character Detail Error: {e}")
+
+            if len(results) >= limit:
                 break
 
         return results
@@ -742,7 +831,7 @@ class CharacterService:
 
         # Compute relevance scores
         for item in all_results:
-            item.score = cls._calculate_relevance(item, clean_query, raw_query)
+            item.score = cls._calculate_relevance(item, clean_query, raw_query) + getattr(item, 'score', 0)
 
         # Sort by relevance score descending
         all_results.sort(key=lambda x: x.score, reverse=True)

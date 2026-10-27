@@ -807,13 +807,21 @@ class AvatarUpdateRequest(BaseModel):
 @router.get("/characters/search")
 def search_characters(
     query: str = Query("", description="Search term for character name"),
+    category: str | None = Query(None, description="Category filter (e.g. 'comic')"),
+    offset: int = Query(0, description="Offset for pagination"),
+    limit: int = Query(4, description="Number of items to fetch"),
     current_user: User = Depends(get_current_user)
 ):
     from app.core.sfw_filter import is_safe_text
     if not is_safe_text(query):
         return []
     from app.services.characters import CharacterService
-    results = CharacterService.search_all(query)
+
+    if category and category.lower() == "comic" and offset > 0:
+        results = [r.to_dict() for r in CharacterService._search_metron(query, offset=offset, limit=limit)]
+    else:
+        results = CharacterService.search_all(query)
+
     clean_results = []
     for c in results:
         name = c.get("name") if isinstance(c, dict) else getattr(c, "name", "")
