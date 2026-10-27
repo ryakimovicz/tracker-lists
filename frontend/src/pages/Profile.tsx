@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
 
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
-import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
+import { getCachedSeries, setCachedSeries, getCachedSeriesMetadata, setCachedSeriesMetadata } from '../utils/seriesCache';
 import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
 import { ItemDetailsModal, StarRatingDisplay } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
@@ -2605,8 +2605,7 @@ export const Profile: React.FC = () => {
       const missingSeriesIds: string[] = [];
       const missingEpisodeSeriesIds: string[] = [];
       allSeriesItems.forEach(s => {
-        const cacheKey = `series_${s.external_id}`;
-        const cached = getCachedSeries(cacheKey);
+        const cached = getCachedSeriesMetadata(s.external_id);
         if (cached && (cached.status || cached.is_ended !== undefined)) {
           endedMap[s.external_id] = cached.status === 'Ended' || cached.status === 'Finished' || cached.status === 'Canceled' || cached.is_ended === true;
         } else {
@@ -2629,11 +2628,13 @@ export const Profile: React.FC = () => {
             try {
               const res = await apiClient.get(`/search/series/${extId}`);
               const sData = res.data;
-              const isEnded = sData.status === 'Ended' || sData.status === 'Finished' || sData.status === 'Canceled' || sData.is_ended === true;
-              const cacheKey = `series_${extId}`;
-              const existingCached = getCachedSeries(cacheKey) || {};
-              setCachedSeries(cacheKey, { ...existingCached, ...sData, status: sData.status });
-              return { extId, isEnded };
+              if (sData) {
+                const isEnded = sData.status === 'Ended' || sData.status === 'Finished' || sData.status === 'Canceled' || sData.is_ended === true;
+                const existingCached = getCachedSeriesMetadata(extId) || {};
+                setCachedSeriesMetadata(extId, { ...existingCached, ...sData, status: sData.status });
+                return { extId, isEnded };
+              }
+              return { extId, isEnded: false };
             } catch (e) {
               return { extId, isEnded: false };
             }

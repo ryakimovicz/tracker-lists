@@ -8,7 +8,7 @@ import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertica
 
 
 
-import { getCachedSeries, setCachedSeries, removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
+import { getCachedSeries, setCachedSeries, removeCachedSeries, clearCachedSeriesMatching, getCachedSeriesMetadata, setCachedSeriesMetadata, invalidatePoisonedSeriesCache } from '../utils/seriesCache';
 import { getCachedShelfItems, createShelfMap, findInShelfMap, updateCachedShelfItem, removeCachedShelfItem } from '../utils/shelfCache';
 import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
@@ -1463,7 +1463,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showOriginalDesc, setShowOriginalDesc] = useState(true);
   const mouseDownOnBackdropRef = useRef(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
-  const [seasons, setSeasons] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>(() => {
+    if (Array.isArray(initialItem?.seasons) && initialItem.seasons.length > 0) {
+      return [...initialItem.seasons].sort((a: any, b: any) => {
+        if (a.season_number === 0) return 1;
+        if (b.season_number === 0) return -1;
+        return a.season_number - b.season_number;
+      });
+    }
+    const isSeriesOrComic = (initialItem?.item_type === 'series' || initialItem?.item_type === 'anime' || initialItem?.item_type === 'comic') && initialItem?.external_id;
+    if (isSeriesOrComic) {
+      const cachedMeta = getCachedSeriesMetadata(initialItem.external_id);
+      if (cachedMeta && Array.isArray(cachedMeta.seasons) && cachedMeta.seasons.length > 0) {
+        return [...cachedMeta.seasons].sort((a: any, b: any) => {
+          if (a.season_number === 0) return 1;
+          if (b.season_number === 0) return -1;
+          return a.season_number - b.season_number;
+        });
+      }
+    }
+    return [];
+  });
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
   const [seasonEpisodes, setSeasonEpisodes] = useState<{ [seasonNumber: number]: any[] }>({});
   const [globalProgress, setGlobalProgress] = useState<Record<string, boolean>>({});
@@ -2865,8 +2885,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
     const isComic = selectedItem?.item_type === 'comic';
-    const cacheKeyAll = isComic ? `${seriesId}_all_episodes` : `${seriesId}_all_episodes_v2`;
-    const cachedAll = getCachedSeries(cacheKeyAll);
+    const cacheKeyAll = `${seriesId}_all_episodes`;
+    const cachedAll = getCachedSeries(cacheKeyAll) || getCachedSeries(`${seriesId}_all_episodes_v2`);
     
     const processAllEps = (allEps: any[]) => {
       const extIds = allEps.map(e => e.external_id || (isComic ? (String(e.id).startsWith('metron_') || String(e.id).startsWith('cv_') ? e.id : `cv_issue_${e.id}`) : `tvm-ep-${e.id}`));
@@ -2914,6 +2934,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const url = isComic ? `/search/comic/volume/${seriesId}/issues` : `/search/series/${seriesId}/episodes`;
       const res = await apiClient.get(url);
       setCachedSeries(cacheKeyAll, res.data);
+      if (!isComic) setCachedSeries(`${seriesId}_all_episodes_v2`, res.data);
       processAllEps(res.data || []);
     } catch (err) {
       console.error("Failed to load season episodes", err);
@@ -3379,16 +3400,51 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
 
           setSeasons(prevSeasons => {
-            if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
-            let validSeasons = prevSeasons.filter(s => {
-              const countInEps = (grouped[s.season_number] || []).length;
-              return countInEps > 0 || (s.episode_count && s.episode_count < 900);
-            }).map(s => {
+            const currentSeasons = (prevSeasons && prevSeasons.length > 0) ? [...prevSeasons] : [];
+
+            // If currentSeasons is empty, derive seasons directly from grouped episodes
+            if (currentSeasons.length === 0) {
+              const derived: any[] = Object.keys(grouped)
+                .map(k => parseInt(k))
+                .filter(k => k > 0)
+                .map(sNum => ({
+                  id: sNum,
+                  season_number: sNum,
+                  episode_count: (grouped[sNum] || []).length
+                }))
+                .sort((a, b) => a.season_number - b.season_number);
+              if (grouped[0] && grouped[0].length > 0) {
+                derived.push({ id: 0, season_number: 0, is_extras: true, episode_count: grouped[0].length });
+              }
+              if (derived.length > 0) {
+                if (!hasManuallyToggledSeasonRef.current) {
+                  const targetSeason = calculateDefaultActiveSeason(allEps, derived, customProgress || globalProgress, customList || episodes, isComic);
+                  setActiveSeason(targetSeason);
+                }
+                return derived;
+              }
+              return currentSeasons;
+            }
+
+            // Update existing seasons with real episode counts from grouped
+            let validSeasons: any[] = currentSeasons.map(s => {
               const countInEps = (grouped[s.season_number] || []).length;
               return {
                 ...s,
                 episode_count: countInEps > 0 ? countInEps : s.episode_count
               };
+            });
+
+            // Merge any seasons present in grouped that were missing in currentSeasons
+            Object.keys(grouped).forEach(k => {
+              const sNum = parseInt(k);
+              if (sNum > 0 && !validSeasons.some(s => s.season_number === sNum)) {
+                validSeasons.push({
+                  id: sNum,
+                  season_number: sNum,
+                  episode_count: grouped[sNum].length
+                });
+              }
             });
 
             // Ensure Extras (season_number: 0) is always at the very end
@@ -3403,7 +3459,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setActiveSeason(targetSeason);
             }
 
-            return validSeasons.length > 0 ? validSeasons : prevSeasons;
+            return validSeasons.length > 0 ? validSeasons : currentSeasons;
           });
         };
 
@@ -3413,16 +3469,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           const seriesId = item.external_id;
           const cacheKeyMeta = `${seriesId}_metadata`;
           const cacheKeyAll = `${seriesId}_all_episodes`;
-          const cachedMeta = getCachedSeries(cacheKeyMeta);
-          const cachedAll = getCachedSeries(cacheKeyAll);
+          const cachedMeta = getCachedSeriesMetadata(seriesId);
+          const cachedAll = getCachedSeries(cacheKeyAll) || getCachedSeries(`${seriesId}_all_episodes_v2`);
 
-          if (cachedMeta && cachedMeta.seasons) {
+          if (cachedMeta && Array.isArray(cachedMeta.seasons) && cachedMeta.seasons.length > 0) {
             const sortedSeasons = [...cachedMeta.seasons].sort((a, b) => {
               if (a.season_number === 0) return 1;
               if (b.season_number === 0) return -1;
               return a.season_number - b.season_number;
             });
-            setSeasons(sortedSeasons);
+            setSeasons(prev => (prev && prev.length > sortedSeasons.length ? prev : sortedSeasons));
             if (!hasManuallyToggledSeasonRef.current) {
               const isComic = item.item_type === 'comic';
               const targetSeason = calculateDefaultActiveSeason(cachedAll || [], sortedSeasons, globalProgress, episodes, isComic);
@@ -3557,32 +3613,50 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           const seriesId = item.external_id;
           const cacheKeyMeta = `${seriesId}_metadata`;
           const cacheKeyAll = `${seriesId}_all_episodes`;
-          const cachedMeta = getCachedSeries(cacheKeyMeta);
-          const cachedAll = getCachedSeries(cacheKeyAll);
+          const cachedMeta = getCachedSeriesMetadata(seriesId);
+          const cachedAll = getCachedSeries(cacheKeyAll) || getCachedSeries(`${seriesId}_all_episodes_v2`);
 
-          if (!cachedMeta || !cachedMeta.seasons) {
+          const hasValidSeasons = cachedMeta && Array.isArray(cachedMeta.seasons) && (
+            cachedMeta.seasons.length > 1 ||
+            (cachedMeta.seasons.length === 1 && (!cachedAll || !cachedAll.some((e: any) => (e.season_number || 1) > 1)))
+          );
+
+          if (!hasValidSeasons) {
             apiClient.get(`/search/series/${seriesId}`).then(seriesRes => {
               const seriesData = seriesRes.data || {};
               let rawSeasons = seriesData?.seasons || [];
               if (rawSeasons.length === 0) {
-                rawSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
+                // If API was rate limited or empty, derive seasons from cachedAll if available
+                if (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) {
+                  const sNums = Array.from(new Set(cachedAll.map((e: any) => e.season_number ?? 1).filter((s: number) => s > 0))).sort((a: number, b: number) => a - b);
+                  if (sNums.length > 0) {
+                    rawSeasons = sNums.map((sNum: number) => ({
+                      id: sNum,
+                      season_number: sNum,
+                      episode_count: cachedAll.filter((e: any) => (e.season_number ?? 1) === sNum).length
+                    }));
+                  }
+                }
               }
-              const sortedSeasons = [...rawSeasons].sort((a: any, b: any) => {
-                if (a.season_number === 0) return 1;
-                if (b.season_number === 0) return -1;
-                return a.season_number - b.season_number;
-              });
-              setCachedSeries(cacheKeyMeta, { ...seriesData, seasons: sortedSeasons });
-              if (seriesData.title) {
-                setSelectedItem((prev: any) => prev ? { ...prev, title: seriesData.title } : null);
-              }
-              setSeasons(sortedSeasons);
-              if (!hasManuallyToggledSeasonRef.current) {
-                const targetSeason = calculateDefaultActiveSeason(cachedAll || [], sortedSeasons, globalProgress, episodes, false);
-                setActiveSeason(targetSeason);
+
+              if (rawSeasons.length > 0) {
+                const sortedSeasons = [...rawSeasons].sort((a: any, b: any) => {
+                  if (a.season_number === 0) return 1;
+                  if (b.season_number === 0) return -1;
+                  return a.season_number - b.season_number;
+                });
+                setCachedSeriesMetadata(seriesId, { ...seriesData, seasons: sortedSeasons });
+                if (seriesData.title) {
+                  setSelectedItem((prev: any) => prev ? { ...prev, title: seriesData.title } : null);
+                }
+                setSeasons(prev => (prev && prev.length > sortedSeasons.length ? prev : sortedSeasons));
+                if (!hasManuallyToggledSeasonRef.current) {
+                  const targetSeason = calculateDefaultActiveSeason(cachedAll || [], sortedSeasons, globalProgress, episodes, false);
+                  setActiveSeason(targetSeason);
+                }
               }
             }).catch(console.error);
-          } else if (cachedMeta.title) {
+          } else if (cachedMeta?.title) {
             setSelectedItem((prev: any) => prev ? { ...prev, title: cachedMeta.title } : null);
           }
 
@@ -3597,6 +3671,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
             if (Array.isArray(res.data) && res.data.length > 0) {
               setCachedSeries(cacheKeyAll, res.data);
+              setCachedSeries(`${seriesId}_all_episodes_v2`, res.data);
               processAllEps(res.data);
             }
           }).catch(err => {
@@ -3608,7 +3683,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setContentRateLimit({ category: limCat, resetAt: rst, reason: rsn });
             }
           }).finally(() => setIsLoadingSeasonEpisodes(false));
-
 
         if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
           setIsLoadingSeasonEpisodes(true);

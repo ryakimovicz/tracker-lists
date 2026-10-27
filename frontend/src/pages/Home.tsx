@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
-import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
+import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching, getCachedSeriesMetadata, setCachedSeriesMetadata } from '../utils/seriesCache';
 import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
@@ -958,16 +958,17 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           })
         : Promise.resolve([]);
 
-      const seriesCacheKey = `series_${item.external_id}`;
-      const cachedSeries = getCachedSeries(seriesCacheKey);
+      const cachedSeries = getCachedSeriesMetadata(item.external_id);
       const seriesPromise = isComic
         ? Promise.resolve(null)
         : (cachedSeries && cachedSeries.seasons
             ? Promise.resolve(cachedSeries)
             : apiClient.get(`/search/series/${item.external_id}`).then(res => {
-                const filteredSeasons = (res.data.seasons || []).filter((s: any) => s.season_number > 0);
+                const filteredSeasons = (res.data?.seasons || []).filter((s: any) => s.season_number > 0);
                 const data = { ...res.data, seasons: filteredSeasons };
-                setCachedSeries(seriesCacheKey, data);
+                if (filteredSeasons.length > 0) {
+                  setCachedSeriesMetadata(item.external_id, data);
+                }
                 return data;
               }).catch(() => null)
           );
@@ -1696,9 +1697,11 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
         } else {
           try {
             const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-            const filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
+            const filteredSeasons = (seriesRes.data?.seasons || []).filter((s: any) => s.season_number > 0);
             seasonsCount = filteredSeasons.length;
-            setCachedSeries(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
+            if (filteredSeasons.length > 0) {
+              setCachedSeriesMetadata(item.external_id, { ...seriesRes.data, seasons: filteredSeasons });
+            }
           } catch (e) {}
         }
 

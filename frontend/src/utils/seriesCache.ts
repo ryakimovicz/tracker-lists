@@ -141,6 +141,85 @@ export const removeCachedSeries = (key: string) => {
   });
 };
 
+/**
+ * Safely retrieves series metadata checking all possible cache key conventions
+ * (series_${id}, ${id}_metadata, clean id variants) and rejects poisoned single-season dummy records.
+ */
+export const getCachedSeriesMetadata = (seriesId?: string | number | null) => {
+  if (!seriesId) return null;
+  const sId = String(seriesId);
+  const cleanId = sId.replace(/^tvm[-_]|^metron_series_|^metron_|^cv_vol_|^cv_/, '');
+
+  const candidates = [
+    `${sId}_metadata`,
+    `series_${sId}`,
+    `tvm_${cleanId}_metadata`,
+    `series_tvm_${cleanId}`,
+    `${cleanId}_metadata`,
+    `series_${cleanId}`
+  ];
+
+  for (const k of candidates) {
+    const data = getCachedSeries(k);
+    if (data && typeof data === 'object') {
+      // Check if this metadata is a poisoned single-season fallback
+      if (Array.isArray(data.seasons)) {
+        const isDummySingleSeason = data.seasons.length === 1 &&
+          data.seasons[0]?.season_number === 1 &&
+          (data.number_of_seasons > 1 || (!data.name && !data.title));
+        if (isDummySingleSeason) {
+          continue; // ignore poisoned candidate
+        }
+      }
+      return data;
+    }
+  }
+  return null;
+};
+
+/**
+ * Sets series metadata consistently across all key conventions.
+ */
+export const setCachedSeriesMetadata = (seriesId?: string | number | null, data?: any) => {
+  if (!seriesId || !data) return;
+  const sId = String(seriesId);
+  const cleanId = sId.replace(/^tvm[-_]|^metron_series_|^metron_|^cv_vol_|^cv_/, '');
+
+  setCachedSeries(`${sId}_metadata`, data);
+  setCachedSeries(`series_${sId}`, data);
+  if (cleanId && cleanId !== sId) {
+    setCachedSeries(`${cleanId}_metadata`, data);
+    setCachedSeries(`series_${cleanId}`, data);
+    if (!sId.startsWith('tvm_') && !sId.startsWith('metron_') && !sId.startsWith('cv_')) {
+      setCachedSeries(`tvm_${cleanId}_metadata`, data);
+      setCachedSeries(`series_tvm_${cleanId}`, data);
+    }
+  }
+};
+
+/**
+ * Clears any poisoned single-season fallback metadata entry for a given series ID.
+ */
+export const invalidatePoisonedSeriesCache = (seriesId?: string | number | null) => {
+  if (!seriesId) return;
+  const sId = String(seriesId);
+  const cleanId = sId.replace(/^tvm[-_]|^metron_series_|^metron_|^cv_vol_|^cv_/, '');
+  const keys = [
+    `${sId}_metadata`,
+    `series_${sId}`,
+    `tvm_${cleanId}_metadata`,
+    `series_tvm_${cleanId}`,
+    `${cleanId}_metadata`,
+    `series_${cleanId}`
+  ];
+  keys.forEach(k => {
+    const d = getCachedSeries(k);
+    if (d && Array.isArray(d.seasons) && d.seasons.length === 1 && d.seasons[0]?.season_number === 1 && (d.number_of_seasons > 1 || (!d.name && !d.title))) {
+      removeCachedSeries(k);
+    }
+  });
+};
+
 export const clearCachedSeriesMatching = (pattern: RegExp | string) => {
   // Clear from memoryCache
   for (const k of Array.from(memoryCache.keys())) {

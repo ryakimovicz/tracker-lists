@@ -7,6 +7,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { PathdLoader } from './PathdLoader';
 import { Clock, AlertCircle } from 'lucide-react';
 import { getCategoryLabel } from '../utils/categoryOrder';
+import { getCachedSeriesMetadata } from '../utils/seriesCache';
 
 interface ItemRouteModalProps {
   onClose?: () => void;
@@ -90,6 +91,13 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
 
   const [item, setItem] = useState<any>(() => {
     if (matchesCurrentId(stateItem)) {
+      const isSeries = stateItem.item_type === 'series' || stateItem.item_type === 'anime' || routeType === 'series' || routeType === 'anime';
+      if (isSeries && (!stateItem.seasons || stateItem.seasons.length === 0)) {
+        const cachedMeta = getCachedSeriesMetadata(stateItem.external_id || routeId);
+        if (cachedMeta && Array.isArray(cachedMeta.seasons) && cachedMeta.seasons.length > 0) {
+          return { ...stateItem, seasons: cachedMeta.seasons };
+        }
+      }
       return stateItem;
     }
     return null;
@@ -101,7 +109,15 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     // If navigation state carries the item, sync it immediately
     const navItem = (location.state as any)?.item;
     if (matchesCurrentId(navItem)) {
-      setItem(navItem);
+      const isSeries = navItem.item_type === 'series' || navItem.item_type === 'anime' || type === 'series' || type === 'anime';
+      let enrichedItem = navItem;
+      if (isSeries && (!navItem.seasons || navItem.seasons.length === 0)) {
+        const cachedMeta = getCachedSeriesMetadata(navItem.external_id || id);
+        if (cachedMeta && Array.isArray(cachedMeta.seasons) && cachedMeta.seasons.length > 0) {
+          enrichedItem = { ...navItem, seasons: cachedMeta.seasons };
+        }
+      }
+      setItem(enrichedItem);
       // For episodes, or items that already have rich description/details,
       // we can stop loading right away.
       const hasFullDetails = Boolean(

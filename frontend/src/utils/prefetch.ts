@@ -1,5 +1,5 @@
 import { apiClient } from '../api/client';
-import { getCachedSeries, setCachedSeries } from './seriesCache';
+import { getCachedSeries, setCachedSeries, getCachedSeriesMetadata, setCachedSeriesMetadata } from './seriesCache';
 
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh cache
 
@@ -22,20 +22,19 @@ export const prefetchMediaDetails = (item: any) => {
     const cacheKeyMeta = `${extId}_metadata`;
     const cacheKeyAll = `${extId}_all_episodes`;
 
-    if (!getCachedSeries(cacheKeyMeta)) {
+    if (!getCachedSeriesMetadata(extId)) {
       apiClient.get(`/search/series/${extId}`).then(res => {
         if (res.data) {
           const seriesData = res.data || {};
           let rawSeasons = seriesData.seasons || [];
-          if (rawSeasons.length === 0) {
-            rawSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
+          if (rawSeasons.length > 0) {
+            const sortedSeasons = [...rawSeasons].sort((a: any, b: any) => {
+              if (a.season_number === 0) return 1;
+              if (b.season_number === 0) return -1;
+              return a.season_number - b.season_number;
+            });
+            setCachedSeriesMetadata(extId, { ...seriesData, seasons: sortedSeasons });
           }
-          const sortedSeasons = [...rawSeasons].sort((a: any, b: any) => {
-            if (a.season_number === 0) return 1;
-            if (b.season_number === 0) return -1;
-            return a.season_number - b.season_number;
-          });
-          setCachedSeries(cacheKeyMeta, { ...seriesData, seasons: sortedSeasons });
         }
       }).catch(() => {});
     }
