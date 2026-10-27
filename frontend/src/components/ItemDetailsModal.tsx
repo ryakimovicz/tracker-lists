@@ -8360,8 +8360,67 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               );
                             }
 
-                            const comicNextCandidate = findNextEpisodeCandidate(displayedIssues, episodes, globalProgress, true).nextEp;
-                            const visibleIssues = displayedIssues.slice(0, comicVisibleCount);
+                            const { nextEp, isCaughtUp } = findNextEpisodeCandidate(displayedIssues, episodes, globalProgress, true);
+                            const comicNextCandidate = nextEp;
+
+                            const parseEpNum = (x: any) => {
+                              if (x == null) return -1;
+                              if (x.issue_number != null && !isNaN(parseFloat(x.issue_number))) return parseFloat(x.issue_number);
+                              if (x.episode_number != null && !isNaN(parseFloat(x.episode_number))) return parseFloat(x.episode_number);
+                              if (x.name) {
+                                const m = String(x.name).match(/#(\d+(\.\d+)?)/);
+                                if (m) return parseFloat(m[1]);
+                              }
+                              if (x.title) {
+                                const m = String(x.title).match(/#(\d+(\.\d+)?)/);
+                                if (m) return parseFloat(m[1]);
+                              }
+                              return -1;
+                            };
+
+                            // Locate target index so user's reading point (e.g. #404 and #405) is loaded and visible at once
+                            let targetIndex = -1;
+                            if (comicNextCandidate) {
+                              const targetNum = parseEpNum(comicNextCandidate);
+                              targetIndex = displayedIssues.findIndex(ep => {
+                                if (ep.id === comicNextCandidate.id || ep.external_id === comicNextCandidate.external_id) return true;
+                                const epNum = parseEpNum(ep);
+                                return targetNum >= 0 && epNum >= 0 && epNum === targetNum;
+                              });
+                            } else if (isCaughtUp) {
+                              targetIndex = displayedIssues.length - 1;
+                            }
+
+                            if (targetIndex < 0) {
+                              for (let i = displayedIssues.length - 1; i >= 0; i--) {
+                                const ep = displayedIssues[i];
+                                const cleanEpId = String(ep.id || ep.external_id || '')
+                                  .replace('cv_issue_metron_issue_', '')
+                                  .replace('cv_issue_', '')
+                                  .replace('metron_issue_', '')
+                                  .replace('cv_', '')
+                                  .replace('metron_', '');
+                                const extIdKey = ep.external_id || (String(ep.id).startsWith('metron_') || String(ep.id).startsWith('cv_') ? String(ep.id) : `metron_issue_${cleanEpId}`);
+                                const cachedIssueState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`);
+                                const epNumFloat = parseEpNum(ep);
+                                const dbEp = (episodes || []).find((x: any) => {
+                                  const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                  if (xClean && cleanEpId && xClean === cleanEpId) return true;
+                                  if (x.external_id && (x.external_id === extIdKey || x.external_id === ep.external_id || x.external_id === cleanEpId)) return true;
+                                  const xNum = parseEpNum(x);
+                                  return epNumFloat >= 0 && xNum >= 0 && epNumFloat === xNum;
+                                });
+                                const isCompleted = !!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed));
+                                if (isCompleted) {
+                                  targetIndex = i;
+                                  break;
+                                }
+                              }
+                            }
+
+                            const requiredCount = targetIndex >= 0 ? Math.max(100, Math.ceil((targetIndex + 5) / 100) * 100) : 100;
+                            const effectiveVisibleCount = Math.max(comicVisibleCount, requiredCount);
+                            const visibleIssues = displayedIssues.slice(0, effectiveVisibleCount);
 
                             return (
                               <div 
@@ -8378,21 +8437,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     .replace('cv_', '')
                                     .replace('metron_', '');
                                   const extIdKey = ep.external_id || (String(ep.id).startsWith('metron_') || String(ep.id).startsWith('cv_') ? String(ep.id) : `metron_issue_${cleanEpId}`);
-                                  
-                                  const parseEpNum = (x: any) => {
-                                    if (x == null) return -1;
-                                    if (x.issue_number != null && !isNaN(parseFloat(x.issue_number))) return parseFloat(x.issue_number);
-                                    if (x.episode_number != null && !isNaN(parseFloat(x.episode_number))) return parseFloat(x.episode_number);
-                                    if (x.name) {
-                                      const m = String(x.name).match(/#(\d+(\.\d+)?)/);
-                                      if (m) return parseFloat(m[1]);
-                                    }
-                                    if (x.title) {
-                                      const m = String(x.title).match(/#(\d+(\.\d+)?)/);
-                                      if (m) return parseFloat(m[1]);
-                                    }
-                                    return -1;
-                                  };
                                   const epNumFloat = parseEpNum(ep);
 
                                   const isCandidateNext = comicNextCandidate && (
@@ -8412,17 +8456,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                   const cachedIssueState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`);
                                   const isCompleted = !!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed));
+                                  const isTargetRow = isCandidateNext || (!comicNextCandidate && targetIndex >= 0 && displayedIssues[targetIndex]?.id === ep.id);
 
                                   return (
                                     <div
                                       key={ep.id || ep.external_id || `cv_${cleanEpId}`}
                                       className="episode-item-row"
                                       ref={(el) => {
-                                        if (el && isCandidateNext && !hasUserScrolledComicContainerRef.current) {
+                                        if (el && isTargetRow && !hasUserScrolledComicContainerRef.current) {
                                           const container = el.parentElement;
                                           if (container) {
                                             const prevEl = el.previousElementSibling as HTMLElement | null;
-                                            const targetEl = prevEl || el;
+                                            const targetEl = isCandidateNext ? (prevEl || el) : el;
                                             const topPos = Math.max(0, targetEl.offsetTop - 8);
                                             if (Math.abs(container.scrollTop - topPos) > 4) {
                                               container.scrollTop = topPos;
@@ -8526,13 +8571,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   );
                                 })}
 
-                                {displayedIssues.length > comicVisibleCount && (
+                                {displayedIssues.length > effectiveVisibleCount && (
                                   <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '0.5rem', paddingBottom: '0.25rem' }}>
                                     <button
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setComicVisibleCount(prev => prev + 100);
+                                        setComicVisibleCount(prev => Math.max(prev, effectiveVisibleCount) + 100);
                                       }}
                                       style={{
                                         display: 'inline-flex',
