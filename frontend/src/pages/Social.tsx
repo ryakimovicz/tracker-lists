@@ -9,6 +9,7 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { SwipeViewPager } from '../components/SwipeViewPager';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
 
@@ -29,10 +30,10 @@ export const Social: React.FC = () => {
   const isEs = language === 'es';
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/social');
 
   const validTabs: SocialTab[] = ['following', 'discover', 'reviews', 'me'];
-  const tabParam = searchParams.get('tab');
+  const tabParam = effectiveSearchParams?.get('tab');
   const activeTab: SocialTab = (tabParam && validTabs.includes(tabParam as SocialTab))
     ? (tabParam as SocialTab)
     : 'following';
@@ -40,8 +41,9 @@ export const Social: React.FC = () => {
   const [activeSocialTab, setActiveSocialTab] = useState<SocialTab>(activeTab);
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveSocialTab(activeTab);
-  }, [activeTab]);
+  }, [activeTab, effectiveSearchParams]);
 
   // Fast in-memory cache to allow 0ms instantaneous tab switching
   const feedCacheRef = useRef<Partial<Record<SocialTab, ActivityCardData[]>>>({
@@ -79,8 +81,9 @@ export const Social: React.FC = () => {
     const targetType = item.item_type || 'movie';
     const targetId = item.external_id || item.id;
     if (targetType && targetId) {
+      const currentBg = (location.state as any)?.backgroundLocation;
       navigate(`/item/${targetType}/${targetId}`, {
-        state: { backgroundLocation: location, item }
+        state: { backgroundLocation: currentBg || location, item }
       });
     } else {
       setSelectedItem(item);
@@ -415,7 +418,7 @@ export const Social: React.FC = () => {
       });
     }
 
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (tab === 'following') {
       newParams.delete('tab');
     } else {
@@ -442,7 +445,7 @@ export const Social: React.FC = () => {
       el.style.setProperty('--tab-act', i === step ? '1' : '0');
     });
 
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (targetTab === 'following') {
       newParams.delete('tab');
     } else {

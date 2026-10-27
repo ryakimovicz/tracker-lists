@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
@@ -756,12 +757,12 @@ export const Search: React.FC = () => {
     };
   }, []);
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/search');
 
   const validExploreTabs = ['new', 'trending', 'guides'] as const;
   type ExploreTab = typeof validExploreTabs[number];
 
-  const exploreTabParamRaw = searchParams.get('tab');
+  const exploreTabParamRaw = effectiveSearchParams?.get('tab');
   // Backwards compatibility for legacy Spanish params: 'nuevo' -> 'new', 'tendencias' -> 'trending', 'guias' -> 'guides'
   const normalizedTabParam = 
     exploreTabParamRaw === 'nuevo' ? 'new' :
@@ -776,8 +777,9 @@ export const Search: React.FC = () => {
   const [activeExploreSubTab, setActiveExploreSubTab] = useState<ExploreTab>(exploreSubTab);
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveExploreSubTab(exploreSubTab);
-  }, [exploreSubTab]);
+  }, [exploreSubTab, effectiveSearchParams]);
 
   const handleExploreSubTabChange = (tab: ExploreTab) => {
     if (typeof window !== 'undefined') {
@@ -796,7 +798,7 @@ export const Search: React.FC = () => {
       el.style.setProperty('--tab-act', i === step ? '1' : '0');
     });
 
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (tab === 'new') {
       newParams.delete('tab');
     } else {
@@ -979,8 +981,9 @@ export const Search: React.FC = () => {
     const targetType = item.item_type || 'movie';
     const targetId = item.external_id || item.id;
     if (targetType && targetId) {
+      const currentBg = (location.state as any)?.backgroundLocation;
       navigate(`/item/${targetType}/${targetId}`, {
-        state: { backgroundLocation: location, item }
+        state: { backgroundLocation: currentBg || location, item }
       });
     } else {
       setSelectedItem(item);

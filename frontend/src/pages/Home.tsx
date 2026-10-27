@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
+import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching, getCachedSeriesMetadata, setCachedSeriesMetadata } from '../utils/seriesCache';
 import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
@@ -2215,14 +2216,14 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/');
   const { language, t } = useTranslation();
   const { user: currentUser } = useAuth();
 
   const validHomeTabs = ["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"] as const;
   type HomeTab = typeof validHomeTabs[number];
 
-  const currentTabParam = searchParams.get('tab');
+  const currentTabParam = effectiveSearchParams?.get('tab');
   const activeTab: HomeTab = (currentTabParam && validHomeTabs.includes(currentTabParam as any))
     ? (currentTabParam as HomeTab)
     : "watching";
@@ -2232,9 +2233,10 @@ export const Home: React.FC = () => {
   isGuidesTabRef.current = activeHomeTab === 'guides';
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveHomeTab(activeTab);
     isGuidesTabRef.current = activeTab === 'guides';
-  }, [activeTab]);
+  }, [activeTab, effectiveSearchParams]);
 
   const handleTabChange = (tab: HomeTab) => {
     isGuidesTabRef.current = tab === 'guides';
@@ -2268,7 +2270,7 @@ export const Home: React.FC = () => {
       scrollAccumulatorRef.current = 0;
       lastToggleTimeRef.current = Date.now();
     }
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (tab === "watching") {
       newParams.delete('tab');
     } else {
@@ -2313,8 +2315,9 @@ export const Home: React.FC = () => {
     const targetType = item.item_type || 'movie';
     const targetId = item.external_id || item.id;
     if (targetType && targetId) {
+      const currentBg = (location.state as any)?.backgroundLocation;
       navigate(`/item/${targetType}/${targetId}`, {
-        state: { backgroundLocation: location, item }
+        state: { backgroundLocation: currentBg || location, item }
       });
     } else {
       setSelectedItem(item);
@@ -2327,13 +2330,14 @@ export const Home: React.FC = () => {
     } catch { return true; }
   });
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
-  const currentViewParam = searchParams.get('view');
+  const currentViewParam = effectiveSearchParams?.get('view');
   const upcomingFilter: "calendar" | "tba" = (currentViewParam === "tba") ? "tba" : "calendar";
   const [activeUpcomingFilter, setActiveUpcomingFilter] = useState<"calendar" | "tba">(upcomingFilter);
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveUpcomingFilter(upcomingFilter);
-  }, [upcomingFilter]);
+  }, [upcomingFilter, effectiveSearchParams]);
 
   const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
   const upcomingSwipeRef = useRef<HTMLDivElement>(null);
@@ -2541,7 +2545,7 @@ export const Home: React.FC = () => {
       scrollAccumulatorRef.current = 0;
       lastToggleTimeRef.current = Date.now();
     }
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (step === 0) {
       newParams.delete('tab');
       newParams.delete('view');
@@ -3062,23 +3066,23 @@ export const Home: React.FC = () => {
         const cacheKeyAll = `${i.external_id}_all_episodes`;
         const allEps = getCachedSeries(cacheKeyAll);
         if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+          const isAiredCheck = (ep: any) => {
+            if (isComic) return true;
+            const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+            if (isExtra) return false;
+            if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
+            if (ep.airdate || ep.air_date) {
+              const ad = ep.airdate || ep.air_date;
+              const at = ep.airtime || '00:00';
+              return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+            }
+            return true;
+          };
+
+          const airedEps = allEps.filter(isAiredCheck);
+          if (airedEps.length === 0) return false;
+
           if (i.tracking_list_id) {
-            const isAiredCheck = (ep: any) => {
-              if (isComic) return true;
-              const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
-              if (isExtra) return false;
-              if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
-              if (ep.airdate || ep.air_date) {
-                const ad = ep.airdate || ep.air_date;
-                const at = ep.airtime || '00:00';
-                return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-              }
-              return true;
-            };
-
-            const airedEps = allEps.filter(isAiredCheck);
-            if (airedEps.length === 0) return false;
-
             // Check if tracked list items are cached or we need to consider if all aired are watched
             const pad = (n: number) => String(n).padStart(2, '0');
             const cachedList = getCachedSeries(`list_${i.tracking_list_id}`);
@@ -3148,6 +3152,34 @@ export const Home: React.FC = () => {
         const cleanVolId = String(i.external_id || '').replace('metron_series_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
         const cacheKeyAll = isEpisodicComic ? `${cleanVolId}_all_episodes` : `${i.external_id}_all_episodes`;
         const allEps = getCachedSeries(cacheKeyAll) || (isEpisodicComic ? getCachedSeries(`metron_series_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`${i.external_id}_all_episodes`) : null);
+
+        const cachedMeta = getCachedSeriesMetadata(i.external_id);
+        if (cachedMeta?.status === 'In Development' || cachedMeta?.status === 'Upcoming' || i.custom_badge === 'upcoming' || cachedMeta?.badge === 'upcoming') {
+          return false;
+        }
+
+        const firstAir = cachedMeta?.first_air_date || cachedMeta?.premiered || i.release_date;
+        let isFutureFirstAir = false;
+        if (firstAir) {
+          const parts = String(firstAir).split('-');
+          let rTime = 0;
+          if (parts.length === 3) {
+            rTime = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
+          } else if (parts.length === 1 && parts[0].length === 4) {
+            const yearNum = parseInt(parts[0]);
+            if (yearNum > new Date().getFullYear()) isFutureFirstAir = true;
+          } else {
+            rTime = new Date(firstAir).getTime();
+          }
+          if (rTime && rTime >= startOfTodayMs && rTime > nowMs) {
+            isFutureFirstAir = true;
+          }
+        }
+
+        if (isFutureFirstAir) {
+          return false;
+        }
+
         if (allEps && Array.isArray(allEps) && allEps.length > 0) {
           const hasAnyAired = allEps.some((ep: any) => {
             if (isEpisodicComic) {
@@ -3157,6 +3189,9 @@ export const Home: React.FC = () => {
               }
               return true;
             }
+            const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+            if (isExtra) return false;
+
             if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
             if (ep.airdate || ep.air_date) {
               const ad = ep.airdate || ep.air_date;

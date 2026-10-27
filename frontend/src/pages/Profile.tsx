@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
 
@@ -618,8 +619,8 @@ export const Profile: React.FC = () => {
   const { refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { username: usernameParam } = useParams<{ username?: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const userIdParam = searchParams.get('user_id');
+  const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/profile');
+  const userIdParam = (effectiveSearchParams || searchParams).get('user_id');
   const targetUserIdentifier = usernameParam || userIdParam;
   const location = useLocation();
 
@@ -630,14 +631,16 @@ export const Profile: React.FC = () => {
     if (targetType === 'music') {
       const isArtist = typeof targetId === 'string' && targetId.startsWith('artist:');
       const cleanArtist = isArtist ? targetId.replace('artist:', '') : (item.title || '');
+      const currentBg = (location.state as any)?.backgroundLocation;
       navigate(`/music/artist/${encodeURIComponent(cleanArtist)}`, {
-        state: { backgroundLocation: location, image: item.image_url }
+        state: { backgroundLocation: currentBg || location, image: item.image_url }
       });
       return;
     }
     if (targetType && targetId) {
+      const currentBg = (location.state as any)?.backgroundLocation;
       navigate(`/item/${targetType}/${targetId}`, {
-        state: { backgroundLocation: location, item }
+        state: { backgroundLocation: currentBg || location, item }
       });
     } else {
       setSelectedItem(item);
@@ -698,7 +701,7 @@ export const Profile: React.FC = () => {
   const validProfileTabs = ['shelf', 'guides', 'favorites', 'music'] as const;
   type ProfileTab = typeof validProfileTabs[number];
 
-  const profileTabParam = searchParams.get('tab');
+  const profileTabParam = effectiveSearchParams?.get('tab');
   const activeTab: ProfileTab = (profileTabParam && validProfileTabs.includes(profileTabParam as any))
     ? (profileTabParam as ProfileTab)
     : 'shelf';
@@ -706,12 +709,13 @@ export const Profile: React.FC = () => {
   const [activeProfileTab, setActiveProfileTab] = useState<ProfileTab>(activeTab);
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveProfileTab(activeTab);
-  }, [activeTab]);
+  }, [activeTab, effectiveSearchParams]);
 
   const handleTabChange = (tab: ProfileTab) => {
     setActiveProfileTab(tab);
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (tab === 'shelf') {
       newParams.delete('tab');
     } else {
@@ -868,16 +872,17 @@ export const Profile: React.FC = () => {
   const [createdGuidesPage, setCreatedGuidesPage] = useState(1);
   const [savedGuidesPage, setSavedGuidesPage] = useState(1);
 
-  const guidesSubTabParam = searchParams.get('subtab');
+  const guidesSubTabParam = effectiveSearchParams?.get('subtab');
   const profileGuidesSubTab: 'created' | 'saved' = (guidesSubTabParam === 'saved') ? 'saved' : 'created';
 
   const [activeGuidesSubTab, setActiveGuidesSubTab] = useState<'created' | 'saved'>(profileGuidesSubTab);
 
   useEffect(() => {
+    if (!effectiveSearchParams) return;
     setActiveGuidesSubTab(profileGuidesSubTab);
-  }, [profileGuidesSubTab]);
+  }, [profileGuidesSubTab, effectiveSearchParams]);
 
-  const musicTypeParam = searchParams.get('type');
+  const musicTypeParam = effectiveSearchParams?.get('type');
   const validMusicTypes = ['artists', 'albums', 'tracks'] as const;
   const initialMusicType: 'artists' | 'albums' | 'tracks' = (musicTypeParam && validMusicTypes.includes(musicTypeParam as any))
     ? (musicTypeParam as 'artists' | 'albums' | 'tracks')
@@ -2090,18 +2095,18 @@ export const Profile: React.FC = () => {
         setMusicType('artists');
       }
 
-      const periodInUrl = searchParams.get('period');
+      const periodInUrl = (effectiveSearchParams || searchParams).get('period');
       if (periodInUrl && validMusicPeriods.includes(periodInUrl as any)) {
         setMusicPeriod(periodInUrl as '7day' | '1month' | 'overall');
       } else if (!periodInUrl) {
         setMusicPeriod('7day');
       }
     }
-  }, [searchParams, activeTab]);
+  }, [effectiveSearchParams, searchParams, activeTab]);
 
   const handleMusicTypeChange = (newType: 'artists' | 'albums' | 'tracks') => {
     setMusicType(newType);
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (newType === 'artists') {
       newParams.delete('type');
     } else {
@@ -2112,7 +2117,7 @@ export const Profile: React.FC = () => {
 
   const handleMusicPeriodChange = (newPeriod: '7day' | '1month' | 'overall') => {
     setMusicPeriod(newPeriod);
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(effectiveSearchParams || searchParams);
     if (newPeriod === '7day') {
       newParams.delete('period');
     } else {
