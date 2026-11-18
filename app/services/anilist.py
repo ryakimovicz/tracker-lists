@@ -180,6 +180,24 @@ class AnilistService:
             return None
         return None
 
+    @staticmethod
+    def _extract_manga_creator(staff_obj: Any) -> Optional[str]:
+        if not staff_obj or not isinstance(staff_obj, dict):
+            return None
+        edges = staff_obj.get("edges") or []
+        for e in edges:
+            role = (e.get("role") or "").lower()
+            if any(k in role for k in ("story & art", "story", "art", "original story", "manga")):
+                name = (e.get("node") or {}).get("name") or {}
+                full = name.get("full")
+                if full:
+                    return str(full)
+        if edges:
+            first_name = (edges[0].get("node") or {}).get("name") or {}
+            if first_name.get("full"):
+                return str(first_name.get("full"))
+        return None
+
     @classmethod
     def search_manga(cls, query: str) -> List[SearchResultItem]:
         if not query:
@@ -196,6 +214,16 @@ class AnilistService:
               title {
                 romaji
                 english
+              }
+              staff(sort: RELEVANCE, perPage: 3) {
+                edges {
+                  role
+                  node {
+                    name {
+                      full
+                    }
+                  }
+                }
               }
               description
               coverImage {
@@ -251,6 +279,8 @@ class AnilistService:
                 mapped_status = "Upcoming" if is_upcoming else None
                 badge = "upcoming" if is_upcoming else None
 
+                author_name = cls._extract_manga_creator(item.get("staff"))
+
                 results.append(
                     SearchResultItem(
                         external_id=str(item.get("id")),
@@ -258,6 +288,7 @@ class AnilistService:
                         image_url=image_url,
                         description=desc,
                         item_type="manga",
+                        creator=author_name,
                         release_date=release_date,
                         popularity=float(item.get("averageScore") or 0),
                         status=mapped_status,
@@ -278,6 +309,16 @@ class AnilistService:
             media(type: MANGA, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: false) {
               id
               title { romaji english }
+              staff(sort: RELEVANCE, perPage: 3) {
+                edges {
+                  role
+                  node {
+                    name {
+                      full
+                    }
+                  }
+                }
+              }
               description
               coverImage { large }
               startDate { year month day }
@@ -322,12 +363,15 @@ class AnilistService:
                 if not is_safe_media_item(title, desc):
                     continue
 
+                author_name = cls._extract_manga_creator(item.get("staff"))
+
                 results.append(SearchResultItem(
                     external_id=str(item.get("id")),
                     title=title,
                     image_url=image_url,
                     description=desc,
                     item_type="manga",
+                    creator=author_name,
                     release_date=release_date or None,
                     popularity=float(item.get("popularity") or item.get("averageScore") or 0)
                 ))
@@ -346,6 +390,16 @@ class AnilistService:
             media(type: MANGA, sort: [START_DATE_DESC], startDate_greater: 20260101, startDate_lesser: $end, isAdult: false) {
               id
               title { romaji english }
+              staff(sort: RELEVANCE, perPage: 3) {
+                edges {
+                  role
+                  node {
+                    name {
+                      full
+                    }
+                  }
+                }
+              }
               description
               coverImage { large }
               startDate { year month day }
@@ -390,12 +444,15 @@ class AnilistService:
                 if not is_safe_media_item(title, desc):
                     continue
 
+                author_name = cls._extract_manga_creator(item.get("staff"))
+
                 results.append(SearchResultItem(
                     external_id=str(item.get("id")),
                     title=title,
                     image_url=image_url,
                     description=desc,
                     item_type="manga",
+                    creator=author_name,
                     release_date=release_date or None,
                     popularity=float(item.get("averageScore") or 0)
                 ))
@@ -420,6 +477,22 @@ class AnilistService:
 
         return title, 1
 
+    @staticmethod
+    def _extract_anime_studio(studios_obj: Any) -> Optional[str]:
+        if not studios_obj or not isinstance(studios_obj, dict):
+            return None
+        edges = studios_obj.get("edges") or []
+        for e in edges:
+            if isinstance(e, dict) and e.get("isMain"):
+                node = e.get("node") or {}
+                if node.get("name"):
+                    return str(node["name"])
+        if edges and isinstance(edges[0], dict):
+            node = edges[0].get("node") or {}
+            if node.get("name"):
+                return str(node["name"])
+        return None
+
     @classmethod
     def get_new_anime(cls) -> List[SearchResultItem]:
         now = int(time.time())
@@ -438,6 +511,14 @@ class AnilistService:
                 title {
                   romaji
                   english
+                }
+                studios(isMain: true) {
+                  edges {
+                    isMain
+                    node {
+                      name
+                    }
+                  }
                 }
                 coverImage {
                   large
@@ -487,12 +568,15 @@ class AnilistService:
                 if not is_safe_media_item(base_title, desc):
                     continue
 
+                studio_name = cls._extract_anime_studio(media.get("studios"))
+
                 results.append(SearchResultItem(
                     external_id=f"anime_{media_id}",
                     title=base_title,
                     image_url=image_url,
                     description=desc,
                     item_type="anime",
+                    creator=studio_name,
                     release_date=airdate,
                     latest_season=season_num,
                     latest_episode=ep_num,
@@ -511,6 +595,14 @@ class AnilistService:
             media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
               id
               title { romaji english }
+              studios(isMain: true) {
+                edges {
+                  isMain
+                  node {
+                    name
+                  }
+                }
+              }
               description
               coverImage { large }
               startDate { year month day }
@@ -555,12 +647,15 @@ class AnilistService:
                 if not is_safe_media_item(title, desc):
                     continue
 
+                studio_name = cls._extract_anime_studio(item.get("studios"))
+
                 results.append(SearchResultItem(
                     external_id=f"anime_{item.get('id')}",
                     title=title,
                     image_url=image_url,
                     description=desc,
                     item_type="anime",
+                    creator=studio_name,
                     release_date=release_date or None,
                     popularity=float(item.get("averageScore") or 0)
                 ))

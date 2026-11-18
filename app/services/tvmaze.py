@@ -28,6 +28,22 @@ _TVMAZE_SERIES_CACHE: Dict[str, tuple[float, dict]] = {}
 _TVMAZE_EPISODES_CACHE: Dict[str, tuple[float, List[dict]]] = {}
 _TVMAZE_CACHE_TTL = 3600 * 12  # 12 hours
 
+def extract_network_or_platform(show_obj: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract network name or streaming/web channel as broadcast platform.
+    Prioritizes broadcast network (HBO, AMC, etc.), falling back to web channel (Netflix, Prime Video, YouTube, etc.).
+    """
+    if not show_obj or not isinstance(show_obj, dict):
+        return None
+    net_obj = show_obj.get("network") if isinstance(show_obj.get("network"), dict) else None
+    web_obj = show_obj.get("webChannel") if isinstance(show_obj.get("webChannel"), dict) else None
+
+    if net_obj and net_obj.get("name"):
+        return net_obj["name"]
+    if web_obj and web_obj.get("name"):
+        return str(web_obj["name"]).strip()
+    return None
+
 import concurrent.futures
 
 class TVMazeService:
@@ -235,6 +251,9 @@ class TVMazeService:
                 if show_id_int and show_id_int in _TVMAZE_AKAS_CACHE:
                     localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code)
 
+                # Extract network or reputable streaming platform as creator
+                net_name = extract_network_or_platform(show)
+
                 results.append(
                     SearchResultItem(
                         external_id=f"tvm_{show.get('id')}",
@@ -242,6 +261,7 @@ class TVMazeService:
                         image_url=image_url,
                         description=show_summary,
                         item_type="anime" if is_anime else "series",
+                        creator=net_name,
                         release_date=release_date,
                         imdb_id=imdb_id,
                         popularity=pop_score
@@ -474,6 +494,7 @@ class TVMazeService:
             lep = item["latest_ep"]
             image_data = show.get("image")
             image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+            net_name = extract_network_or_platform(show)
 
             results.append(SearchResultItem(
                 external_id=f"tvm_{show.get('id')}",
@@ -481,6 +502,7 @@ class TVMazeService:
                 image_url=image_url,
                 description=show.get("summary", ""),
                 item_type="series",
+                creator=net_name,
                 release_date=lep["airdate"],
                 latest_season=lep.get("season"),
                 latest_episode=lep.get("number"),
@@ -568,6 +590,7 @@ class TVMazeService:
             lep = item["latest_ep"]
             image_data = show.get("image")
             image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+            net_name = extract_network_or_platform(show)
 
             results.append(SearchResultItem(
                 external_id=f"tvm_{show.get('id')}",
@@ -575,6 +598,7 @@ class TVMazeService:
                 image_url=image_url,
                 description=show.get("summary", ""),
                 item_type="anime",
+                creator=net_name,
                 release_date=lep["airdate"],
                 latest_season=lep.get("season"),
                 latest_episode=lep.get("number"),
@@ -701,6 +725,7 @@ class TVMazeService:
                         norm = (sh.get("name") or "").lower().strip()
                         img = sh.get("image") or {}
                         img_url = img.get("original") or img.get("medium")
+                        net_name = extract_network_or_platform(sh)
                         if ext_id not in seen_ids and norm not in seen_titles and img_url:
                             seen_ids.add(ext_id)
                             seen_titles.add(norm)
@@ -710,6 +735,7 @@ class TVMazeService:
                                 image_url=img_url,
                                 description=sh.get("summary", ""),
                                 item_type="series",
+                                creator=net_name,
                                 release_date=sh.get("premiered"),
                                 popularity=sh.get("weight", 0)
                             ))
@@ -742,6 +768,7 @@ class TVMazeService:
                         image_url = image_data.get("original") or image_data.get("medium") if image_data else None
                         ext_id = f"tvm_{show.get('id')}"
                         norm = (show.get("name") or "").lower().strip()
+                        net_name = extract_network_or_platform(show)
                         if ext_id not in seen_ids and norm not in seen_titles and image_url:
                             seen_ids.add(ext_id)
                             seen_titles.add(norm)
@@ -751,6 +778,7 @@ class TVMazeService:
                                 image_url=image_url,
                                 description=show.get("summary", ""),
                                 item_type="series",
+                                creator=net_name,
                                 release_date=show.get("premiered"),
                                 popularity=show.get("weight", 0)
                             ))

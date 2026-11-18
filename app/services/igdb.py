@@ -329,7 +329,8 @@ class IGDBService:
         fields_str = (
             "fields id, name, status, category, game_type, parent_game, version_parent, "
             "cover.image_id, first_release_date, summary, total_rating, rating_count, "
-            "hypes, follows, themes, age_ratings.rating;"
+            "hypes, follows, themes, age_ratings.rating, "
+            "involved_companies.developer, involved_companies.publisher, involved_companies.company.name;"
         )
         body = f'search "{safe_query}"; {fields_str} limit 100;'
 
@@ -450,6 +451,22 @@ class IGDBService:
 
                 mapped_status = "Upcoming" if (badge == "upcoming" or game_status_val in (2, 3, 4, 7)) else None
 
+                dev_name = None
+                involved = item.get("involved_companies") or []
+                for comp in involved:
+                    if isinstance(comp, dict) and comp.get("developer"):
+                        c = comp.get("company")
+                        if isinstance(c, dict) and c.get("name"):
+                            dev_name = c["name"]
+                            break
+                if not dev_name:
+                    for comp in involved:
+                        if isinstance(comp, dict) and comp.get("publisher"):
+                            c = comp.get("company")
+                            if isinstance(c, dict) and c.get("name"):
+                                dev_name = c["name"]
+                                break
+
                 results.append(
                     SearchResultItem(
                         external_id=str(item.get("id")),
@@ -457,6 +474,7 @@ class IGDBService:
                         image_url=image_url,
                         description=desc,
                         item_type="game",
+                        creator=dev_name,
                         release_date=release_date,
                         popularity=pop_val,
                         status=mapped_status,
@@ -658,6 +676,22 @@ class IGDBService:
             elif "remake" in name_lower:
                 badge = "remake"
 
+            dev_name = None
+            involved = item.get("involved_companies") or []
+            for comp in involved:
+                if isinstance(comp, dict) and comp.get("developer"):
+                    c = comp.get("company")
+                    if isinstance(c, dict) and c.get("name"):
+                        dev_name = c["name"]
+                        break
+            if not dev_name:
+                for comp in involved:
+                    if isinstance(comp, dict) and comp.get("publisher"):
+                        c = comp.get("company")
+                        if isinstance(c, dict) and c.get("name"):
+                            dev_name = c["name"]
+                            break
+
             results.append(
                 SearchResultItem(
                     external_id=str(item.get("id")),
@@ -665,6 +699,7 @@ class IGDBService:
                     image_url=image_url,
                     description=item.get("summary") or "No description available.",
                     item_type="game",
+                    creator=dev_name,
                     release_date=release_date,
                     badge=badge
                 )
@@ -676,7 +711,8 @@ class IGDBService:
         now = int(time.time())
         body = (
             f"fields id, name, category, game_type, parent_game, version_parent, cover.image_id, "
-            f"first_release_date, summary; where first_release_date < {now} & cover != null & "
+            f"first_release_date, summary, involved_companies.developer, involved_companies.publisher, involved_companies.company.name; "
+            f"where first_release_date < {now} & cover != null & "
             f"(game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); "
             f"sort first_release_date desc; limit 100;"
         )
@@ -707,7 +743,8 @@ class IGDBService:
                 joined_gids = ",".join(gids[:35])
                 body_games = (
                     f"fields id, name, category, game_type, parent_game, version_parent, cover.image_id, "
-                    f"first_release_date, summary, total_rating; where id = ({joined_gids}) & cover != null; limit 35;"
+                    f"first_release_date, summary, total_rating, involved_companies.developer, involved_companies.publisher, involved_companies.company.name; "
+                    f"where id = ({joined_gids}) & cover != null; limit 35;"
                 )
                 items = cls._execute_query(body_games, use_cache=True, cache_ttl=1800)
                 id_to_item = {str(item.external_id): item for item in items}
@@ -720,7 +757,8 @@ class IGDBService:
         # Fallback query without date restrictions
         body_fallback = (
             "fields id, name, category, game_type, parent_game, version_parent, cover.image_id, "
-            "first_release_date, summary, total_rating; where cover != null & total_rating != null; "
+            "first_release_date, summary, total_rating, involved_companies.developer, involved_companies.publisher, involved_companies.company.name; "
+            "where cover != null & total_rating != null; "
             "sort total_rating desc; limit 24;"
         )
         return cls._execute_query(body_fallback, use_cache=True, cache_ttl=1800)

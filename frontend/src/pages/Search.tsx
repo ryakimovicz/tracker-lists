@@ -32,6 +32,7 @@ interface SearchResultItem {
   page_count?: number;
   cv_id?: string;
   metron_id?: string;
+  creator?: string;
 }
 
 export const renderMediaBadge = (
@@ -299,31 +300,81 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
         <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
           {item.item_type === 'comic' && item.badge && item.badge !== 'series' && subTab !== 'trending' ? (
             <>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {formatComicBadgeText(item.badge, language === 'es')}
-              </div>
+              {(() => {
+                const badgeText = formatComicBadgeText(item.badge, language === 'es');
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>
+                      {badgeText}
+                    </span>
+                    {item.creator && (
+                      <>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>•</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.creator}>
+                          {item.creator}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
               {item.release_date && (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                   {item.release_date}
                 </div>
               )}
             </>
           ) : (
             <>
-              {epSubtitle && (
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {epSubtitle}
-                </div>
+              {epSubtitle ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>
+                      {epSubtitle}
+                    </span>
+                    {item.creator && (
+                      <>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>•</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.creator}>
+                          {item.creator}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {item.release_date && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                      {item.release_date}
+                    </div>
+                  )}
+                </>
+              ) : (
+                (() => {
+                  const authorStr = item.creator || '';
+                  const dateStr = item.release_date || '';
+
+                  if (authorStr || dateStr) {
+                    return (
+                      <>
+                        {authorStr && (
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={authorStr}>
+                            {authorStr}
+                          </div>
+                        )}
+                        {dateStr && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={dateStr}>
+                            {dateStr}
+                          </div>
+                        )}
+                      </>
+                    );
+                  }
+                  return (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.title}
+                    </div>
+                  );
+                })()
               )}
-              {item.release_date ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  {item.release_date}
-                </div>
-              ) : !epSubtitle ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                  {item.title}
-                </div>
-              ) : null}
             </>
           )}
 
@@ -2195,11 +2246,25 @@ export const Search: React.FC = () => {
                           <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayTitle}>
                             {displayTitle}
                           </h4>
-                          {item.release_date && (
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                              {formatReleaseDate(item.release_date)}
-                            </div>
-                          )}
+                          {(() => {
+                            const dateStr = item.release_date ? formatReleaseDate(item.release_date) : '';
+                            const authorStr = item.creator || '';
+                            if (!authorStr && !dateStr) return null;
+                            return (
+                              <div style={{ marginBottom: '0.25rem' }}>
+                                {authorStr && (
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={authorStr}>
+                                    {authorStr}
+                                  </div>
+                                )}
+                                {dateStr && (
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={dateStr}>
+                                    {dateStr}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                             {activeTab === 'all' && (
                               <span

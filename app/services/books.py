@@ -291,6 +291,25 @@ class BookSearchService:
             return desc
         return ""
 
+    @staticmethod
+    def _extract_inventaire_author(desc: Optional[str]) -> Optional[str]:
+        """Extract author name from Inventaire description or summary string using heuristic patterns."""
+        if not desc or not isinstance(desc, str):
+            return None
+        patterns = [
+            r'\b(?:written\s+by|escrito\s+por)\s+([^\.,;\(\)]+)',
+            r'\b(?:novel|novela|book|libro|work|play|obra|story collection)\s+(?:by|de)\s+(?:(?:Colombian|American|French|Spanish|British|English|Mexican|Argentine|German|Russian)?\s*(?:Nobel Prize-winning\s+)?author\s+)?([^\.,;\(\)]+)',
+            r'\b(?:by|de)\s+([^\.,;\(\)]+)'
+        ]
+        for p in patterns:
+            m = re.search(p, desc, re.IGNORECASE)
+            if m:
+                cand = m.group(1).strip()
+                cand = re.sub(r'\s+of\s+the\s+.*$', '', cand, flags=re.I).strip()
+                if 3 <= len(cand) <= 50 and not any(cand.lower().startswith(x) for x in ['the ', 'a ', 'an ', 'un ', 'una ', 'el ', 'la ']):
+                    return cand
+        return None
+
     @classmethod
     def fetch_open_library(cls, query: str) -> List[Tuple[SearchResultItem, List[str], Optional[str]]]:
         if not query:
@@ -313,7 +332,8 @@ class BookSearchService:
         for doc in data.get("docs", []):
             title = doc.get("title") or "Untitled Book"
             authors = doc.get("author_name", [])
-            author_str = f"Author: {authors[0]}." if authors else ""
+            author_val = str(authors[0]).strip() if authors else None
+            author_str = f"Author: {author_val}." if author_val else ""
             first_publish = doc.get("first_publish_year")
             pub_str = f" First published in {first_publish}." if first_publish else ""
             desc = f"{author_str}{pub_str}"
@@ -350,7 +370,8 @@ class BookSearchService:
                 description=desc,
                 item_type="book",
                 release_date=str(first_publish) if first_publish else None,
-                page_count=int(page_count) if page_count and str(page_count).isdigit() else None
+                page_count=int(page_count) if page_count and str(page_count).isdigit() else None,
+                creator=author_val
             )
             results.append((item, isbns, ol_key))
 
@@ -371,6 +392,25 @@ class BookSearchService:
                 d = cls._inv_request(url, timeout=6)
                 if d and isinstance(d, dict):
                     entities = d.get("entities", {})
+                    # Collect author/work URIs to resolve in batch
+                    resolve_uris = set()
+                    for ent in entities.values():
+                        claims = ent.get("claims", {})
+                        for p50 in claims.get("wdt:P50", []):
+                            resolve_uris.add(p50)
+                        for p629 in claims.get("wdt:P629", []):
+                            resolve_uris.add(p629)
+
+                    author_map = {}
+                    if resolve_uris:
+                        u_param = "&".join(f"uris={u}" for u in list(resolve_uris)[:10])
+                        batch_res = cls._inv_request(f"https://inventaire.io/api/entities/by-uris?{u_param}", timeout=4)
+                        if batch_res and isinstance(batch_res, dict):
+                            for b_uri, b_ent in batch_res.get("entities", {}).items():
+                                author_name = cls._extract_inventaire_label(b_ent)
+                                if author_name and author_name != "Untitled Book":
+                                    author_map[b_uri] = author_name
+
                     for uri, ent in entities.items():
                         label = cls._extract_inventaire_label(ent)
                         desc = cls._extract_inventaire_description(ent)
@@ -378,12 +418,23 @@ class BookSearchService:
                         ol_claims = claims.get("wdt:P648", [])
                         image_url = cls._extract_inventaire_image(ent.get("image"))
                         ext_id = f"inventaire-{uri.replace(':', '_')}"
+
+                        # Determine author
+                        author_val = None
+                        for p50 in claims.get("wdt:P50", []):
+                            if p50 in author_map:
+                                author_val = author_map[p50]
+                                break
+                        if not author_val:
+                            author_val = cls._extract_inventaire_author(desc)
+
                         item = SearchResultItem(
                             external_id=ext_id,
                             title=label,
                             image_url=image_url,
                             description=desc,
-                            item_type="book"
+                            item_type="book",
+                            creator=author_val
                         )
                         results.append((item, [query_clean], ol_claims))
             else:
@@ -391,7 +442,37 @@ class BookSearchService:
                 url = f"https://inventaire.io/api/search?types=works&limit=10&search={encoded}"
                 d = cls._inv_request(url, timeout=6)
                 if d and isinstance(d, dict):
-                    for r in d.get("results", []):
+                    raw_items = d.get("results", [])
+                    # Find works needing author resolution
+                    work_uris = [r.get("uri") for r in raw_items if r.get("uri")]
+                    author_map = {}
+                    if work_uris:
+                        u_param = "&".join(f"uris={u}" for u in work_uris[:10])
+                        batch_entities = cls._inv_request(f"https://inventaire.io/api/entities/by-uris?{u_param}", timeout=4)
+                        if batch_entities and isinstance(batch_entities, dict):
+                            ents = batch_entities.get("entities", {})
+                            author_uris = set()
+                            work_to_author_uri = {}
+                            for w_uri, w_ent in ents.items():
+                                p50s = w_ent.get("claims", {}).get("wdt:P50", [])
+                                if p50s:
+                                    work_to_author_uri[w_uri] = p50s[0]
+                                    author_uris.add(p50s[0])
+                            if author_uris:
+                                a_param = "&".join(f"uris={a}" for a in list(author_uris)[:10])
+                                a_res = cls._inv_request(f"https://inventaire.io/api/entities/by-uris?{a_param}", timeout=4)
+                                if a_res and isinstance(a_res, dict):
+                                    a_ents = a_res.get("entities", {})
+                                    for a_u, a_e in a_ents.items():
+                                        lbl = cls._extract_inventaire_label(a_e)
+                                        if lbl and lbl != "Untitled Book":
+                                            author_map[a_u] = lbl
+
+                            for w_u, a_u in work_to_author_uri.items():
+                                if a_u in author_map:
+                                    author_map[w_u] = author_map[a_u]
+
+                    for r in raw_items:
                         label = cls._extract_inventaire_label(r)
                         desc = cls._extract_inventaire_description(r)
                         if not is_safe_media_item(label, desc):
@@ -403,12 +484,16 @@ class BookSearchService:
                         image_url = cls._extract_inventaire_image(r.get("image"))
                         ext_id = f"inventaire-{uri.replace(':', '_')}"
 
+                        # Determine author
+                        author_val = author_map.get(uri) or cls._extract_inventaire_author(desc)
+
                         item = SearchResultItem(
                             external_id=ext_id,
                             title=label,
                             image_url=image_url,
                             description=desc,
-                            item_type="book"
+                            item_type="book",
+                            creator=author_val
                         )
                         results.append((item, [], ol_claims))
         except Exception as e:
@@ -495,6 +580,8 @@ class BookSearchService:
                             matched_ol_item.image_url = inv_item.image_url
                         if (not matched_ol_item.description or len(matched_ol_item.description) < 40) and inv_item.description:
                             matched_ol_item.description = inv_item.description
+                        if not matched_ol_item.creator and inv_item.creator:
+                            matched_ol_item.creator = inv_item.creator
                     continue
 
                 # Unique work found in Inventaire!
@@ -580,6 +667,16 @@ class BookSearchService:
                             pass
 
                     first_pub = data.get("first_publish_date")
+                    author_val = None
+                    try:
+                        work_search_url = f"https://openlibrary.org/search.json?q=key:/works/{work_key}&fields=author_name&limit=1"
+                        ws_data = cls._ol_request(work_search_url, timeout=4)
+                        if ws_data and isinstance(ws_data, dict):
+                            ws_docs = ws_data.get("docs", [])
+                            if ws_docs and ws_docs[0].get("author_name"):
+                                author_val = str(ws_docs[0]["author_name"][0]).strip()
+                    except Exception:
+                        pass
 
                     # If Open Library description is empty, check Inventaire summary
                     if not desc:
@@ -606,7 +703,8 @@ class BookSearchService:
                         image_url=image_url,
                         description=desc,
                         item_type="book",
-                        release_date=str(first_pub) if first_pub else None
+                        release_date=str(first_pub) if first_pub else None,
+                        creator=author_val
                     )
                     cls._details_cache[cache_key] = (now_ts, result)
                     return result
@@ -615,7 +713,15 @@ class BookSearchService:
 
         # B) Inventaire detail
         elif clean_ext.startswith("inventaire-") or clean_ext.startswith("inv_"):
-            uri = clean_ext.replace("inventaire-", "").replace("inv_", "").replace("_", ":").strip()
+            uri_raw = clean_ext.replace("inventaire-", "")
+            if uri_raw.startswith("inv_"):
+                uri = "inv:" + uri_raw[4:]
+            elif uri_raw.startswith("wd_"):
+                uri = "wd:" + uri_raw[3:]
+            elif "_" in uri_raw:
+                uri = uri_raw.replace("_", ":", 1).strip()
+            else:
+                uri = uri_raw.strip()
             try:
                 # 1. Fetch entity
                 ent_url = f"https://inventaire.io/api/entities/by-uris?uris={uri}"
@@ -637,12 +743,29 @@ class BookSearchService:
                     except Exception:
                         pass
 
+                    # 3. Determine author and release date
+                    author_val = None
+                    p50s = ent.get("claims", {}).get("wdt:P50", [])
+                    if p50s:
+                        a_uri = p50s[0]
+                        a_data = cls._inv_request(f"https://inventaire.io/api/entities/by-uris?uris={a_uri}", timeout=4)
+                        if a_data and isinstance(a_data, dict):
+                            a_ent = a_data.get("entities", {}).get(a_uri, {})
+                            author_val = cls._extract_inventaire_label(a_ent)
+                    if not author_val:
+                        author_val = cls._extract_inventaire_author(desc)
+
+                    pub_dates = ent.get("claims", {}).get("wdt:P577", [])
+                    rel_date = str(pub_dates[0])[:10] if pub_dates else None
+
                     result = SearchResultItem(
                         external_id=clean_ext,
                         title=title,
                         image_url=image_url,
                         description=desc,
-                        item_type="book"
+                        item_type="book",
+                        creator=author_val,
+                        release_date=rel_date
                     )
                     cls._details_cache[cache_key] = (now_ts, result)
                     return result
@@ -683,8 +806,9 @@ class BookSearchService:
                     if norm in seen_titles:
                         continue
 
-                    authors = [a.get("name") for a in work.get("authors", []) if a.get("name")]
-                    author_str = f"Author: {authors[0]}." if authors else ""
+                    authors_raw = work.get("author_name") or [a.get("name") for a in work.get("authors", []) if a.get("name")]
+                    author_val = str(authors_raw[0]).strip() if authors_raw else None
+                    author_str = f"Author: {author_val}." if author_val else ""
                     first_pub = work.get("first_publish_year")
                     pub_str = f" First published: {first_pub}." if first_pub else ""
                     desc = f"{author_str}{pub_str}"
@@ -712,7 +836,8 @@ class BookSearchService:
                             image_url=image_url,
                             description=desc,
                             item_type="book",
-                            release_date=str(first_pub) if first_pub else None
+                            release_date=str(first_pub) if first_pub else None,
+                            creator=author_val
                         ))
 
                     if len(results) >= 24:
@@ -786,7 +911,8 @@ class BookSearchService:
                         continue
 
                     authors = doc.get("author_name") or []
-                    author_str = f"Author: {authors[0]}." if authors else ""
+                    author_val = str(authors[0]).strip() if authors else None
+                    author_str = f"Author: {author_val}." if author_val else ""
                     pub_str = f" First published: {pub_year}."
                     desc = f"{author_str}{pub_str}".strip()
 
@@ -805,7 +931,8 @@ class BookSearchService:
                         image_url=image_url,
                         description=desc,
                         item_type="book",
-                        release_date=str(pub_year)
+                        release_date=str(pub_year),
+                        creator=author_val
                     ))
 
                     if len(results) >= 24:
@@ -843,7 +970,8 @@ class BookSearchService:
                                 continue
 
                             authors = doc.get("author_name") or []
-                            author_str = f"Author: {authors[0]}." if authors else ""
+                            author_val = str(authors[0]).strip() if authors else None
+                            author_str = f"Author: {author_val}." if author_val else ""
                             pub_str = f" First published: {pub_year}."
                             desc = f"{author_str}{pub_str}".strip()
 
@@ -862,7 +990,8 @@ class BookSearchService:
                                 image_url=image_url,
                                 description=desc,
                                 item_type="book",
-                                release_date=str(pub_year)
+                                release_date=str(pub_year),
+                                creator=author_val
                             ))
 
                             if len(results) >= 24:
@@ -873,20 +1002,20 @@ class BookSearchService:
         # Curated recent bestsellers (current year 2026) fallback to ensure high quality in case of complete API outage
         if len(results) < 8:
             curated_recent = [
-                ("openlibrary-OL42393185W", "King of Gluttony", "15207442", "Author: Ana Huang. First published: 2026.", "2026"),
-                ("openlibrary-OL43158021W", "Tempting Venom", "15248444", "Author: Rina Kent. First published: 2026.", "2026"),
-                ("openlibrary-OL43591244W", "Dear Debbie", "15163694", "Author: Freida McFadden. First published: 2026.", "2026"),
-                ("openlibrary-OL43280192W", "Threshing Day", "15260919", "Author: Rebecca Yarros. First published: 2026.", "2026"),
-                ("openlibrary-OL43178201W", "My Husband's Wife", "15248921", "Author: Alice Feeney. First published: 2026.", "2026"),
-                ("openlibrary-OL43160293W", "Starside", "15248355", "Author: Alex Aster. First published: 2026.", "2026"),
-                ("openlibrary-OL43589210W", "Half His Age", "15166163", "Author: Jennette McCurdy. First published: 2026.", "2026"),
-                ("openlibrary-OL43019284W", "When I Kill You", "15125665", "Author: B.A. Paris. First published: 2026.", "2026"),
-                ("openlibrary-OL43581290W", "Woman Down", "15162122", "Author: Colleen Hoover. First published: 2026.", "2026"),
-                ("openlibrary-OL43201948W", "Love Song", "15210477", "Author: Elle Kennedy. First published: 2026.", "2026"),
-                ("openlibrary-OL43192048W", "Game On", "15235861", "Author: Navessa Allen. First published: 2026.", "2026"),
-                ("openlibrary-OL43519284W", "Cuando vi a la muerte prestar su sombrero", "15152509", "Author: Rodrigo Unda. First published: 2026.", "2026"),
+                ("openlibrary-OL42393185W", "King of Gluttony", "15207442", "Author: Ana Huang. First published: 2026.", "2026", "Ana Huang"),
+                ("openlibrary-OL43158021W", "Tempting Venom", "15248444", "Author: Rina Kent. First published: 2026.", "2026", "Rina Kent"),
+                ("openlibrary-OL43591244W", "Dear Debbie", "15163694", "Author: Freida McFadden. First published: 2026.", "2026", "Freida McFadden"),
+                ("openlibrary-OL43280192W", "Threshing Day", "15260919", "Author: Rebecca Yarros. First published: 2026.", "2026", "Rebecca Yarros"),
+                ("openlibrary-OL43178201W", "My Husband's Wife", "15248921", "Author: Alice Feeney. First published: 2026.", "2026", "Alice Feeney"),
+                ("openlibrary-OL43160293W", "Starside", "15248355", "Author: Alex Aster. First published: 2026.", "2026", "Alex Aster"),
+                ("openlibrary-OL43589210W", "Half His Age", "15166163", "Author: Jennette McCurdy. First published: 2026.", "2026", "Jennette McCurdy"),
+                ("openlibrary-OL43019284W", "When I Kill You", "15125665", "Author: B.A. Paris. First published: 2026.", "2026", "B.A. Paris"),
+                ("openlibrary-OL43581290W", "Woman Down", "15162122", "Author: Colleen Hoover. First published: 2026.", "2026", "Colleen Hoover"),
+                ("openlibrary-OL43201948W", "Love Song", "15210477", "Author: Elle Kennedy. First published: 2026.", "2026", "Elle Kennedy"),
+                ("openlibrary-OL43192048W", "Game On", "15235861", "Author: Navessa Allen. First published: 2026.", "2026", "Navessa Allen"),
+                ("openlibrary-OL43519284W", "Cuando vi a la muerte prestar su sombrero", "15152509", "Author: Rodrigo Unda. First published: 2026.", "2026", "Rodrigo Unda"),
             ]
-            for ext_id, title, cov, desc, pub_year in curated_recent:
+            for ext_id, title, cov, desc, pub_year, aut_name in curated_recent:
                 if ext_id not in seen_keys:
                     seen_keys.add(ext_id)
                     results.append(SearchResultItem(
@@ -895,7 +1024,8 @@ class BookSearchService:
                         image_url=f"https://covers.openlibrary.org/b/id/{cov}-L.jpg",
                         description=desc,
                         item_type="book",
-                        release_date=pub_year
+                        release_date=pub_year,
+                        creator=aut_name
                     ))
 
         if results:

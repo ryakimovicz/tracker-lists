@@ -7,6 +7,8 @@ import re
 import math
 import logging
 import threading
+import os
+import sqlite3
 from collections import deque
 from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
@@ -15,6 +17,50 @@ from app.services.base import SearchResultItem
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_TRAKT_CACHE_DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "trakt_cache.db"))
+
+def _init_trakt_cache():
+    try:
+        with sqlite3.connect(_TRAKT_CACHE_DB) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS trakt_cache (
+                    key TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trakt_cache_updated ON trakt_cache(updated_at)")
+    except Exception as e:
+        logger.warning(f"Could not initialize trakt_cache.db: {e}")
+
+_init_trakt_cache()
+
+def _get_trakt_db_cache(key: str, ttl: float = 3600 * 24 * 30) -> Optional[Any]:
+    now = time.time()
+    try:
+        with sqlite3.connect(_TRAKT_CACHE_DB) as conn:
+            row = conn.execute("SELECT data, updated_at FROM trakt_cache WHERE key = ?", (key,)).fetchone()
+            if row:
+                data_json, updated_at = row
+                if now - updated_at < ttl:
+                    return json.loads(data_json)
+    except Exception as e:
+        logger.debug(f"Trakt cache get error for '{key}': {e}")
+    return None
+
+def _set_trakt_db_cache(key: str, data: Any) -> None:
+    now = time.time()
+    try:
+        data_json = json.dumps(data)
+        with sqlite3.connect(_TRAKT_CACHE_DB) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO trakt_cache (key, data, updated_at) VALUES (?, ?, ?)",
+                (key, data_json, now)
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"Trakt cache set error for '{key}': {e}")
 
 
 class TraktService:
@@ -302,6 +348,40 @@ class TraktService:
         )
 
     @classmethod
+    def get_movie_director(cls, lookup_id: str) -> Optional[str]:
+        if not lookup_id:
+            return None
+        clean_id = str(lookup_id).strip()
+        if clean_id.startswith("trakt_"):
+            clean_id = clean_id.replace("trakt_", "")
+        elif clean_id.startswith("omdb_"):
+            clean_id = clean_id.replace("omdb_", "")
+
+        cache_key = f"director_{clean_id.lower()}"
+        cached = _get_trakt_db_cache(cache_key)
+        if cached is not None:
+            return cached if cached else None
+
+        encoded = urllib.parse.quote(clean_id)
+        url = f"https://api.trakt.tv/movies/{encoded}/people"
+        try:
+            people_data = cls._trakt_request(url, timeout=4)
+            if people_data and isinstance(people_data, dict):
+                directing = people_data.get("crew", {}).get("directing", [])
+                directors = [
+                    p["person"]["name"]
+                    for p in directing
+                    if isinstance(p, dict) and p.get("job") == "Director" and p.get("person", {}).get("name")
+                ]
+                dir_name = ", ".join(directors) if directors else ""
+                _set_trakt_db_cache(cache_key, dir_name)
+                return dir_name if dir_name else None
+        except Exception as e:
+            logger.debug(f"Could not fetch director for {clean_id}: {e}")
+
+        return None
+
+    @classmethod
     def get_movie_detail(cls, external_id: str) -> Optional[SearchResultItem]:
         client_id = cls.get_client_id()
         if not external_id or not client_id:
@@ -331,6 +411,9 @@ class TraktService:
         data = cls._trakt_request(url, timeout=5)
         if data and isinstance(data, dict):
             result = cls._format_movie_item(data, override_external_id=external_id)
+            director = cls.get_movie_director(lookup_id)
+            if director:
+                result.creator = director
             cls._details_cache[cache_key] = (time.time(), result)
             return result
 
@@ -359,8 +442,24 @@ class TraktService:
                 movie_data = entry.get("movie")
                 if movie_data:
                     item = cls._format_movie_item(movie_data)
+                    # Check SQLite cache for director (0 API calls)
+                    trakt_id = movie_data.get("ids", {}).get("trakt")
+                    if trakt_id:
+                        cached_dir = _get_trakt_db_cache(f"director_{trakt_id}")
+                        if cached_dir:
+                            item.creator = cached_dir
                     if is_safe_media_item(item.title, item.description):
                         results.append(item)
+
+            # Preload up to 8 missing directors safely within rate limit
+            fetched = 0
+            for item in results:
+                if not item.creator and fetched < 8:
+                    trakt_id = item.external_id.replace("trakt_", "")
+                    d = cls.get_movie_director(trakt_id)
+                    if d:
+                        item.creator = d
+                    fetched += 1
 
         if results:
             cls._search_cache[cache_key] = (time.time(), results)
@@ -390,8 +489,24 @@ class TraktService:
                 movie_data = entry.get("movie")
                 if movie_data:
                     item = cls._format_movie_item(movie_data)
+                    # Check SQLite cache for director (0 API calls)
+                    trakt_id = movie_data.get("ids", {}).get("trakt")
+                    if trakt_id:
+                        cached_dir = _get_trakt_db_cache(f"director_{trakt_id}")
+                        if cached_dir:
+                            item.creator = cached_dir
                     if is_safe_media_item(item.title, item.description):
                         results.append(item)
+
+            # Preload up to 8 missing directors safely within rate limit
+            fetched = 0
+            for item in results:
+                if not item.creator and fetched < 8:
+                    trakt_id = item.external_id.replace("trakt_", "")
+                    d = cls.get_movie_director(trakt_id)
+                    if d:
+                        item.creator = d
+                    fetched += 1
 
         if results:
             cls._search_cache[cache_key] = (now_ts, results)
@@ -516,6 +631,11 @@ class TraktService:
                     continue
                 movie_data["released"] = rel_date
                 item = cls._format_movie_item(movie_data)
+                trakt_id = movie_data.get("ids", {}).get("trakt")
+                if trakt_id:
+                    cached_dir = _get_trakt_db_cache(f"director_{trakt_id}")
+                    if cached_dir:
+                        item.creator = cached_dir
                 if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
                     seen_ids.add(item.external_id)
                     results.append(item)
@@ -535,12 +655,27 @@ class TraktService:
                 if movie_year < today.year - 1:
                     continue
                 item = cls._format_movie_item(movie_data)
+                trakt_id = movie_data.get("ids", {}).get("trakt")
+                if trakt_id:
+                    cached_dir = _get_trakt_db_cache(f"director_{trakt_id}")
+                    if cached_dir:
+                        item.creator = cached_dir
                 if item.external_id not in seen_ids and is_safe_media_item(item.title, item.description):
                     seen_ids.add(item.external_id)
                     results.append(item)
 
         # Sort descending by release date (upcoming films in next 14 days, followed by current & last week)
         results.sort(key=lambda x: str(x.release_date or ""), reverse=True)
+
+        # Preload up to 3 missing directors safely without burning rate limit
+        fetched = 0
+        for item in results:
+            if not item.creator and fetched < 3:
+                trakt_id = item.external_id.replace("trakt_", "")
+                d = cls.get_movie_director(trakt_id)
+                if d:
+                    item.creator = d
+                fetched += 1
 
         if results:
             cls._search_cache[cache_key] = (now_ts, results)

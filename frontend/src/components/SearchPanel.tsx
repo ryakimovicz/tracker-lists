@@ -267,11 +267,25 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayTitle}</h5>
-                        {media.release_date && (
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.1rem' }}>
-                            {formatReleaseDate(media.release_date)}
-                          </span>
-                        )}
+                        {(() => {
+                          const dateStr = media.release_date ? formatReleaseDate(media.release_date) : '';
+                          const authorStr = media.creator || '';
+                          if (!authorStr && !dateStr) return null;
+                          return (
+                            <div style={{ marginBottom: '0.1rem' }}>
+                              {authorStr && (
+                                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={authorStr}>
+                                  {authorStr}
+                                </span>
+                              )}
+                              {dateStr && (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={dateStr}>
+                                  {dateStr}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>
                           {media.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : media.item_type === 'manga' ? 'Manga' : t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}
                         </span>
