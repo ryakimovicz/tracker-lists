@@ -166,7 +166,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }
             </li>
           </ul>
 
-          <div style={{ overflowX: 'auto', marginTop: '1.25rem', marginBottom: '1.25rem' }}>
+          <div className="plan-comparison-desktop" style={{ overflowX: 'auto', marginTop: '1.25rem', marginBottom: '1.25rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
@@ -208,6 +208,49 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="plan-comparison-mobile" style={{ marginTop: '1rem', marginBottom: '1.25rem', gap: '0.65rem' }}>
+            {[
+              {
+                name: isEs ? 'Sesión segura' : 'Secure Session',
+                type: 'Cookie (HttpOnly)',
+                keyName: 'refresh_token',
+                purpose: isEs ? 'Renovación segura de credenciales de sesión' : 'Secure session credential renewal',
+                duration: isEs ? 'Persistente (sesión)' : 'Session-based'
+              },
+              {
+                name: isEs ? 'Idioma' : 'Language',
+                type: 'LocalStorage',
+                keyName: 'preferred_language',
+                purpose: isEs ? 'Recordar preferencia de idioma (ES / EN)' : 'Remember language preference (ES / EN)',
+                duration: isEs ? 'Persistente local' : 'Local persistent'
+              },
+              {
+                name: isEs ? 'Tema visual' : 'Display Theme',
+                type: 'LocalStorage',
+                keyName: 'theme',
+                purpose: isEs ? 'Recordar apariencia (claro / oscuro)' : 'Remember display appearance (light / dark)',
+                duration: isEs ? 'Persistente local' : 'Local persistent'
+              },
+              {
+                name: isEs ? 'Aviso de Cookies' : 'Cookie Notice',
+                type: 'LocalStorage',
+                keyName: 'cookie_consent',
+                purpose: isEs ? 'Evitar mostrar reiteradamente el banner de cookies' : 'Dismiss recurring cookie consent banner',
+                duration: isEs ? 'Persistente local' : 'Local persistent'
+              }
+            ].map((row, idx) => (
+              <div key={idx} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{row.name}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>{row.type}</span>
+                </div>
+                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--accent-primary)' }}>{row.keyName}</div>
+                <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>{row.purpose}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isEs ? 'Duración:' : 'Duration:'} {row.duration}</div>
+              </div>
+            ))}
           </div>
 
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
