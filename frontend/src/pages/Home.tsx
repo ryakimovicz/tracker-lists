@@ -1362,9 +1362,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const coverUrl = getCoverUrl();
 
   const isPoster = variant === 'poster';
+  const canBlurSetting = !user || ((user?.is_pro || user?.is_admin || user?.is_vip) && user?.blur_unwatched_episodes);
   const shouldBlurEpisodeCover = Boolean(
-    (user?.is_pro || user?.is_admin || user?.is_vip) &&
-    user?.blur_unwatched_episodes &&
+    canBlurSetting &&
     !isPoster &&
     !isComic &&
     (item.item_type === 'series' || item.item_type === 'anime') &&
@@ -3727,9 +3727,9 @@ export const Home: React.FC = () => {
                 }
 
                 const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
+                const canBlurGuideSetting = !currentUser || ((currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) && currentUser?.blur_unwatched_episodes);
                 const shouldBlurGuide = Boolean(
-                  (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
-                  currentUser?.blur_unwatched_episodes &&
+                  canBlurGuideSetting &&
                   isGuideEpisode &&
                   !g.is_completed &&
                   !revealedGuides[g.item_id]
@@ -3791,9 +3791,9 @@ export const Home: React.FC = () => {
                   }
 
                   const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
+                  const canBlurGuideSetting = !currentUser || ((currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) && currentUser?.blur_unwatched_episodes);
                   const shouldBlurGuide = Boolean(
-                    (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
-                    currentUser?.blur_unwatched_episodes &&
+                    canBlurGuideSetting &&
                     isGuideEpisode &&
                     !g.is_completed &&
                     !revealedGuides[g.item_id]
