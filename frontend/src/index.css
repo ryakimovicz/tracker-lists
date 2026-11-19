@@ -1145,6 +1145,8 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  color: color-mix(in srgb, var(--tab-color, var(--accent-primary)) calc(var(--tab-act, 0) * 100%), var(--text-secondary));
+  transition: color 0.15s ease;
 }
 
 .home-tab-icon {
