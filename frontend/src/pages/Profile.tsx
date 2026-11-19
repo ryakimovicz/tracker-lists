@@ -746,7 +746,7 @@ export const Profile: React.FC = () => {
   const getCleanErrorMessage = useCallback((err: any, fallback: string): string => {
     const detail = err?.response?.data?.detail;
     if (!detail || typeof detail !== 'string') return fallback;
-    const isInternal = /sqlite|sql|integrityerror|not null|foreign key|syntaxerror|traceback|operationalerror|internal server error/i.test(detail);
+    const isInternal = /sqlite|sql|psycopg|postgres|railway|integrityerror|not null|foreign key|syntaxerror|traceback|operationalerror|internal server error|connection to server|password authentication/i.test(detail);
     if (isInternal || (err?.response?.status && err.response.status >= 500)) {
       return fallback;
     }
@@ -760,6 +760,13 @@ export const Profile: React.FC = () => {
       setErrorMsg(prev => prev === cleanMsg ? '' : prev);
     }, 4500);
   }, [getCleanErrorMessage]);
+
+  const showSuccessMessage = useCallback((msg: string, durationMs: number = 3500) => {
+    setSuccessMsg(msg);
+    setTimeout(() => {
+      setSuccessMsg(prev => prev === msg ? '' : prev);
+    }, durationMs);
+  }, []);
   const [loading, setLoading] = useState(() => {
     if (!targetUserIdentifier) {
       try {
@@ -851,8 +858,7 @@ export const Profile: React.FC = () => {
       }).then(async () => {
         await refreshProfile();
         await fetchProfileAndLibrary();
-        setSuccessMsg(language === 'es' ? '⭐ ¡Bienvenido a Pathd Premium! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd Premium! Your subscription was successfully activated.');
-        setTimeout(() => setSuccessMsg(''), 6000);
+        showSuccessMessage(language === 'es' ? '⭐ ¡Bienvenido a Pathd Premium! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd Premium! Your subscription was successfully activated.', 6000);
       }).catch(err => {
         console.error('Error verifying payment:', err);
       });
@@ -2283,15 +2289,14 @@ export const Profile: React.FC = () => {
       } : null);
 
       if (isNowRequested) {
-        setSuccessMsg(language === 'es' ? 'Solicitud de seguimiento enviada.' : 'Follow request sent.');
+        showSuccessMessage(language === 'es' ? 'Solicitud de seguimiento enviada.' : 'Follow request sent.');
       } else if (isNowFollowing) {
-        setSuccessMsg(language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.');
+        showSuccessMessage(language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.');
       } else {
-        setSuccessMsg(language === 'es' ? 'Dejaste de seguir o cancelaste la solicitud.' : 'Unfollowed or cancelled request.');
+        showSuccessMessage(language === 'es' ? 'Dejaste de seguir o cancelaste la solicitud.' : 'Unfollowed or cancelled request.');
       }
-      setTimeout(() => setSuccessMsg(''), 3500);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Error updating follow status');
+      showErrorMessage(err, language === 'es' ? 'No se pudo actualizar el seguimiento.' : 'Could not update follow status.');
     }
   };
 
@@ -2755,7 +2760,8 @@ export const Profile: React.FC = () => {
       }
       
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to fetch library information.');
+      // Do not display raw or background fetch errors on the profile page
+      console.warn('Could not refresh profile data in background:', err?.message || err);
     } finally {
       setLoading(false);
     }
@@ -2774,12 +2780,12 @@ export const Profile: React.FC = () => {
   const connectLastFm = async (token: string) => {
     try {
       await apiClient.post(`/users/me/lastfm/connect?token=${token}`);
-      setSuccessMsg(language === 'es' ? 'Conectado a Last.fm exitosamente.' : 'Connected to Last.fm successfully.');
+      showSuccessMessage(language === 'es' ? 'Conectado a Last.fm exitosamente.' : 'Connected to Last.fm successfully.');
       searchParams.delete('token');
       navigate('/profile', { replace: true });
       fetchProfileAndLibrary();
     } catch(err) {
-      setErrorMsg('Error connecting to Last.fm');
+      showErrorMessage(err, language === 'es' ? 'No se pudo conectar con Last.fm.' : 'Error connecting to Last.fm.');
     }
   };
 
@@ -2919,9 +2925,9 @@ export const Profile: React.FC = () => {
           setProfile(prev => prev ? { ...prev, lastfm_username: undefined } : null);
           setNowPlaying(null);
           setTopAlbums([]);
-          setSuccessMsg(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
+          showSuccessMessage(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
         } catch(err) {
-          setErrorMsg('Error disconnecting from Last.fm');
+          showErrorMessage(err, language === 'es' ? 'No se pudo desconectar de Last.fm.' : 'Error disconnecting from Last.fm.');
         }
       }
     }, 'disconnect_lastfm');
@@ -2956,8 +2962,6 @@ export const Profile: React.FC = () => {
       updateCachedShelfItem(updatedStub);
       window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedStub } }));
     }
-    setSuccessMsg(language === 'es' ? 'Estado actualizado con éxito.' : 'Status updated successfully.');
-    setTimeout(() => setSuccessMsg(''), 3000);
 
     try {
       await updateLibraryStatusSafe(itemId, newStatus);
@@ -2973,7 +2977,7 @@ export const Profile: React.FC = () => {
         updateCachedShelfItem(rollbackStub);
         window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackStub } }));
       }
-      setErrorMsg(err.response?.data?.detail || err.message || 'Failed to update item status.');
+      showErrorMessage(err, language === 'es' ? 'No se pudo actualizar el estado.' : 'Failed to update item status.');
     }
   };
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
@@ -2983,10 +2987,9 @@ export const Profile: React.FC = () => {
     if (!currentFav) {
       const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(targetItem.status);
       if (isUnconsumed) {
-        setErrorMsg(language === 'es' 
+        showErrorMessage(null, language === 'es' 
           ? 'Solo puedes destacar elementos que hayas empezado a consumir o completado.' 
           : 'You can only feature items that you have started or completed.');
-        setTimeout(() => setErrorMsg(''), 5000);
         return;
       }
 
@@ -3116,8 +3119,7 @@ export const Profile: React.FC = () => {
         return [{ ...finalNewItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
       });
 
-      setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
-      setTimeout(() => setSuccessMsg(''), 4000);
+      showSuccessMessage(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.', 4000);
 
       const favStub = { ...finalNewItem, is_favorite: true };
       const unFavStub = { ...newItemObj, id: itemToReplaceId, is_favorite: false };
@@ -3249,13 +3251,11 @@ export const Profile: React.FC = () => {
         try {
           await apiClient.delete(`/library/${itemId}`);
           setLibraryItems(prev => prev.filter(item => item.id !== itemId));
-          setSuccessMsg(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
+          showSuccessMessage(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
           
           const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
           const actRes = await apiClient.get(targetActivityUrl);
           setActivities(actRes.data);
-          
-          setTimeout(() => setSuccessMsg(''), 3000);
         } catch (err: any) {
           const fallback = language === 'es' ? 'No se pudo eliminar la obra de la estantería.' : 'Failed to delete item from shelf.';
           showErrorMessage(err, fallback);
@@ -3291,8 +3291,7 @@ export const Profile: React.FC = () => {
               saved_lists: (prev.saved_lists || []).filter((l: any) => l.id !== listId)
             };
           });
-          setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
-          setTimeout(() => setSuccessMsg(''), 3000);
+          showSuccessMessage(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
         } catch (err: any) {
           const fallback = language === 'es' ? 'No se pudo eliminar la guía. Por favor, intenta nuevamente.' : 'Failed to delete guide. Please try again.';
           showErrorMessage(err, fallback);
@@ -5272,61 +5271,6 @@ export const Profile: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {profile?.admin_warning && isOwnProfile && (
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#ef4444', padding: '1rem 1.25rem', borderRadius: 12, fontSize: '0.95rem', margin: '1rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <AlertTriangle size={22} style={{ flexShrink: 0 }} />
-            <div>
-              <strong>{language === 'es' ? 'Aviso de la Administración:' : 'Administration Warning:'}</strong>
-              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-primary)', fontSize: '0.9rem' }}>{profile.admin_warning}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleDismissWarning}
-            className="btn-secondary"
-            style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', flexShrink: 0, background: 'rgba(0,0,0,0.4)' }}
-          >
-            {language === 'es' ? 'Entendido' : 'Dismiss'}
-          </button>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.9rem', margin: '0.75rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <AlertCircle size={18} style={{ flexShrink: 0 }} />
-            <span>{errorMsg}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorMsg('')}
-            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: 0.8 }}
-            title={language === 'es' ? 'Cerrar' : 'Dismiss'}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {successMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.9rem', margin: '0.75rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CheckCircle size={18} style={{ flexShrink: 0 }} />
-            <span>{successMsg}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSuccessMsg('')}
-            style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: 0.8 }}
-            title={language === 'es' ? 'Cerrar' : 'Dismiss'}
-          >
-            <X size={16} />
-          </button>
         </div>
       )}
 
@@ -7900,6 +7844,63 @@ export const Profile: React.FC = () => {
               ? 'Mantené presionada una obra para reordenar tus destacados'
               : 'Hold down an item to reorder your featured favorites'}
           </span>
+        </div>
+      )}
+
+      {/* Floating non-intrusive Toast Notification (Success / Error) */}
+      {(errorMsg || successMsg) && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
+            right: '1.25rem',
+            left: 'auto',
+            maxWidth: 'calc(100vw - 2.5rem)',
+            width: 'max-content',
+            zIndex: 10050,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
+            background: errorMsg ? 'rgba(24, 16, 18, 0.94)' : 'rgba(14, 24, 20, 0.94)',
+            border: errorMsg ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(16, 185, 129, 0.45)',
+            color: errorMsg ? '#f87171' : '#34d399',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(12px)',
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            lineHeight: 1.35
+          }}
+        >
+          {errorMsg ? (
+            <AlertCircle size={18} style={{ flexShrink: 0, color: '#ef4444' }} />
+          ) : (
+            <CheckCircle size={18} style={{ flexShrink: 0, color: '#10b981' }} />
+          )}
+          <span style={{ color: 'var(--text-primary, #f3f4f6)', maxWidth: '340px' }}>
+            {errorMsg || successMsg}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted, #9ca3af)',
+              cursor: 'pointer',
+              padding: '0.2rem',
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: '0.25rem'
+            }}
+            title={language === 'es' ? 'Cerrar' : 'Dismiss'}
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
     </div>

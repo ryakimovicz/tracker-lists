@@ -110,6 +110,18 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Sanitize internal server / database errors globally so raw technical details never leak to any UI component
+    const rawDetail = error.response?.data?.detail;
+    const status = error.response?.status;
+    if (
+      (typeof status === 'number' && status >= 500) ||
+      (typeof rawDetail === 'string' && /sqlite|sql|psycopg|postgres|railway|integrityerror|operationalerror|internal server error|traceback|connection to server|password authentication/i.test(rawDetail))
+    ) {
+      if (error.response && error.response.data && typeof error.response.data === 'object') {
+        delete error.response.data.detail;
+      }
+    }
+
     return Promise.reject(error);
   }
 );

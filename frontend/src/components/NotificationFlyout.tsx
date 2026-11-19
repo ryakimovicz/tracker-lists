@@ -289,7 +289,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     onClose();
 
     if (notif.notification_type === 'admin_warning' || notif.entity_type === 'moderation') {
-      navigate('/profile');
+      return;
     } else if (notif.notification_type === 'new_follower' || notif.notification_type === 'follow_request') {
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
     } else if (notif.entity_type === 'item') {
@@ -616,9 +616,13 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
                     color: 'var(--text-primary)'
                   }}
                 >
-                  <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
-                    {notif.actor_username}
-                  </span>{' '}
+                  {notif.notification_type !== 'admin_warning' && (
+                    <>
+                      <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
+                        {notif.actor_username}
+                      </span>{' '}
+                    </>
+                  )}
                   {renderDescription(notif)}
                 </p>
 
