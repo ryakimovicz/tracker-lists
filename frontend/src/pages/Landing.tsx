@@ -440,8 +440,8 @@ export const Landing: React.FC = () => {
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '640px', margin: 0, lineHeight: 1.5 }}>
           {isEs
-            ? 'Únete a la comunidad de Pathd y lleva el control unificado de todo lo que ves, lees, juegas y escuchas desde un solo lugar.'
-            : 'Join the Pathd community and keep unified track of everything you watch, read, play, and listen to from a single place.'}
+            ? 'Únete a la comunidad de Pathd y lleva el control unificado de todo lo que ves, lees y juegas desde un solo lugar.'
+            : 'Join the Pathd community and keep unified track of everything you watch, read, and play from a single place.'}
         </p>
         <Link
           to="/register"
