@@ -20,4 +20,6 @@ class SearchResultItem(BaseModel):
     cv_id: Optional[str] = None
     metron_id: Optional[str] = None
     creator: Optional[str] = None
+    volumes: Optional[int] = None
+    chapters: Optional[int] = None
 

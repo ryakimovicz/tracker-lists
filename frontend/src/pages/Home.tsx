@@ -2156,15 +2156,23 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
         <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto", minHeight: "1.2em", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
           <span>
           {(() => {
+            const formatMangaVal = (val: number) => {
+              if (!val) return '\u00A0';
+              const c = val >= 10000 ? (val % 10000) : val;
+              if (!c) return '\u00A0';
+              return `${c} ${language === 'es' ? (c === 1 ? 'capítulo' : 'capítulos') : (c === 1 ? 'chapter' : 'chapters')}`;
+            };
             if (item.status === 'endless') return language === 'es' ? 'Infinito' : 'Endless';
             if (item.status === 'completed' || item.status === 'read') {
-                if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
+                if (item.item_type === 'manga') return formatMangaVal(item.total_pages || item.pages_read);
+                if (['book', 'comic'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
                 if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '\u00A0';
                 if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : (language === 'es' ? 'Terminado' : 'Completed');
                 return language === 'es' ? 'Visto' : 'Watched';
             }
             if (['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
-                if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
+                if (item.item_type === 'manga') return formatMangaVal(item.total_pages);
+                if (['book', 'comic'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
                 if (item.item_type === 'movie' && item.total_pages) return `${item.total_pages} min`;
                 return language === 'es' ? (item.item_type === 'game' ? 'Por jugar' : 'Por ver') : 'Plan to';
             }
@@ -2181,7 +2189,11 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
                   if (item.item_type === 'game') {
                       return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{Math.floor(item.pages_read / 60)}h {String(item.pages_read % 60).padStart(2, '0')}m</span>;
                   }
-                  if (['book', 'comic', 'manga'].includes(item.item_type)) {
+                  if (item.item_type === 'manga') {
+                      const c = item.pages_read >= 10000 ? (item.pages_read % 10000) : item.pages_read;
+                      return c > 0 ? <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{c} {language === 'es' ? (c === 1 ? 'capítulo' : 'capítulos') : (c === 1 ? 'chapter' : 'chapters')}</span> : null;
+                  }
+                  if (['book', 'comic'].includes(item.item_type)) {
                       return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{item.pages_read} {language === 'es' ? 'páginas' : 'pages'}</span>;
                   }
               }
@@ -2369,6 +2381,11 @@ export const Home: React.FC = () => {
     window.history.pushState({ pathd_home_guard: true }, '', currentLoc);
 
     const handlePopState = (e: PopStateEvent) => {
+      // Only intercept back navigation when the user is actually on Home ('/')
+      if (window.location.pathname !== '/') {
+        return;
+      }
+
       // If an overlay modal route is active, let router handle modal navigation
       if (
         window.location.pathname.startsWith('/item/') ||
@@ -4021,24 +4038,34 @@ export const Home: React.FC = () => {
                         return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
                       };
 
+                      const formatMangaVal = (val: number) => {
+                        if (!val) return '';
+                        const c = val >= 10000 ? (val % 10000) : val;
+                        if (!c) return '';
+                        return `${c} ${language === 'es' ? (c === 1 ? 'capítulo' : 'capítulos') : (c === 1 ? 'chapter' : 'chapters')}`;
+                      };
+
                       if (item.status === 'plan_to_watch') {
                         if (item.item_type === 'movie') return formatTime(item.total_pages);
                         return '';
                       }
                       if (['completed', 'read', 'endless'].includes(item.status)) {
-                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                        if (item.item_type === 'manga') return formatMangaVal(item.total_pages || item.pages_read);
+                        if (['book', 'comic'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
                         if (item.item_type === 'movie') return formatTime(item.total_pages);
                         if (item.item_type === 'game') return formatTime(item.pages_read);
                         return '';
                       }
                       if (item.status === 'dropped') {
-                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                        if (item.item_type === 'manga') return formatMangaVal(item.pages_read);
+                        if (['book', 'comic'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
                         if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
                         return '';
                       }
                       if (['watching', 'reading', 'playing'].includes(item.status)) {
                         if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
-                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                        if (item.item_type === 'manga') return formatMangaVal(item.pages_read);
+                        if (['book', 'comic'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
                       }
                       return "";
                     })()}

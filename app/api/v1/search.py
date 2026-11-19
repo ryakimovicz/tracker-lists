@@ -1519,43 +1519,34 @@ def lookup_media_item(
                     coverImage { large extraLarge }
                     description
                     startDate { year month day }
+                    volumes
+                    chapters
+                    status
                   }
                 }
                 """
-                payload = json.dumps({
-                    "query": graphql_query,
-                    "variables": {"id": int(clean_mid)}
-                }).encode("utf-8")
-                req = urllib.request.Request(
-                    "https://graphql.anilist.co",
-                    data=payload,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                        "Origin": "https://anilist.co",
-                        "Referer": "https://anilist.co/"
-                    }
-                )
-                with urllib.request.urlopen(req, timeout=5) as m_res:
-                    if m_res.status == 200:
-                        m_data = json.loads(m_res.read().decode()).get("data", {}).get("Media")
-                        if m_data:
-                            t_obj = m_data.get("title") or {}
-                            m_title = t_obj.get("english") or t_obj.get("romaji") or "Untitled Manga"
-                            cov_obj = m_data.get("coverImage") or {}
-                            m_img = cov_obj.get("extraLarge") or cov_obj.get("large")
-                            start_d = m_data.get("startDate") or {}
-                            y, m, d = start_d.get("year"), start_d.get("month"), start_d.get("day")
-                            rel_d = f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else (str(y) if y else None)
-                            result_data = {
-                                "external_id": ext_id_clean,
-                                "title": m_title,
-                                "item_type": "manga",
-                                "image_url": m_img,
-                                "description": m_data.get("description") or "",
-                                "release_date": rel_d
-                            }
+                al_res = AnilistService._graphql_request(graphql_query, {"id": int(clean_mid)}, timeout=5)
+                if al_res and isinstance(al_res, dict):
+                    m_data = al_res.get("data", {}).get("Media")
+                    if m_data:
+                        t_obj = m_data.get("title") or {}
+                        m_title = t_obj.get("english") or t_obj.get("romaji") or "Untitled Manga"
+                        cov_obj = m_data.get("coverImage") or {}
+                        m_img = cov_obj.get("extraLarge") or cov_obj.get("large")
+                        start_d = m_data.get("startDate") or {}
+                        y, m, d = start_d.get("year"), start_d.get("month"), start_d.get("day")
+                        rel_d = f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else (str(y) if y else None)
+                        result_data = {
+                            "external_id": ext_id_clean,
+                            "title": m_title,
+                            "item_type": "manga",
+                            "image_url": m_img,
+                            "description": m_data.get("description") or "",
+                            "release_date": rel_d,
+                            "volumes": m_data.get("volumes"),
+                            "chapters": m_data.get("chapters"),
+                            "series_status": m_data.get("status")
+                        }
     except Exception as e:
         print(f"Error fetching external item detail in lookup: {e}")
 
@@ -1589,6 +1580,9 @@ def lookup_media_item(
         result_data["is_favorite"] = existing.is_favorite
         result_data["tracking_list_id"] = existing.tracking_list_id
         result_data["completed_at"] = existing.completed_at.isoformat() if existing.completed_at else None
+        result_data["pages_read"] = existing.pages_read
+        result_data["total_pages"] = existing.total_pages
+        result_data["last_seen_episode"] = existing.last_seen_episode
 
     if response is not None:
         st_after = check_category_rate_limit_status(type_clean)

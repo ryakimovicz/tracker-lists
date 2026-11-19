@@ -405,22 +405,28 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
           </span>
         )}
 
-        {/* Book / Comic / Manga Pages Read */}
+        {/* Book / Comic / Manga Pages or Chapters Read */}
         {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
             <BookOpen size={12} />
             {(() => {
-              const read = item.pages_read || 0;
-              const total = item.total_pages || 0;
+              const rawRead = item.pages_read || 0;
+              const rawTotal = item.total_pages || 0;
+              const isManga = item.item_type === 'manga';
+              const read = isManga && rawRead >= 10000 ? (rawRead % 10000) : rawRead;
+              const total = isManga && rawTotal >= 10000 ? (rawTotal % 10000) : rawTotal;
+              const unitSingle = isManga ? (language === 'es' ? 'cap.' : 'ch.') : (language === 'es' ? 'pág.' : 'page');
+              const unitPlural = isManga ? (language === 'es' ? 'caps.' : 'chs.') : (language === 'es' ? 'págs.' : 'pages');
+
               if (item.status === 'read' || item.status === 'completed') {
                 const count = total > 0 ? total : read;
-                return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+                return `${count} ${count === 1 ? unitSingle : unitPlural}`;
               }
               if (read > 0 && total > 0) {
-                return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
+                return `${read} / ${total} ${unitPlural}`;
               }
               const count = read > 0 ? read : total;
-              return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+              return `${count} ${count === 1 ? unitSingle : unitPlural}`;
             })()}
           </span>
         )}
@@ -513,13 +519,17 @@ const ShelfListItemRow = React.memo<ShelfListItemRowProps>(({
       <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
     );
   } else if (['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0)) {
-    const read = item.pages_read || 0;
-    const total = item.total_pages || 0;
+    const rawRead = item.pages_read || 0;
+    const rawTotal = item.total_pages || 0;
+    const isManga = item.item_type === 'manga';
+    const read = isManga && rawRead >= 10000 ? (rawRead % 10000) : rawRead;
+    const total = isManga && rawTotal >= 10000 ? (rawTotal % 10000) : rawTotal;
+    const unit = isManga ? (language === 'es' ? 'caps.' : 'chs.') : (language === 'es' ? 'págs.' : 'pages');
     const label = (item.status === 'read' || item.status === 'completed')
-      ? `${total > 0 ? total : read} ${language === 'es' ? 'págs.' : 'pages'}`
+      ? `${total > 0 ? total : read} ${unit}`
       : (read > 0 && total > 0)
-      ? `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`
-      : `${read > 0 ? read : total} ${language === 'es' ? 'págs.' : 'pages'}`;
+      ? `${read} / ${total} ${unit}`
+      : `${read > 0 ? read : total} ${unit}`;
     metadataSnippet = (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
         <BookOpen size={12} />
@@ -8275,7 +8285,15 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           ) : (
             <>Watched {count} episodes of {renderTitle(rawTitle)}.</>
           );
-        } else if (itemType === 'book' || itemType === 'manga') {
+        } else if (itemType === 'manga') {
+          const chRead = pages >= 10000 ? (pages % 10000) : pages;
+          const chTotal = totalPages >= 10000 ? (totalPages % 10000) : totalPages;
+          msg = isEs ? (
+            <>Se avanzaron capítulos en {renderTitle(rawTitle)} ({chRead}{chTotal ? ` / ${chTotal}` : ''} caps).</>
+          ) : (
+            <>Progressed chapters in {renderTitle(rawTitle)} ({chRead}{chTotal ? ` / ${chTotal}` : ''} chs).</>
+          );
+        } else if (itemType === 'book') {
           msg = isEs ? (
             <>Se avanzaron páginas en {renderTitle(rawTitle)} ({pages}{totalPages ? ` / ${totalPages}` : ''} págs).</>
           ) : (
@@ -8319,7 +8337,28 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
             ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
             : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
         }
-      } else if (itemType === 'book' || itemType === 'manga') {
+      } else if (itemType === 'manga') {
+        const chRead = pages >= 10000 ? (pages % 10000) : pages;
+        const chTotal = totalPages >= 10000 ? (totalPages % 10000) : totalPages;
+        if (status === 'read' || status === 'completed') {
+          const finalCh = chTotal > 0 ? chTotal : chRead;
+          msg = isEs
+            ? <>Se terminó de leer {renderTitle(rawTitle)}{finalCh ? ` (${finalCh} caps)` : ''}.</>
+            : <>Finished reading {renderTitle(rawTitle)}{finalCh ? ` (${finalCh} chs)` : ''}.</>;
+        } else if (status === 'dropped') {
+          msg = isEs
+            ? <>Se abandonó {renderTitle(rawTitle)}{chRead ? ` (en el cap. ${chRead})` : ''}.</>
+            : <>Dropped {renderTitle(rawTitle)}{chRead ? ` (at ch. ${chRead})` : ''}.</>;
+        } else if (chRead > 0) {
+          msg = isEs
+            ? <>Se leyó hasta el cap. {chRead}{chTotal ? ` de ${chTotal}` : ''} de {renderTitle(rawTitle)}.</>
+            : <>Read up to ch. {chRead}{chTotal ? ` of ${chTotal}` : ''} of {renderTitle(rawTitle)}.</>;
+        } else {
+          msg = isEs
+            ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
+            : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
+        }
+      } else if (itemType === 'book') {
         if (status === 'read' || status === 'completed') {
           msg = isEs
             ? <>Se terminó de leer {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} págs)` : ''}.</>

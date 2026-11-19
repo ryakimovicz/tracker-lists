@@ -235,6 +235,8 @@ class AnilistService:
                 day
               }
               averageScore
+              volumes
+              chapters
             }
           }
         }
@@ -292,7 +294,9 @@ class AnilistService:
                         release_date=release_date,
                         popularity=float(item.get("averageScore") or 0),
                         status=mapped_status,
-                        badge=badge
+                        badge=badge,
+                        volumes=item.get("volumes"),
+                        chapters=item.get("chapters")
                     )
                 )
             return results
@@ -327,6 +331,8 @@ class AnilistService:
               popularity
               genres
               isAdult
+              volumes
+              chapters
             }
           }
         }
@@ -373,7 +379,9 @@ class AnilistService:
                     item_type="manga",
                     creator=author_name,
                     release_date=release_date or None,
-                    popularity=float(item.get("popularity") or item.get("averageScore") or 0)
+                    popularity=float(item.get("popularity") or item.get("averageScore") or 0),
+                    volumes=item.get("volumes"),
+                    chapters=item.get("chapters")
                 ))
             return results
         except Exception as e:
@@ -407,6 +415,8 @@ class AnilistService:
               averageScore
               genres
               isAdult
+              volumes
+              chapters
             }
           }
         }
@@ -454,7 +464,9 @@ class AnilistService:
                     item_type="manga",
                     creator=author_name,
                     release_date=release_date or None,
-                    popularity=float(item.get("averageScore") or 0)
+                    popularity=float(item.get("averageScore") or 0),
+                    volumes=item.get("volumes"),
+                    chapters=item.get("chapters")
                 ))
             return results
         except Exception as e:
@@ -777,13 +789,16 @@ class AnilistService:
     def get_manga_relations(cls, manga_id: str) -> dict:
         clean_id = str(manga_id).replace("manga_", "").replace("anilist_", "")
         if not clean_id.isdigit():
-            return {"sequels_prequels": [], "spin_offs_side_stories": [], "other_relations": []}
+            return {"sequels_prequels": [], "spin_offs_side_stories": [], "other_relations": [], "volumes": None, "chapters": None, "status": None}
 
         graphql_query = """
         query ($id: Int) {
           Media(id: $id, type: MANGA) {
             id
             title { romaji english }
+            volumes
+            chapters
+            status
             relations {
               edges {
                 relationType
@@ -808,6 +823,9 @@ class AnilistService:
         sequels_prequels = []
         spin_offs_side_stories = []
         other_relations = []
+        volumes_count = None
+        chapters_count = None
+        media_status = None
 
         try:
             data = cls._graphql_request(graphql_query, {"id": int(clean_id)}, timeout=6)
@@ -815,10 +833,17 @@ class AnilistService:
                 return {
                     "sequels_prequels": [],
                     "spin_offs_side_stories": [],
-                    "other_relations": []
+                    "other_relations": [],
+                    "volumes": None,
+                    "chapters": None,
+                    "status": None
                 }
 
-            edges = data.get("data", {}).get("Media", {}).get("relations", {}).get("edges", [])
+            media_obj = data.get("data", {}).get("Media", {}) or {}
+            volumes_count = media_obj.get("volumes")
+            chapters_count = media_obj.get("chapters")
+            media_status = media_obj.get("status")
+            edges = media_obj.get("relations", {}).get("edges", [])
 
             seen_ids = set()
             for edge in edges:
@@ -870,5 +895,8 @@ class AnilistService:
         return {
             "sequels_prequels": sequels_prequels,
             "spin_offs_side_stories": spin_offs_side_stories,
-            "other_relations": other_relations
+            "other_relations": other_relations,
+            "volumes": volumes_count,
+            "chapters": chapters_count,
+            "status": media_status
         }

@@ -2430,12 +2430,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const previousCompletedAt = selectedItem.completed_at;
     const optimisticCompletedAt = ['completed', 'read'].includes(newStatus) ? (selectedItem.completed_at || new Date().toISOString()) : null;
 
+    let extraPayload: Record<string, any> = {};
+    if (selectedItem.item_type === 'manga' && newStatus === 'read') {
+      const rawTotal = typeof totalPagesVal === 'number' && totalPagesVal > 0 ? (totalPagesVal >= 10000 ? totalPagesVal % 10000 : totalPagesVal) : 0;
+      const mChaps = Number(selectedItem.chapters) || Number((mangaRelations as any)?.chapters) || rawTotal;
+      if (mChaps > 0) {
+        setPagesReadVal(mChaps);
+        setTotalPagesVal(mChaps);
+        extraPayload = { pages_read: mChaps, total_pages: mChaps };
+      }
+    }
+
     if (selectedItem.id) {
       // 1. Instant 0ms Optimistic Update in UI, modal, caches, and listeners
       const optimisticItem = {
         ...selectedItem,
         status: newStatus,
-        completed_at: optimisticCompletedAt
+        completed_at: optimisticCompletedAt,
+        ...extraPayload
       };
       setSelectedItem((prev: any) => prev ? optimisticItem : null);
       updateCachedShelfItem(optimisticItem);
@@ -2443,7 +2455,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       onUpdate && onUpdate(optimisticItem);
 
       try {
-        const res = await updateLibraryStatusSafe(selectedItem.id, newStatus);
+        const res = await updateLibraryStatusSafe(selectedItem.id, newStatus, extraPayload);
         const updatedItem = { ...optimisticItem, ...res };
         setSelectedItem((prev: any) => prev ? updatedItem : null);
         updateCachedShelfItem(updatedItem);
@@ -3187,11 +3199,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       // 1. Render item immediately with whatever data we already have
+      const initialMangaMax = item.item_type === 'manga' && item.chapters
+        ? (Number(item.chapters) || 0)
+        : 0;
+      const initialPagesRead = item.item_type === 'manga' && (item.pages_read || 0) >= 10000
+        ? (item.pages_read % 10000)
+        : (item.pages_read || 0);
+      const rawStoredTotal = item.total_pages || item.page_count || 0;
+      const initialTotalPages = item.item_type === 'manga'
+        ? (initialMangaMax > 0 ? initialMangaMax : (rawStoredTotal >= 10000 ? (rawStoredTotal % 10000) : (rawStoredTotal || '')))
+        : (rawStoredTotal || '');
       setSelectedItem(item);
       setUserRating(Number(item.rating) || 0);
       setUserComment('');
-      setPagesReadVal(item.pages_read || 0);
-      setTotalPagesVal(item.total_pages || item.page_count || '');
+      setPagesReadVal(initialPagesRead);
+      setTotalPagesVal(initialTotalPages);
       setHasInteractedWithTime(false);
       setItemReviews([]);
       setDescExpanded(false);
@@ -3860,11 +3882,46 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setGameRelations(null);
         }
 
-        // Fetch manga relations (sequels, prequels, spin-offs, side stories)
+        // Fetch manga relations (sequels, prequels, spin-offs, side stories) + total chapters from AniList
         if (item.item_type === 'manga' && item.external_id) {
+          const applyMangaTotals = (relData: any) => {
+            if (!relData) return;
+            const apiChaps = Number(relData.chapters) || 0;
+            if (apiChaps > 0) {
+              setTotalPagesVal(apiChaps);
+              setSelectedItem((prev: any) => {
+                if (!prev) return null;
+                const isReadStatus = prev.status === 'read' || prev.status === 'completed';
+                const prevRead = prev.pages_read >= 10000 ? (prev.pages_read % 10000) : (prev.pages_read || 0);
+                const nextPagesRead = (isReadStatus && prevRead === 0) ? apiChaps : prevRead;
+                if (isReadStatus && prevRead === 0) {
+                  setPagesReadVal(apiChaps);
+                }
+                return {
+                  ...prev,
+                  chapters: apiChaps || prev.chapters,
+                  total_pages: apiChaps,
+                  pages_read: nextPagesRead
+                };
+              });
+              if (item.id && (!item.total_pages || item.total_pages !== apiChaps)) {
+                const isReadStatus = item.status === 'read' || item.status === 'completed';
+                const itemRead = item.pages_read >= 10000 ? (item.pages_read % 10000) : (item.pages_read || 0);
+                const payload: any = { total_pages: apiChaps };
+                if (isReadStatus && itemRead === 0) {
+                  payload.pages_read = apiChaps;
+                } else if (item.pages_read >= 10000) {
+                  payload.pages_read = itemRead;
+                }
+                apiClient.put(`/library/${item.id}`, payload).catch(() => {});
+              }
+            }
+          };
+
           const cachedRel = getCachedSeries(`manga_rel_${item.external_id}`);
           if (cachedRel) {
             setMangaRelations(cachedRel);
+            applyMangaTotals(cachedRel);
             setIsLoadingMangaRelations(false);
           } else {
             setIsLoadingMangaRelations(true);
@@ -3872,7 +3929,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           apiClient.get(`/search/manga/${item.external_id}/relations`)
             .then(res => {
               setMangaRelations(res.data || null);
-              if (res.data) setCachedSeries(`manga_rel_${item.external_id}`, res.data);
+              if (res.data) {
+                setCachedSeries(`manga_rel_${item.external_id}`, res.data);
+                applyMangaTotals(res.data);
+              }
             })
             .catch(e => {
               console.error("Failed to load manga relations", e);
@@ -6096,7 +6156,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleUpdatePages = (newPages: number) => {
     setHasInteractedWithTime(true);
-    const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+    const isMangaItem = !isEpisode && selectedItem?.item_type === 'manga';
+    const apiMangaChaps = isMangaItem ? (Number(selectedItem?.chapters) || Number((mangaRelations as any)?.chapters) || 0) : 0;
+    const rawMax = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+    const maxPages = isMangaItem
+      ? (apiMangaChaps > 0 ? apiMangaChaps : (rawMax >= 10000 ? (rawMax % 10000) : rawMax))
+      : rawMax;
     let finalPages = Math.max(0, isNaN(newPages) ? 0 : newPages);
     if (maxPages > 0) {
       if (finalPages >= maxPages) {
@@ -7151,8 +7216,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   {/* Favorite toggler moved to 3-dots menu */}
 
-                  {/* Modern & Comfortable Pages Read Picker for books, mangas and comic issues */}
+                  {/* Modern & Comfortable Pages / Chapters Read Picker for books, mangas and comic issues */}
                   {((!isEpisode && selectedItem && ['book', 'manga'].includes(selectedItem.item_type)) || isComicIssue) && (() => {
+                    const isMangaItem = !isEpisode && selectedItem?.item_type === 'manga';
                     const isRead = selectedItem.status === 'read' || (isComicIssue && isEpisodeCompleted);
                     const isReadingOrDropped = ['reading', 'dropped'].includes(selectedItem.status) || (isComicIssue && !isRead && selectedItem.status);
 
@@ -7160,16 +7226,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       return null;
                     }
 
-                    const currentPages = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
-                    const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+                    const rawCurrentPages = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
+                    const currentPages = isMangaItem && rawCurrentPages >= 10000 ? (rawCurrentPages % 10000) : rawCurrentPages;
+                    const apiMangaChaps = isMangaItem ? (Number(selectedItem.chapters) || Number((mangaRelations as any)?.chapters) || 0) : 0;
+                    const rawMaxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+                    const maxPages = isMangaItem
+                      ? (apiMangaChaps > 0 ? apiMangaChaps : (rawMaxPages >= 10000 ? (rawMaxPages % 10000) : rawMaxPages))
+                      : rawMaxPages;
                     const progressPercent = maxPages > 0 ? Math.min(100, Math.round((currentPages / maxPages) * 100)) : 0;
+                    const unitText = isMangaItem ? (language === 'es' ? 'caps' : 'chs') : (language === 'es' ? 'págs' : 'pages');
 
                     const handleTotalPagesBlur = () => {
                       handleSaveTotalPages();
                     };
 
                     if (isRead) {
-                      // When completed / read: show dedicated Total Pages field with ability to input or edit
+                      // When completed / read: show dedicated Total Pages / Total Chapters field
                       return (
                         <div style={{
                           marginTop: '0.6rem',
@@ -7185,7 +7257,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <BookOpen size={15} color="var(--accent-primary)" />
-                            {language === 'es' ? 'Páginas totales:' : 'Total pages:'}
+                            {isMangaItem
+                              ? (language === 'es' ? 'Capítulos totales:' : 'Total chapters:')
+                              : (language === 'es' ? 'Páginas totales:' : 'Total pages:')}
                           </span>
 
                           <div
@@ -7208,11 +7282,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             <input
                               type="number"
                               min={0}
-                              max={99999}
+                              max={isMangaItem && apiMangaChaps > 0 ? apiMangaChaps : 99999}
                               disabled={!user}
                               readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
-                              value={totalPagesVal}
-                              placeholder={language === 'es' ? 'Ej: 320' : 'Ex: 320'}
+                              value={maxPages > 0 ? maxPages : totalPagesVal}
+                              placeholder={isMangaItem ? (language === 'es' ? 'Ej: 200' : 'Ex: 200') : (language === 'es' ? 'Ej: 320' : 'Ex: 320')}
                               onFocus={(e) => {
                                 if (typeof window !== 'undefined' && window.innerWidth <= 768) {
                                   e.target.blur();
@@ -7222,7 +7296,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 if (totalPagesVal === 0) setTotalPagesVal('');
                               }}
                               onChange={(e) => {
-                                const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                let val: number | '' = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                if (typeof val === 'number' && isMangaItem && apiMangaChaps > 0 && val > apiMangaChaps) {
+                                  val = apiMangaChaps;
+                                }
                                 setTotalPagesVal(val);
                               }}
                               onBlur={handleTotalPagesBlur}
@@ -7237,7 +7314,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 textAlign: 'center',
                                 background: 'transparent',
                                 border: 'none',
-                                color: totalPagesVal ? 'var(--text-primary)' : 'var(--text-muted)',
+                                color: (maxPages > 0 || totalPagesVal) ? 'var(--text-primary)' : 'var(--text-muted)',
                                 fontWeight: 700,
                                 fontSize: '0.9rem',
                                 outline: 'none',
@@ -7246,7 +7323,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               }}
                             />
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                              {language === 'es' ? 'págs' : 'pages'}
+                              {unitText}
                             </span>
                           </div>
                         </div>
@@ -7264,15 +7341,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         flexDirection: 'column',
                         gap: '0.5rem'
                       }}>
-                        {/* Main row: Label + [ Pages Read ] / [ Total Pages ] */}
+                        {/* Main row: Label + [ Pages/Chapters Read ] / [ Total Pages/Chapters ] */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <BookOpen size={15} color="var(--accent-primary)" />
-                            {language === 'es' ? 'Páginas leídas:' : 'Pages read:'}
+                            {isMangaItem
+                              ? (language === 'es' ? 'Capítulos leídos:' : 'Chapters read:')
+                              : (language === 'es' ? 'Páginas leídas:' : 'Pages read:')}
                           </span>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            {/* Current Pages Input Box */}
+                            {/* Current Pages/Chapters Input Box */}
                             <div
                               onClick={() => {
                                 if (typeof window !== 'undefined' && window.innerWidth <= 768) {
@@ -7339,7 +7418,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                             <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>/</span>
 
-                            {/* Total Pages Input Box (Editable if needed) */}
+                            {/* Total Pages/Chapters Input Box (Editable if needed) */}
                             <div
                               onClick={() => {
                                 if (typeof window !== 'undefined' && window.innerWidth <= 768) {
@@ -7360,10 +7439,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <input
                                 type="number"
                                 min={0}
-                                max={99999}
+                                max={isMangaItem && apiMangaChaps > 0 ? apiMangaChaps : 99999}
                                 disabled={!user}
                                 readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
-                                value={totalPagesVal}
+                                value={maxPages > 0 ? maxPages : totalPagesVal}
                                 placeholder={language === 'es' ? 'Total' : 'Total'}
                                 onFocus={(e) => {
                                   if (typeof window !== 'undefined' && window.innerWidth <= 768) {
@@ -7374,7 +7453,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   if (totalPagesVal === 0) setTotalPagesVal('');
                                 }}
                                 onChange={(e) => {
-                                  const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                  let val: number | '' = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                  if (typeof val === 'number' && isMangaItem && apiMangaChaps > 0 && val > apiMangaChaps) {
+                                    val = apiMangaChaps;
+                                  }
                                   setTotalPagesVal(val);
                                 }}
                                 onBlur={handleTotalPagesBlur}
@@ -7389,7 +7471,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
-                                  color: totalPagesVal ? 'var(--text-primary)' : 'var(--text-muted)',
+                                  color: (maxPages > 0 || totalPagesVal) ? 'var(--text-primary)' : 'var(--text-muted)',
                                   fontWeight: 700,
                                   fontSize: '0.9rem',
                                   outline: 'none',
@@ -7398,13 +7480,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }}
                               />
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                {language === 'es' ? 'págs' : 'pages'}
+                                {unitText}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Subtle Progress Slider when Total Pages is Known */}
+                        {/* Subtle Progress Slider when Total Pages/Chapters is Known */}
                         {user && maxPages > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
                             <input
@@ -7428,7 +7510,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
                     );
                   })()}
-
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
                   {!isCosmeticDlc && selectedItem && ( 
@@ -12821,19 +12902,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 isOpen={showProgressPickerModal}
                 onClose={() => closeSubModal(true)}
                 mode={progressPickerTarget === 'time' ? 'time' : 'pages'}
+                unitLabel={!isEpisode && selectedItem?.item_type === 'manga' ? (language === 'es' ? 'caps' : 'chs') : undefined}
                 value={
                   progressPickerTarget === 'time'
                     ? (typeof pagesReadVal === 'number' ? pagesReadVal : 0)
                     : progressPickerTarget === 'total_pages'
-                      ? (typeof totalPagesVal === 'number' && totalPagesVal > 0 ? totalPagesVal : 0)
-                      : (typeof pagesReadVal === 'number' ? pagesReadVal : 0)
+                      ? (() => {
+                          const rawTotal = typeof totalPagesVal === 'number' && totalPagesVal > 0 ? totalPagesVal : 0;
+                          if (!isEpisode && selectedItem?.item_type === 'manga') {
+                            const apiChaps = Number(selectedItem?.chapters) || Number((mangaRelations as any)?.chapters) || 0;
+                            return apiChaps > 0 ? apiChaps : (rawTotal >= 10000 ? (rawTotal % 10000) : rawTotal);
+                          }
+                          return rawTotal;
+                        })()
+                      : (() => {
+                          const rawRead = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
+                          return (!isEpisode && selectedItem?.item_type === 'manga' && rawRead >= 10000) ? (rawRead % 10000) : rawRead;
+                        })()
                 }
                 maxValue={
                   progressPickerTarget === 'time'
                     ? (selectedItem?.total_pages || selectedItem?.runtime || selectedItem?.page_count || (isEpisode && !isComicIssue ? 45 : 0))
                     : progressPickerTarget === 'total_pages'
-                      ? 0
-                      : ((typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || 0))
+                      ? (!isEpisode && selectedItem?.item_type === 'manga'
+                          ? (Number(selectedItem?.chapters) || Number((mangaRelations as any)?.chapters) || 0)
+                          : 0)
+                      : (() => {
+                          const rawMax = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || 0);
+                          if (!isEpisode && selectedItem?.item_type === 'manga') {
+                            const apiChaps = Number(selectedItem?.chapters) || Number((mangaRelations as any)?.chapters) || 0;
+                            return apiChaps > 0 ? apiChaps : (rawMax >= 10000 ? (rawMax % 10000) : rawMax);
+                          }
+                          return rawMax;
+                        })()
                 }
                 title={
                   progressPickerTarget === 'time'
@@ -12841,8 +12942,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         ? (language === 'es' ? 'Tiempo visto' : 'Time watched')
                         : (language === 'es' ? 'Horas jugadas' : 'Hours played'))
                     : progressPickerTarget === 'total_pages'
-                      ? (language === 'es' ? 'Páginas totales' : 'Total pages')
-                      : (language === 'es' ? 'Páginas leídas' : 'Pages read')
+                      ? (!isEpisode && selectedItem?.item_type === 'manga'
+                          ? (language === 'es' ? 'Capítulos totales' : 'Total chapters')
+                          : (language === 'es' ? 'Páginas totales' : 'Total pages'))
+                      : (!isEpisode && selectedItem?.item_type === 'manga'
+                          ? (language === 'es' ? 'Capítulos leídos' : 'Chapters read')
+                          : (language === 'es' ? 'Páginas leídas' : 'Pages read'))
                 }
                 onChange={(val) => {
                   if (progressPickerTarget === 'time') {

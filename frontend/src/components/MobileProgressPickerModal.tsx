@@ -7,9 +7,10 @@ export interface MobileProgressPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   mode: 'time' | 'pages';
-  value: number; // For time: total minutes; for pages: pages read
-  maxValue?: number; // For time: max duration in minutes; for pages: total pages
+  value: number; // For time: total minutes; for pages: pages/chapters read
+  maxValue?: number; // For time: max duration in minutes; for pages: total pages/chapters
   title?: string;
+  unitLabel?: string; // Optional custom unit label for pages mode (e.g. 'caps' / 'chs')
   onChange: (newValue: number) => void;
   onTotalPagesChange?: (newTotal: number) => void;
 }
@@ -24,11 +25,13 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
   value,
   maxValue = 0,
   title,
+  unitLabel,
   onChange,
   onTotalPagesChange
 }) => {
   const { language } = useTranslation();
   const isEs = language === 'es';
+  const resolvedUnit = unitLabel || (isEs ? 'págs' : 'pages');
 
   // Local state for interactive editing before committing
   const [currentValue, setCurrentValue] = useState<number>(value);
@@ -87,12 +90,12 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
 
   const minutesList = useMemo(() => {
     const list: number[] = [];
-    for (let i = 0; i < 60; i++) list.push(i);
+    for (let i = 0; i <= 59; i++) list.push(i);
     return list;
   }, []);
 
-  // For pages: create an appropriate page list (0 to maxPages or at least 2000)
-  const maxPages = mode === 'pages' ? Math.max(maxValue > 0 ? maxValue : 0, currentValue + 500, 2000) : 0;
+  // For pages/chapters: if maxValue > 0 is known, cap wheel at maxValue; otherwise provide an appropriate range
+  const maxPages = mode === 'pages' ? (maxValue > 0 ? maxValue : Math.max(currentValue + 500, 2000)) : 0;
   const pagesList = useMemo(() => {
     const list: number[] = [];
     const limit = Math.min(maxPages, 10000);
@@ -129,7 +132,6 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
   if (!isOpen) return null;
 
   // Update value helper with optional capping
-  // Update value helper with optional capping
   const updateVal = (newVal: number, fromKeyboard = false) => {
     let finalVal = Math.max(0, newVal);
     if (maxValue > 0 && finalVal > maxValue) {
@@ -157,8 +159,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
     const index = Math.round(top / ITEM_HEIGHT);
     const validH = Math.min(Math.max(0, index), hoursList.length - 1);
     const currentM = currentValueRef.current % 60;
-    const newTotal = validH * 60 + currentM;
-    updateVal(newTotal);
+    updateVal(validH * 60 + currentM);
   };
 
   const handleMinutesScroll = () => {
@@ -167,8 +168,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
     const index = Math.round(top / ITEM_HEIGHT);
     const validM = Math.min(Math.max(0, index), 59);
     const currentH = Math.floor(currentValueRef.current / 60);
-    const newTotal = currentH * 60 + validM;
-    updateVal(newTotal);
+    updateVal(currentH * 60 + validM);
   };
 
   const handlePagesScroll = () => {
@@ -199,12 +199,13 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
     }
     const h = parseInt(text, 10);
     if (!isNaN(h)) {
-      const newTotal = Math.max(0, h) * 60 + (currentValueRef.current % 60);
+      const clampedH = Math.max(0, h);
+      const newTotal = clampedH * 60 + (currentValueRef.current % 60);
       updateVal(newTotal, true);
       if (hoursScrollRef.current) {
         isProgrammaticScroll.current = true;
         if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        hoursScrollRef.current.scrollTop = Math.min(Math.max(0, h), hoursList.length - 1) * ITEM_HEIGHT;
+        hoursScrollRef.current.scrollTop = Math.min(clampedH, hoursList.length - 1) * ITEM_HEIGHT;
         scrollTimeoutRef.current = setTimeout(() => {
           isProgrammaticScroll.current = false;
         }, 100);
@@ -504,13 +505,13 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                   }}
                 />
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  {isEs ? 'págs' : 'pages'}
+                  {resolvedUnit}
                 </span>
               </div>
 
               {maxValue > 0 && (
                 <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                  / {maxValue} {isEs ? 'págs' : 'pages'}
+                  / {maxValue} {resolvedUnit}
                 </div>
               )}
             </div>
@@ -620,7 +621,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: isSelected ? '1.4rem' : '1.05rem',
+                        fontSize: isSelected ? '1.35rem' : '1.05rem',
                         fontWeight: isSelected ? 800 : 500,
                         color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)',
                         transform: isSelected ? 'scale(1.08)' : 'scale(0.92)',
@@ -628,7 +629,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                         cursor: 'pointer'
                       }}
                     >
-                      {h} <span style={{ fontSize: '0.78rem', marginLeft: 3, opacity: 0.7 }}>h</span>
+                      {h} <span style={{ fontSize: '0.76rem', marginLeft: 4, opacity: 0.7 }}>h</span>
                     </div>
                   );
                 })}
@@ -636,7 +637,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                 <div style={{ height: ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2) }} />
               </div>
 
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-muted)', padding: '0 0.2rem' }}>:</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-muted)', padding: '0 0.2rem' }}>:</div>
 
               {/* Minutes Column */}
               <div
@@ -669,7 +670,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: isSelected ? '1.4rem' : '1.05rem',
+                        fontSize: isSelected ? '1.35rem' : '1.05rem',
                         fontWeight: isSelected ? 800 : 500,
                         color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)',
                         transform: isSelected ? 'scale(1.08)' : 'scale(0.92)',
@@ -677,7 +678,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                         cursor: 'pointer'
                       }}
                     >
-                      {String(m).padStart(2, '0')} <span style={{ fontSize: '0.78rem', marginLeft: 3, opacity: 0.7 }}>m</span>
+                      {String(m).padStart(2, '0')} <span style={{ fontSize: '0.76rem', marginLeft: 4, opacity: 0.7 }}>m</span>
                     </div>
                   );
                 })}
@@ -686,7 +687,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
               </div>
             </div>
           ) : (
-            /* Pages Single Wheel Column */
+            /* Pages / Chapters Single Wheel Column */
             <div
               ref={pagesScrollRef}
               onScroll={handlePagesScroll}
@@ -726,7 +727,7 @@ export const MobileProgressPickerModal: React.FC<MobileProgressPickerModalProps>
                       cursor: 'pointer'
                     }}
                   >
-                    {p} <span style={{ fontSize: '0.78rem', marginLeft: 4, opacity: 0.7 }}>{isEs ? 'págs' : 'pages'}</span>
+                    {p} <span style={{ fontSize: '0.78rem', marginLeft: 4, opacity: 0.7 }}>{resolvedUnit}</span>
                   </div>
                 );
               })}

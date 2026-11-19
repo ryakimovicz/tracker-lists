@@ -727,7 +727,9 @@ class IGDBService:
 
         try:
             lists = []
-            for pop_type in [9, 34, 5]:
+            # 3: Playing (IGDB all platforms), 2: Want to Play (IGDB all platforms),
+            # 1: Visits (IGDB all platforms), 9: Top Sellers
+            for pop_type in [3, 2, 1, 9]:
                 body = f"fields game_id, value; where popularity_type = {pop_type}; sort value desc; limit 15;"
                 data = cls.apicalypse_request("popularity_primitives", body, timeout=5.0, use_cache=True, cache_ttl=1800) or []
                 lists.append([str(p["game_id"]) for p in data if "game_id" in p])
