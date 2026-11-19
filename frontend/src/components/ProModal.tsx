@@ -15,6 +15,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<'streaming' | 'reading' | 'premium'>('premium');
+  const [premiumBilling, setPremiumBilling] = useState<'monthly' | 'annual'>('monthly');
 
   // Synchronize URL query parameter with modal visibility: ?modal=premium or ?premium=true
   useEffect(() => {
@@ -86,7 +88,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await apiClient.post('/payments/create-checkout');
+      const res = await apiClient.post('/payments/create-checkout', {
+        plan: selectedPlan,
+        billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly'
+      });
       if (res.data?.checkout_url) {
         window.location.href = res.data.checkout_url;
       } else {
@@ -188,118 +193,183 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           </div>
         )}
 
-        {/* Scrollable Benefits List */}
+        {/* Scrollable Plans Selector */}
         <div 
           className="pro-modal-benefits-list"
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: '0.75rem',
             overflowY: 'auto',
-            paddingRight: '0.4rem',
-            marginBottom: '1.25rem'
+            paddingRight: '0.25rem',
+            marginBottom: '1rem'
           }}
         >
-          {/* Benefit 0: Profile Banners & Ambient Backgrounds */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <ImageIcon size={18} />
+          {/* Plan 1: Pack de Streaming */}
+          <div
+            onClick={() => setSelectedPlan('streaming')}
+            style={{
+              padding: '0.9rem 1rem',
+              borderRadius: '12px',
+              border: `1.5px solid ${selectedPlan === 'streaming' ? 'var(--color-movie)' : 'var(--border-color)'}`,
+              background: selectedPlan === 'streaming' ? 'color-mix(in srgb, var(--color-movie) 8%, transparent)' : 'var(--bg-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--color-movie)' }}>
+                {isEs ? 'Pack de Streaming' : 'Streaming Pack'}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                $1.99 <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {isEs ? 'mes' : 'mo'}</span>
+              </span>
             </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Portadas y Fondos de Pantalla de Perfil' : 'Profile Banners & Ambient Wallpapers'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Personaliza tu portada y el fondo completo de tu perfil con imágenes panorámicas en alta resolución de tus obras favoritas.'
-                  : 'Customize your profile banner and full-page ambient wallpaper with high-resolution artworks from your favorite titles.'}
-              </p>
-            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.28rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {(isEs ? [
+                'Categorías: Películas, Series y Anime',
+                'Hasta 10 destacados en esas categorías',
+                'Reordenar libremente esas categorías',
+                'Protección anti-spoilers (desenfoque de episodios)',
+                'Historial completo de re-consumo en Streaming',
+                'Portadas y fondos de perfil con obras de Streaming'
+              ] : [
+                'Categories: Movies, TV Shows & Anime',
+                'Up to 10 favorites in those categories',
+                'Freely reorder those categories',
+                'Anti-spoiler protection (unwatched episode blur)',
+                'Full re-consumption history in Streaming',
+                'Profile banners & wallpapers from Streaming titles'
+              ]).map((item, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Check size={13} color="var(--color-movie)" style={{ flexShrink: 0 }} />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* Benefit 1: Anti-Spoilers (Blur unwatched episodes) */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <EyeOff size={18} />
+          {/* Plan 2: Pack de Lectura */}
+          <div
+            onClick={() => setSelectedPlan('reading')}
+            style={{
+              padding: '0.9rem 1rem',
+              borderRadius: '12px',
+              border: `1.5px solid ${selectedPlan === 'reading' ? 'var(--color-manga)' : 'var(--border-color)'}`,
+              background: selectedPlan === 'reading' ? 'color-mix(in srgb, var(--color-manga) 8%, transparent)' : 'var(--bg-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--color-manga)' }}>
+                {isEs ? 'Pack de Lectura' : 'Reading Pack'}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                $1.99 <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {isEs ? 'mes' : 'mo'}</span>
+              </span>
             </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Protección Anti-Spoilers' : 'Anti-Spoiler Protection'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Desenfoca automáticamente portadas y miniaturas de episodios no vistos para evitar spoilers mientras exploras tus series y animes. Revela con 1 clic cuando quieras.'
-                  : 'Automatically blurs posters and thumbnails of unwatched episodes to prevent spoilers while browsing your shows and anime. Reveal with 1 click anytime.'}
-              </p>
-            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.28rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {(isEs ? [
+                'Categorías: Libros, Cómics y Manga',
+                'Hasta 10 destacados en esas categorías',
+                'Reordenar libremente esas categorías',
+                'Historial completo de re-consumo en Lectura',
+                'Portadas y fondos de perfil con obras de Lectura'
+              ] : [
+                'Categories: Books, Comics & Manga',
+                'Up to 10 favorites in those categories',
+                'Freely reorder those categories',
+                'Full re-consumption history in Reading',
+                'Profile banners & wallpapers from Reading titles'
+              ]).map((item, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Check size={13} color="var(--color-manga)" style={{ flexShrink: 0 }} />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* Benefit 2: 10 Favorites per category */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Star size={18} />
+          {/* Plan 3: Pack Premium (Mensual / Anual) */}
+          <div
+            onClick={() => setSelectedPlan('premium')}
+            style={{
+              padding: '0.95rem 1rem',
+              borderRadius: '12px',
+              border: `1.5px solid ${selectedPlan === 'premium' ? '#f59e0b' : 'var(--border-color)'}`,
+              background: selectedPlan === 'premium' ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Star size={15} fill="#f59e0b" color="#f59e0b" /> {isEs ? 'Pack Premium' : 'Premium Pack'}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedPlan('premium');
+                    setPremiumBilling(prev => prev === 'annual' ? 'monthly' : 'annual');
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: premiumBilling === 'annual' ? '#0f172a' : 'var(--text-secondary)',
+                    background: premiumBilling === 'annual' ? '#f59e0b' : 'var(--bg-secondary)',
+                    border: `1px solid ${premiumBilling === 'annual' ? '#f59e0b' : 'var(--border-color)'}`,
+                    borderRadius: '999px',
+                    padding: '0.18rem 0.55rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Check size={12} strokeWidth={3} style={{ opacity: premiumBilling === 'annual' ? 1 : 0.45 }} />
+                  <span>{isEs ? 'Anual -37%' : 'Annual -37%'}</span>
+                </button>
+              </div>
+              <span style={{ fontWeight: 800, fontSize: '1.02rem', color: 'var(--text-primary)' }}>
+                {premiumBilling === 'monthly' ? '$3.99' : '$29.99'}{' '}
+                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                  / {premiumBilling === 'monthly' ? (isEs ? 'mes' : 'mo') : (isEs ? 'año' : 'yr')}
+                </span>
+              </span>
             </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Hasta 10 Destacados por Categoría' : 'Up to 10 Favorites per Category'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Manga, Cómics y Juegos (hasta 70 obras en total).'
-                  : 'Build your ultimate Top 10 in Movies, TV Shows, Anime, Books, Manga, Comics, and Games (up to 70 total).'}
-              </p>
-            </div>
-          </div>
 
-          {/* Benefit 2: Customization (Color & Category Order) */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Palette size={18} />
-            </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Color de la Interfaz y Personalización' : 'Interface Color & Customization'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Elige el color principal de la interfaz en toda la plataforma y reorganiza libremente el orden de las categorías.'
-                  : 'Choose your main interface color across the entire platform and freely reorder categories.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Benefit 3: Private Guides */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Lock size={18} />
-            </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Guías Privadas y No Listadas' : 'Private & Unlisted Guides'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Crea listas secretas solo para ti o enlaces no listados para compartir con quien elijas.'
-                  : 'Create secret lists for yourself, or unlisted links to share with selected friends.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Benefit 4: Unlimited Re-consumption & History */}
-          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <RotateCcw size={18} />
-            </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Historial Completo de Re-consumos' : 'Full Re-consumption History'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {isEs
-                  ? 'Vuelve a marcar obras completadas cuantas veces quieras y accede a tu lista cronológica detallada con fechas exactas de visualización, lectura y juego.'
-                  : 'Re-mark completed titles as many times as you want and access your detailed historical timeline of watches, reads, and plays.'}
-              </p>
-            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.28rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {(isEs ? [
+                'Todas las categorías (incluye Juegos)',
+                'Hasta 10 destacados en todas las categorías',
+                'Reordenar libremente todas las categorías',
+                'Protección anti-spoilers habilitada',
+                'Historial completo de re-consumo en todas las categorías',
+                'Portadas y fondos de perfil con cualquier obra',
+                'Personalizar el color de la interfaz en toda la app',
+                'Guías privadas y no listadas',
+                'Insignia Premium en tu perfil y comentarios'
+              ] : [
+                'All categories (includes Games)',
+                'Up to 10 favorites in all categories',
+                'Freely reorder all categories',
+                'Anti-spoiler protection enabled',
+                'Full re-consumption history across all categories',
+                'Profile banners & wallpapers from any title',
+                'Custom interface theme color across the app',
+                'Private & unlisted guides',
+                'Premium badge on your profile & comments'
+              ]).map((item, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Check size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
@@ -357,9 +427,13 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                 <Crown size={18} />
                 {loading
                   ? (isEs ? 'Preparando pago...' : 'Preparing checkout...')
-                  : user?.is_pro
-                  ? (isEs ? 'Mantener Premium al finalizar regalo ($4,99/mes)' : 'Keep Premium after gift ends ($4.99/mo)')
-                  : (isEs ? 'Comenzar prueba gratis de 7 días' : 'Start 7-day free trial')}
+                  : selectedPlan === 'streaming'
+                    ? (isEs ? 'Suscribirse a Pack de Streaming ($1.99/mes)' : 'Subscribe to Streaming Pack ($1.99/mo)')
+                    : selectedPlan === 'reading'
+                      ? (isEs ? 'Suscribirse a Pack de Lectura ($1.99/mes)' : 'Subscribe to Reading Pack ($1.99/mo)')
+                      : (premiumBilling === 'annual'
+                          ? (isEs ? 'Suscribirse a Premium Anual ($29.99/año)' : 'Subscribe to Annual Premium ($29.99/yr)')
+                          : (isEs ? 'Suscribirse a Premium ($3.99/mes)' : 'Subscribe to Premium ($3.99/mo)'))}
               </button>
 
               {!user?.is_pro && (
@@ -370,8 +444,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   margin: '0.55rem 0 0 0'
                 }}>
                   {isEs 
-                    ? 'Luego $4,99/mes (impuestos incluidos). Cancela cuando quieras.'
-                    : 'Then $4.99/mo (taxes included). Cancel anytime.'}
+                    ? 'Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
+                    : 'Local taxes may apply depending on your country. Cancel anytime.'}
                 </p>
               )}
             </div>
