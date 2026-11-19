@@ -42,64 +42,67 @@ export const Landing: React.FC = () => {
 
   const planComparison = [
     {
-      feature: isEs ? '7 Categorías completas (Películas, Series, Anime, Libros, Cómics, Manga, Juegos)' : '7 Full Categories (Movies, TV Shows, Anime, Books, Comics, Manga, Games)',
-      free: isEs ? 'Ilimitadas' : 'Unlimited',
-      premium: isEs ? 'Ilimitadas' : 'Unlimited'
-    },
-    {
-      feature: isEs ? 'Estantería personal y registro de progreso' : 'Personal shelf & progress tracking',
-      free: isEs ? 'Completo' : 'Full',
-      premium: isEs ? 'Completo' : 'Full'
-    },
-    {
-      feature: isEs ? 'Calificaciones con estrellas, reseñas y comentarios (con GIFs, stickers y clips)' : 'Star ratings, reviews, and comments (with GIFs, stickers, and clips)',
-      free: isEs ? 'Sí' : 'Yes',
-      premium: isEs ? 'Sí' : 'Yes'
-    },
-    {
-      feature: isEs ? 'Guías comunitarias y universos cronológicos' : 'Community guides & chronological universes',
-      free: isEs ? 'Públicas' : 'Public',
-      premium: isEs ? 'Públicas, Privadas y No Listadas' : 'Public, Private & Unlisted'
+      feature: isEs ? 'Categorías incluidas' : 'Included categories',
+      free: isEs ? 'Todas (ilimitadas)' : 'All (unlimited)',
+      streaming: isEs ? 'Películas, Series, Anime' : 'Movies, TV Shows, Anime',
+      reading: isEs ? 'Libros, Cómics, Manga' : 'Books, Comics, Manga',
+      premium: isEs ? 'Todas (incl. Juegos)' : 'All (incl. Games)'
     },
     {
       feature: isEs ? 'Obras destacadas en tu perfil' : 'Featured works on your profile',
-      free: isEs ? '1 obra por categoría' : '1 item per category',
-      premium: isEs ? 'Hasta 10 por categoría (Top 10)' : 'Up to 10 per category (Top 10)'
+      free: isEs ? '1 por categoría' : '1 per category',
+      streaming: isEs ? '10 en Streaming' : '10 in Streaming',
+      reading: isEs ? '10 en Lectura' : '10 in Reading',
+      premium: isEs ? '10 en todas las categorías' : '10 in all categories'
     },
     {
-      feature: isEs ? 'Re-consumo de obras e historial' : 'Re-consumption & history',
-      free: isEs ? 'Contador de re-consumos' : 'Re-consumption counter',
-      premium: isEs ? 'Historial cronológico completo de re-consumos' : 'Full chronological re-consumption history'
+      feature: isEs ? 'Reordenar categorías en la app' : 'Reorder categories across the app',
+      free: isEs ? 'Orden estándar' : 'Standard order',
+      streaming: isEs ? 'Categorías de Streaming' : 'Streaming categories',
+      reading: isEs ? 'Categorías de Lectura' : 'Reading categories',
+      premium: isEs ? 'Todas las categorías' : 'All categories'
     },
     {
       feature: isEs ? 'Protección anti-spoilers' : 'Anti-spoiler protection',
       free: isEs ? 'Estándar' : 'Standard',
-      premium: isEs ? 'Desenfoque automático de carátulas y episodios no vistos' : 'Auto-blur for unwatched episodes and covers'
+      streaming: isEs ? 'Habilitado' : 'Enabled',
+      reading: isEs ? 'Estándar' : 'Standard',
+      premium: isEs ? 'Habilitado' : 'Enabled'
     },
     {
-      feature: isEs ? 'Portadas panorámicas y fondos de pantalla de perfil' : 'Panoramic profile banners & wallpapers',
-      free: isEs ? 'Fondo liso predeterminado' : 'Default solid background',
-      premium: isEs ? 'Portadas y fondos de pantalla en alta resolución (HD)' : 'High-resolution (HD) banners & wallpapers'
+      feature: isEs ? 'Historial de re-consumo' : 'Re-consumption history',
+      free: isEs ? 'Solo contador' : 'Counter only',
+      streaming: isEs ? 'En Streaming' : 'In Streaming',
+      reading: isEs ? 'En Lectura' : 'In Reading',
+      premium: isEs ? 'Todas las categorías' : 'All categories'
     },
     {
-      feature: isEs ? 'Color de la interfaz en toda la app' : 'Interface theme color across the app',
-      free: isEs ? 'Color predeterminado' : 'Default color',
-      premium: isEs ? 'Personalización completa de color' : 'Full interface color customization'
+      feature: isEs ? 'Personalización de perfil (portadas y fondos)' : 'Profile customization (banners & wallpapers)',
+      free: isEs ? 'Fondo predeterminado' : 'Default background',
+      streaming: isEs ? 'Con obras de Streaming' : 'With Streaming works',
+      reading: isEs ? 'Con obras de Lectura' : 'With Reading works',
+      premium: isEs ? 'Con todas las categorías' : 'With all categories'
     },
     {
-      feature: isEs ? 'Reorganización del orden de categorías en toda la app' : 'Custom category order across the entire app',
-      free: isEs ? 'Orden estándar' : 'Standard order',
-      premium: isEs ? 'Reorganización libre' : 'Fully customizable'
+      feature: isEs ? 'Personalizar color de la interfaz' : 'Custom interface color',
+      free: '—',
+      streaming: '—',
+      reading: '—',
+      premium: isEs ? 'Incluido' : 'Included'
+    },
+    {
+      feature: isEs ? 'Guías privadas y no listadas' : 'Private & unlisted guides',
+      free: isEs ? 'Solo públicas' : 'Public only',
+      streaming: isEs ? 'Solo públicas' : 'Public only',
+      reading: isEs ? 'Solo públicas' : 'Public only',
+      premium: isEs ? 'Públicas, Privadas y No Listadas' : 'Public, Private & Unlisted'
     },
     {
       feature: isEs ? 'Insignia en perfil y comentarios' : 'Badge on profile & comments',
       free: isEs ? 'Estándar' : 'Standard',
-      premium: isEs ? 'Insignia Premium (estrella dorada)' : 'Premium badge (golden star)'
-    },
-    {
-      feature: isEs ? 'Apoyo al proyecto' : 'Support the project',
-      free: isEs ? 'Miembro de la comunidad' : 'Community member',
-      premium: isEs ? 'Apoyo directo al desarrollo independiente' : 'Direct support for independent development'
+      streaming: isEs ? 'Estándar' : 'Standard',
+      reading: isEs ? 'Estándar' : 'Standard',
+      premium: isEs ? 'Insignia Premium' : 'Premium badge'
     }
   ];
 
@@ -125,8 +128,8 @@ export const Landing: React.FC = () => {
     {
       q: isEs ? '¿De dónde provienen las carátulas, sinopsis y fechas?' : 'Where do posters, synopses, and dates come from?',
       a: isEs
-        ? 'Pathd se conecta dinámicamente con las mejores bases de datos comunitarias y profesionales del mundo: Trakt para cine, TVMaze para series y anime, AniList para manga, IGDB/Twitch para videojuegos, y Last.fm y Deezer para música.'
-        : 'Pathd connects dynamically to industry-leading open and community databases: Trakt for movies, TVMaze for TV shows and anime, AniList for manga, IGDB/Twitch for games, and Last.fm and Deezer for music.'
+        ? 'Pathd se conecta dinámicamente con las mejores bases de datos comunitarias y profesionales del mundo: Trakt y Fanart.tv para películas, TVMaze para series y anime, Open Library e Inventaire para libros, Metron para cómics, AniList para manga, e IGDB/Twitch para videojuegos, complementadas con datos y tendencias de Wikipedia y Wikidata.'
+        : 'Pathd connects dynamically to industry-leading open and community databases: Trakt and Fanart.tv for movies, TVMaze for TV shows and anime, Open Library and Inventaire for books, Metron for comics, AniList for manga, and IGDB/Twitch for games, enriched with data and trends from Wikipedia and Wikidata.'
     }
   ];
 
@@ -238,27 +241,39 @@ export const Landing: React.FC = () => {
         {/* Desktop Comparison Table */}
         <div className="glass-card plan-comparison-desktop" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--card-shadow)' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '760px' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ padding: '1rem 1.25rem', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700, width: '50%' }}>
+                  <th style={{ padding: '1rem 1.25rem', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700, width: '32%' }}>
                     {isEs ? 'Característica' : 'Feature'}
                   </th>
-                  <th style={{ padding: '1rem 1.25rem', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700, width: '25%', textAlign: 'center' }}>
-                    <div>{isEs ? 'Plan Gratuito' : 'Free Plan'}</div>
+                  <th style={{ padding: '1rem 0.75rem', color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 700, width: '17%', textAlign: 'center' }}>
+                    <div>{isEs ? 'Gratis' : 'Free'}</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '0.2rem' }}>
-                      $0 · {isEs ? 'Gratis para siempre' : 'Free forever'}
+                      $0
                     </div>
                   </th>
-                  <th style={{ padding: '1rem 1.25rem', color: '#f59e0b', fontSize: '0.95rem', fontWeight: 800, width: '25%', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Star size={16} fill="#f59e0b" color="#f59e0b" /> Pathd Premium
+                  <th style={{ padding: '1rem 0.75rem', color: 'var(--color-movie)', fontSize: '0.9rem', fontWeight: 800, width: '17%', textAlign: 'center' }}>
+                    <div>{isEs ? 'Pack de Streaming' : 'Streaming Pack'}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, marginTop: '0.2rem' }}>
+                      $1.99 <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span>
                     </div>
-                    <div style={{ fontSize: '0.9rem', color: '#f59e0b', fontWeight: 700, marginTop: '0.2rem' }}>
-                      $4.99 USD / {isEs ? 'mes' : 'mo'}
+                  </th>
+                  <th style={{ padding: '1rem 0.75rem', color: 'var(--color-manga)', fontSize: '0.9rem', fontWeight: 800, width: '17%', textAlign: 'center' }}>
+                    <div>{isEs ? 'Pack de Lectura' : 'Reading Pack'}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, marginTop: '0.2rem' }}>
+                      $1.99 <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span>
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '0.1rem' }}>
-                      {isEs ? 'Prueba gratis de 7 días · Cancela cuando quieras' : '7-day free trial · Cancel anytime'}
+                  </th>
+                  <th style={{ padding: '1rem 0.75rem', color: '#f59e0b', fontSize: '0.9rem', fontWeight: 800, width: '17%', textAlign: 'center', background: 'rgba(245, 158, 11, 0.05)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Star size={14} fill="#f59e0b" color="#f59e0b" /> {isEs ? 'Pack Premium' : 'Premium Pack'}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 700, marginTop: '0.2rem' }}>
+                      $3.99 <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '0.1rem' }}>
+                      {isEs ? 'o $29.99 / año' : 'or $29.99 / yr'}
                     </div>
                   </th>
                 </tr>
@@ -266,13 +281,19 @@ export const Landing: React.FC = () => {
               <tbody>
                 {planComparison.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: idx === planComparison.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 500 }}>
+                    <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}>
                       {row.feature}
                     </td>
-                    <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'center', fontWeight: 600 }}>
+                    <td style={{ padding: '0.85rem 0.75rem', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'center', fontWeight: 600 }}>
                       {row.free}
                     </td>
-                    <td style={{ padding: '0.85rem 1.25rem', color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'center', fontWeight: 700, background: 'rgba(245, 158, 11, 0.04)' }}>
+                    <td style={{ padding: '0.85rem 0.75rem', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'center', fontWeight: 600 }}>
+                      {row.streaming}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'center', fontWeight: 600 }}>
+                      {row.reading}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'center', fontWeight: 700, background: 'rgba(245, 158, 11, 0.04)' }}>
                       {row.premium}
                     </td>
                   </tr>
@@ -284,30 +305,48 @@ export const Landing: React.FC = () => {
 
         {/* Mobile Comparison Feature-by-Feature Cards */}
         <div className="plan-comparison-mobile">
-          <div className="plan-mobile-summary-header">
+          <div className="plan-mobile-summary-header" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <div className="plan-mobile-summary-card free">
-              <span className="plan-mobile-summary-name">{isEs ? 'Plan Gratuito' : 'Free Plan'}</span>
+              <span className="plan-mobile-summary-name">{isEs ? 'Gratis' : 'Free'}</span>
               <span className="plan-mobile-summary-price">$0</span>
-              <span className="plan-mobile-summary-sub">{isEs ? 'Gratis para siempre' : 'Free forever'}</span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'Para siempre' : 'Forever'}</span>
+            </div>
+            <div className="plan-mobile-summary-card" style={{ borderColor: 'color-mix(in srgb, var(--color-movie) 35%, transparent)', background: 'color-mix(in srgb, var(--color-movie) 6%, transparent)' }}>
+              <span className="plan-mobile-summary-name" style={{ color: 'var(--color-movie)' }}>{isEs ? 'Pack Streaming' : 'Streaming Pack'}</span>
+              <span className="plan-mobile-summary-price">$1.99 <span style={{ fontSize: '0.68rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span></span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'Pelis, Series, Anime' : 'Movies, TV, Anime'}</span>
+            </div>
+            <div className="plan-mobile-summary-card" style={{ borderColor: 'color-mix(in srgb, var(--color-manga) 35%, transparent)', background: 'color-mix(in srgb, var(--color-manga) 6%, transparent)' }}>
+              <span className="plan-mobile-summary-name" style={{ color: 'var(--color-manga)' }}>{isEs ? 'Pack Lectura' : 'Reading Pack'}</span>
+              <span className="plan-mobile-summary-price">$1.99 <span style={{ fontSize: '0.68rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span></span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'Libros, Cómics, Manga' : 'Books, Comics, Manga'}</span>
             </div>
             <div className="plan-mobile-summary-card premium">
               <span className="plan-mobile-summary-name">
-                <Star size={14} fill="#f59e0b" color="#f59e0b" /> Pathd Premium
+                <Star size={13} fill="#f59e0b" color="#f59e0b" /> {isEs ? 'Pack Premium' : 'Premium Pack'}
               </span>
               <span className="plan-mobile-summary-price">
-                $4.99 USD <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>/ {isEs ? 'mes' : 'mo'}</span>
+                $3.99 <span style={{ fontSize: '0.68rem', fontWeight: 500 }}>/ {isEs ? 'mes' : 'mo'}</span>
               </span>
-              <span className="plan-mobile-summary-sub">{isEs ? 'Prueba gratis de 7 días' : '7-day free trial'}</span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'o $29.99 / año' : 'or $29.99 / yr'}</span>
             </div>
           </div>
 
           {planComparison.map((row, idx) => (
             <div key={idx} className="plan-mobile-feature-card">
               <div className="plan-mobile-feature-title">{row.feature}</div>
-              <div className="plan-mobile-comparison-grid">
+              <div className="plan-mobile-comparison-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
                 <div className="plan-mobile-col free">
                   <span className="plan-mobile-badge free">{isEs ? 'Gratis' : 'Free'}</span>
                   <span className="plan-mobile-value free">{row.free}</span>
+                </div>
+                <div className="plan-mobile-col" style={{ background: 'color-mix(in srgb, var(--color-movie) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-movie) 25%, transparent)', borderRadius: '8px', padding: '0.45rem' }}>
+                  <span className="plan-mobile-badge" style={{ color: 'var(--color-movie)' }}>Streaming</span>
+                  <span className="plan-mobile-value">{row.streaming}</span>
+                </div>
+                <div className="plan-mobile-col" style={{ background: 'color-mix(in srgb, var(--color-manga) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-manga) 25%, transparent)', borderRadius: '8px', padding: '0.45rem' }}>
+                  <span className="plan-mobile-badge" style={{ color: 'var(--color-manga)' }}>{isEs ? 'Lectura' : 'Reading'}</span>
+                  <span className="plan-mobile-value">{row.reading}</span>
                 </div>
                 <div className="plan-mobile-col premium">
                   <span className="plan-mobile-badge premium">
