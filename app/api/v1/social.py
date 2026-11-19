@@ -842,30 +842,77 @@ def get_discover_feed(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
+    from sqlalchemy import func
+
     accept_lang = request.headers.get("Accept-Language", "es")
     parts = accept_lang.split("-")
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    # Discover feed: activities from public users, not hidden, no comment events
+    # Discover feed: activities from public users (excluding self and already-followed users),
+    # not hidden, no comment events, ranked by recency + engagement (likes & comments)
     public_users_query = db.query(User.id).filter(User.is_private == False)
     comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
 
-    activity_records = db.query(UserActivityLog).filter(
+    filters = [
         UserActivityLog.user_id.in_(public_users_query),
         UserActivityLog.is_hidden == False,
-        ~UserActivityLog.activity_type.in_(comment_types)
-    ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
+        ~UserActivityLog.activity_type.in_(comment_types),
+    ]
+    if current_user:
+        followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
+        filters.append(UserActivityLog.user_id != current_user.id)
+        filters.append(~UserActivityLog.user_id.in_(followed_ids_query))
+
+    pool_limit = max(120, (skip + limit) * 4)
+    activity_records = db.query(UserActivityLog).filter(
+        *filters
+    ).order_by(UserActivityLog.created_at.desc()).limit(pool_limit).all()
+
+    if not activity_records:
+        return []
+
+    act_ids = [r.id for r in activity_records]
+    likes_map = dict(
+        db.query(ActivityLike.activity_id, func.count(ActivityLike.id))
+        .filter(ActivityLike.activity_id.in_(act_ids))
+        .group_by(ActivityLike.activity_id)
+        .all()
+    )
+    comments_map = dict(
+        db.query(ActivityComment.activity_id, func.count(ActivityComment.id))
+        .filter(ActivityComment.activity_id.in_(act_ids))
+        .group_by(ActivityComment.activity_id)
+        .all()
+    )
+
+    now_utc = datetime.now(timezone.utc)
+
+    def _discover_score(rec: UserActivityLog) -> float:
+        created = rec.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age_hours = max(0.0, (now_utc - created).total_seconds() / 3600.0)
+        likes = likes_map.get(rec.id, 0)
+        comments = comments_map.get(rec.id, 0)
+        engagement = 1.0 + (likes * 2.0) + (comments * 3.0)
+        return engagement / ((age_hours + 2.0) ** 1.25)
+
+    ranked_records = sorted(activity_records, key=_discover_score, reverse=True)
 
     uid = current_user.id if current_user else None
-    feed = []
+    deduped_records = []
     seen_favorite_keys = set()
-    for r in activity_records:
+    for r in ranked_records:
         if r.activity_type in ("item_favorited", "shelf_favorite"):
             fav_key = (r.user_id, r.activity_type, str(r.external_id or r.item_title or r.id).strip().lower())
             if fav_key in seen_favorite_keys:
                 continue
             seen_favorite_keys.add(fav_key)
+        deduped_records.append(r)
+
+    feed = []
+    for r in deduped_records[skip : skip + limit]:
         item = _format_activity_item(r, db, uid, client_lang, client_country)
         if item:
             feed.append(item)
@@ -884,14 +931,20 @@ def get_reviews_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    # Review activities: item_reviewed, guide_rated, item_rated
+    # Review activities: item_reviewed, guide_rated, item_rated (excluding own reviews)
     review_types = ["item_reviewed", "guide_rated", "item_rated"]
     public_users_query = db.query(User.id).filter(User.is_private == False)
 
-    activity_records = db.query(UserActivityLog).filter(
+    filters = [
         UserActivityLog.user_id.in_(public_users_query),
         UserActivityLog.is_hidden == False,
         UserActivityLog.activity_type.in_(review_types)
+    ]
+    if current_user:
+        filters.append(UserActivityLog.user_id != current_user.id)
+
+    activity_records = db.query(UserActivityLog).filter(
+        *filters
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     uid = current_user.id if current_user else None
