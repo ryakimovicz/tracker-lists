@@ -15,6 +15,7 @@ from app.models.addition import ListAddition, ListAdditionItem, UserAdoptedAddit
 from app.models.activity import UserActivityLog
 from app.models.consumption import ConsumptionHistory
 from app.models.translation import TranslationCache
+from app.models.explore_cache import ExploreGlobalCache
 
 __all__ = [
     "Base",
@@ -51,5 +52,6 @@ __all__ = [
     "AdditionComment",
     "UserActivityLog",
     "ConsumptionHistory",
-    "TranslationCache"
+    "TranslationCache",
+    "ExploreGlobalCache"
 ]

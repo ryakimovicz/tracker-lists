@@ -93,8 +93,7 @@ def run_database_migrations():
             else:
                 logger.info("Alembic: Applying pending migrations to head...")
                 command.upgrade(alembic_cfg, "head")
-        else:
-            Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
     except Exception as e:
         logger.warning(f"Alembic auto-migration encountered an issue: {e}. Ensuring tables via Base.metadata.create_all.")
         Base.metadata.create_all(bind=engine)

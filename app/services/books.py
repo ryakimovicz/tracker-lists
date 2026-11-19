@@ -798,7 +798,10 @@ class BookSearchService:
 
         try:
             url = "https://openlibrary.org/trending/daily.json?limit=35"
-            data = cls._ol_request(url, timeout=8)
+            data = cls._ol_request(url, timeout=14)
+            if not data:
+                # Fallback to weekly trending if daily endpoint timed out
+                data = cls._ol_request("https://openlibrary.org/trending/weekly.json?limit=35", timeout=14)
             if data and isinstance(data, dict):
                 for work in data.get("works", []):
                     title = work.get("title") or "Untitled Book"

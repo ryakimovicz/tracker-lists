@@ -94,7 +94,7 @@ class TVMazeService:
             if len(cls._request_timestamps) >= 18:
                 sleep_needed = 10.0 - (now - cls._request_timestamps[0]) + 0.1
                 if sleep_needed > 0:
-                    if sleep_needed <= 3.5:
+                    if sleep_needed <= 10.5:
                         logger.info(f"TVMaze sliding window rate pacing (18/10s), waiting {sleep_needed:.2f}s...")
                         time.sleep(sleep_needed)
                         now = time.time()
@@ -525,12 +525,11 @@ class TVMazeService:
                 return data
 
         today = datetime.date.today()
-        # Look back up to 14 days to capture ongoing anime across 2 full broadcast weeks
-        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14)]
+        # Look back up to 7 days to capture ongoing anime across broadcast week
+        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
         
         urls = []
         for d in dates:
-            urls.append(f"https://api.tvmaze.com/schedule/web?date={d}")
             urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=JP")
 
         def fetch_url(u):
@@ -626,7 +625,7 @@ class TVMazeService:
 
     @classmethod
     def get_trending_series(cls) -> List[SearchResultItem]:
-        cache_key = "tvmaze_trending_series_wiki_v4"
+        cache_key = "tvmaze_trending_series_wiki_v5"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]

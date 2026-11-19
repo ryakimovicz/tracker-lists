@@ -819,10 +819,222 @@ class ExploreTabsResponse(BaseModel):
     tendencias: List[SearchResultItem] = []
     descubrir: List[SearchResultItem] = []
 
-# In-memory TTL cache for explore new & trending items
+import threading
+from app.core.database import SessionLocal
+from app.models.explore_cache import ExploreGlobalCache
+
+# Shared in-memory + DB persistent TTL cache for explore new & trending items
 _EXPLORE_NUEVO_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _EXPLORE_TENDENCIAS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _EXPLORE_CACHE_TTL = 4 * 3600  # 4 hours
+
+_EXPLORE_REFRESH_LOCK = threading.Lock()
+_EXPLORE_REFRESH_IN_PROGRESS = {"nuevo": False, "tendencias": False}
+
+def _serialize_explore_items(items: List[SearchResultItem]) -> str:
+    data = []
+    for x in items:
+        if hasattr(x, "model_dump"):
+            data.append(x.model_dump())
+        else:
+            data.append(x.dict())
+    return json.dumps(data, ensure_ascii=False)
+
+def _deserialize_explore_items(payload_json: str) -> List[SearchResultItem]:
+    try:
+        raw_list = json.loads(payload_json)
+        if isinstance(raw_list, list):
+            return [SearchResultItem(**item) for item in raw_list if isinstance(item, dict)]
+    except Exception as e:
+        print(f"Error deserializing explore cache from DB: {e}")
+    return []
+
+def _load_explore_cache_from_db(cache_key: str, mem_cache: Dict[str, Tuple[float, List[SearchResultItem]]]) -> Optional[Tuple[float, List[SearchResultItem]]]:
+    db = SessionLocal()
+    try:
+        row = db.query(ExploreGlobalCache).filter(ExploreGlobalCache.cache_key == cache_key).first()
+        if row and row.payload_json:
+            items = _deserialize_explore_items(row.payload_json)
+            if items:
+                mem_cache[cache_key] = (row.updated_at, items)
+                return row.updated_at, items
+    except Exception as e:
+        print(f"Error loading explore cache {cache_key} from DB: {e}")
+    finally:
+        db.close()
+    return None
+
+def _save_explore_cache_to_db(cache_key: str, updated_at: float, items: List[SearchResultItem]) -> None:
+    if not items:
+        return
+    db = SessionLocal()
+    try:
+        payload_str = _serialize_explore_items(items)
+        row = db.query(ExploreGlobalCache).filter(ExploreGlobalCache.cache_key == cache_key).first()
+        if row:
+            row.payload_json = payload_str
+            row.updated_at = updated_at
+        else:
+            row = ExploreGlobalCache(
+                cache_key=cache_key,
+                payload_json=payload_str,
+                updated_at=updated_at
+            )
+            db.add(row)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving explore cache {cache_key} to DB: {e}")
+    finally:
+        db.close()
+
+_EXPLORE_EXPECTED_ITEM_TYPES = {"series", "anime", "manga", "game", "movie", "book", "comic"}
+
+def _has_all_expected_categories(items: List[SearchResultItem]) -> bool:
+    if not items:
+        return False
+    present_types = {x.item_type for x in items}
+    return _EXPLORE_EXPECTED_ITEM_TYPES.issubset(present_types)
+
+def _backfill_missing_explore_categories(section: str, cache_key: str, current_items: List[SearchResultItem], mem_cache: Dict[str, Tuple[float, List[SearchResultItem]]]) -> List[SearchResultItem]:
+    """Fetch only the specific category providers that are missing from current_items."""
+    import time
+    present_types = {x.item_type for x in current_items}
+    missing = _EXPLORE_EXPECTED_ITEM_TYPES - present_types
+    if not missing:
+        return current_items
+
+    added: List[SearchResultItem] = []
+    if section == "nuevo":
+        provider_map = {
+            "series": lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "anime": lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "manga": lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "game": lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "movie": lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "book": lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "comic": lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]),
+        }
+    else:
+        provider_map = {
+            "series": lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "anime": lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "manga": lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "game": lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "movie": lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "book": lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]),
+            "comic": lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]),
+        }
+
+    for m_type in missing:
+        fn = provider_map.get(m_type)
+        if fn:
+            try:
+                res = fn()
+                if res:
+                    added.extend(res)
+            except Exception as e:
+                print(f"Error backfilling {section} category {m_type}: {e}")
+
+    if added:
+        updated_items = list(current_items) + added
+        now_ts = time.time()
+        mem_cache[cache_key] = (now_ts, updated_items)
+        _save_explore_cache_to_db(cache_key, now_ts, updated_items)
+        return updated_items
+    return current_items
+
+def _merge_with_previous_categories(new_items: List[SearchResultItem], prev_items: List[SearchResultItem]) -> List[SearchResultItem]:
+    """If an external API temporarily failed and returned 0 items for its item_type, retain previous items of that type."""
+    if not prev_items:
+        return new_items
+    present_types = {x.item_type for x in new_items}
+    merged = list(new_items)
+    for item in prev_items:
+        if item.item_type not in present_types:
+            merged.append(item)
+    return merged
+
+def _refresh_explore_nuevo_sync(cache_key: str) -> List[SearchResultItem]:
+    import time
+    now_ts = time.time()
+    prev_items = _EXPLORE_NUEVO_CACHE.get(cache_key, (0, []))[1]
+    fetched_nuevo: List[SearchResultItem] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        futures_nuevo = {
+            "tv": executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "anime": executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "manga": executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "games": executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "movies": executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "books": executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "comics": executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[])),
+        }
+        for k, fut in futures_nuevo.items():
+            try:
+                res = fut.result()
+                if res:
+                    fetched_nuevo.extend(res)
+            except Exception as e:
+                print(f"Error in nuevo task {k}: {e}")
+
+    final_items = _merge_with_previous_categories(fetched_nuevo, prev_items)
+    if final_items:
+        _EXPLORE_NUEVO_CACHE[cache_key] = (now_ts, final_items)
+        _save_explore_cache_to_db(cache_key, now_ts, final_items)
+    return final_items
+
+def _refresh_explore_tendencias_sync(cache_key: str) -> List[SearchResultItem]:
+    import time
+    now_ts = time.time()
+    prev_items = _EXPLORE_TENDENCIAS_CACHE.get(cache_key, (0, []))[1]
+    fetched_trend: List[SearchResultItem] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        futures_trend = {
+            "tv": executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "anime": executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "manga": executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "games": executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "movies": executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "books": executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[])),
+            "comics": executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[])),
+        }
+        for k, fut in futures_trend.items():
+            try:
+                res = fut.result()
+                if res:
+                    fetched_trend.extend(res)
+            except Exception as e:
+                print(f"Error in tendencias task {k}: {e}")
+
+    final_items = _merge_with_previous_categories(fetched_trend, prev_items)
+    if final_items:
+        _EXPLORE_TENDENCIAS_CACHE[cache_key] = (now_ts, final_items)
+        _save_explore_cache_to_db(cache_key, now_ts, final_items)
+    return final_items
+
+def _trigger_background_explore_refresh(section: str, cache_key: str) -> None:
+    with _EXPLORE_REFRESH_LOCK:
+        if _EXPLORE_REFRESH_IN_PROGRESS.get(section):
+            return
+        _EXPLORE_REFRESH_IN_PROGRESS[section] = True
+
+    def _worker():
+        try:
+            if section == "nuevo":
+                _refresh_explore_nuevo_sync(cache_key)
+            elif section == "tendencias":
+                _refresh_explore_tendencias_sync(cache_key)
+        except Exception as e:
+            print(f"Background explore refresh error ({section}): {e}")
+        finally:
+            with _EXPLORE_REFRESH_LOCK:
+                _EXPLORE_REFRESH_IN_PROGRESS[section] = False
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
 
 @router.get("/explore/tabs", response_model=ExploreTabsResponse)
 @limiter.limit("60/minute")
@@ -832,7 +1044,6 @@ def get_explore_tabs(
     current_user: User = Depends(get_current_user_optional)
 ):
     import time
-    import concurrent.futures
     now_ts = time.time()
     agregado = []
     
@@ -867,72 +1078,48 @@ def get_explore_tabs(
             return False
         return True
 
-    # 2. Nuevo (APIs with 4-hour in-memory cache)
+    # 2. Nuevo (Global shared cache: RAM -> DB -> Stale-While-Revalidate background refresh)
     cache_key_nuevo = "explore_nuevo_global_v18"
-    nuevo = []
-    if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
-        cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
-        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
-            nuevo = [x for x in cached_items if is_item_allowed(x)]
+    nuevo_entry = _EXPLORE_NUEVO_CACHE.get(cache_key_nuevo)
+    if not nuevo_entry:
+        nuevo_entry = _load_explore_cache_from_db(cache_key_nuevo, _EXPLORE_NUEVO_CACHE)
 
-    # 3. Tendencias (APIs with 4-hour in-memory cache)
-    cache_key_trend = "explore_tendencias_global_v14"
-    tendencias = []
-    if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
-        cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]
-        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
-            tendencias = [x for x in cached_items if is_item_allowed(x)]
+    # 3. Tendencias (Global shared cache: RAM -> DB -> Stale-While-Revalidate background refresh)
+    cache_key_trend = "explore_tendencias_global_v16"
+    trend_entry = _EXPLORE_TENDENCIAS_CACHE.get(cache_key_trend)
+    if not trend_entry:
+        trend_entry = _load_explore_cache_from_db(cache_key_trend, _EXPLORE_TENDENCIAS_CACHE)
 
-    tasks_to_run = []
-    need_nuevo = (len(nuevo) == 0)
-    need_tendencias = (len(tendencias) == 0)
+    # If completely empty (first ever boot on an empty DB), acquire lock so only 1 request populates it
+    if not nuevo_entry or not trend_entry:
+        with _EXPLORE_REFRESH_LOCK:
+            nuevo_entry = _EXPLORE_NUEVO_CACHE.get(cache_key_nuevo) or _load_explore_cache_from_db(cache_key_nuevo, _EXPLORE_NUEVO_CACHE)
+            trend_entry = _EXPLORE_TENDENCIAS_CACHE.get(cache_key_trend) or _load_explore_cache_from_db(cache_key_trend, _EXPLORE_TENDENCIAS_CACHE)
+            if not nuevo_entry:
+                items_n = _refresh_explore_nuevo_sync(cache_key_nuevo)
+                nuevo_entry = (time.time(), items_n)
+            if not trend_entry:
+                items_t = _refresh_explore_tendencias_sync(cache_key_trend)
+                trend_entry = (time.time(), items_t)
+    else:
+        # Check if any category is missing from the cached snapshot and backfill only that missing category
+        if not _has_all_expected_categories(nuevo_entry[1]):
+            with _EXPLORE_REFRESH_LOCK:
+                updated_n = _backfill_missing_explore_categories("nuevo", cache_key_nuevo, nuevo_entry[1], _EXPLORE_NUEVO_CACHE)
+                nuevo_entry = (nuevo_entry[0], updated_n)
+        if not _has_all_expected_categories(trend_entry[1]):
+            with _EXPLORE_REFRESH_LOCK:
+                updated_t = _backfill_missing_explore_categories("tendencias", cache_key_trend, trend_entry[1], _EXPLORE_TENDENCIAS_CACHE)
+                trend_entry = (trend_entry[0], updated_t)
 
-    if need_nuevo or need_tendencias:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
-            futures_nuevo = {}
-            futures_trend = {}
+        # Stale-While-Revalidate: serve cached items immediately (0 API calls) and refresh in background if TTL expired
+        if now_ts - nuevo_entry[0] >= _EXPLORE_CACHE_TTL:
+            _trigger_background_explore_refresh("nuevo", cache_key_nuevo)
+        if now_ts - trend_entry[0] >= _EXPLORE_CACHE_TTL:
+            _trigger_background_explore_refresh("tendencias", cache_key_trend)
 
-            if need_nuevo:
-                futures_nuevo["tv"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
-
-            if need_tendencias:
-                futures_trend["tv"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
-
-            if need_nuevo:
-                fetched_nuevo = []
-                for k, fut in futures_nuevo.items():
-                    try:
-                        res = fut.result()
-                        fetched_nuevo.extend(res)
-                    except Exception as e:
-                        print(f"Error in nuevo task {k}: {e}")
-                if fetched_nuevo:
-                    _EXPLORE_NUEVO_CACHE[cache_key_nuevo] = (now_ts, fetched_nuevo)
-                    nuevo = [x for x in fetched_nuevo if is_item_allowed(x)]
-
-            if need_tendencias:
-                fetched_trend = []
-                for k, fut in futures_trend.items():
-                    try:
-                        res = fut.result()
-                        fetched_trend.extend(res)
-                    except Exception as e:
-                        print(f"Error in tendencias task {k}: {e}")
-                if fetched_trend:
-                    _EXPLORE_TENDENCIAS_CACHE[cache_key_trend] = (now_ts, fetched_trend)
-                    tendencias = [x for x in fetched_trend if is_item_allowed(x)]
+    nuevo = [x for x in (nuevo_entry[1] if nuevo_entry else []) if is_item_allowed(x)]
+    tendencias = [x for x in (trend_entry[1] if trend_entry else []) if is_item_allowed(x)]
 
     return ExploreTabsResponse(
         agregado=agregado,
