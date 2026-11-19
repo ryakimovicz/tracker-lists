@@ -854,6 +854,9 @@ def _load_explore_cache_from_db(cache_key: str, mem_cache: Dict[str, Tuple[float
     try:
         row = db.query(ExploreGlobalCache).filter(ExploreGlobalCache.cache_key == cache_key).first()
         if row and row.payload_json:
+            mem_entry = mem_cache.get(cache_key)
+            if mem_entry and mem_entry[0] >= row.updated_at and len(mem_entry[1]) > 0:
+                return mem_entry
             items = _deserialize_explore_items(row.payload_json)
             if items:
                 mem_cache[cache_key] = (row.updated_at, items)
@@ -862,7 +865,7 @@ def _load_explore_cache_from_db(cache_key: str, mem_cache: Dict[str, Tuple[float
         print(f"Error loading explore cache {cache_key} from DB: {e}")
     finally:
         db.close()
-    return None
+    return mem_cache.get(cache_key)
 
 def _save_explore_cache_to_db(cache_key: str, updated_at: float, items: List[SearchResultItem]) -> None:
     if not items:
@@ -1078,17 +1081,13 @@ def get_explore_tabs(
             return False
         return True
 
-    # 2. Nuevo (Global shared cache: RAM -> DB -> Stale-While-Revalidate background refresh)
+    # 2. Nuevo (Global shared cache: RAM <-> DB -> Stale-While-Revalidate background refresh)
     cache_key_nuevo = "explore_nuevo_global_v18"
-    nuevo_entry = _EXPLORE_NUEVO_CACHE.get(cache_key_nuevo)
-    if not nuevo_entry:
-        nuevo_entry = _load_explore_cache_from_db(cache_key_nuevo, _EXPLORE_NUEVO_CACHE)
+    nuevo_entry = _load_explore_cache_from_db(cache_key_nuevo, _EXPLORE_NUEVO_CACHE)
 
-    # 3. Tendencias (Global shared cache: RAM -> DB -> Stale-While-Revalidate background refresh)
+    # 3. Tendencias (Global shared cache: RAM <-> DB -> Stale-While-Revalidate background refresh)
     cache_key_trend = "explore_tendencias_global_v16"
-    trend_entry = _EXPLORE_TENDENCIAS_CACHE.get(cache_key_trend)
-    if not trend_entry:
-        trend_entry = _load_explore_cache_from_db(cache_key_trend, _EXPLORE_TENDENCIAS_CACHE)
+    trend_entry = _load_explore_cache_from_db(cache_key_trend, _EXPLORE_TENDENCIAS_CACHE)
 
     # If completely empty (first ever boot on an empty DB), acquire lock so only 1 request populates it
     if not nuevo_entry or not trend_entry:

@@ -792,7 +792,7 @@ class TVMazeService:
 
     @classmethod
     def get_trending_anime(cls) -> List[SearchResultItem]:
-        cache_key = "tvmaze_trending_anime_anilist_v3"
+        cache_key = "tvmaze_trending_anime_anilist_v4"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]
@@ -805,8 +805,9 @@ class TVMazeService:
         seen_ids = set()
         seen_titles = set()
 
-        # 1. Fetch current trending anime from AniList (pure community trending algorithm)
+        # 1. Fetch current trending anime from AniList (pure community trending algorithm + animation studio)
         anilist_norms = []
+        anilist_studio_by_norm = {}
         try:
             from app.services.anilist import AnilistService
             graphql_query = """
@@ -816,6 +817,14 @@ class TVMazeService:
                   id
                   title { romaji english }
                   synonyms
+                  studios(isMain: true) {
+                    edges {
+                      isMain
+                      node {
+                        name
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -826,13 +835,26 @@ class TVMazeService:
                 for item in al_media:
                     t_obj = item.get("title") or {}
                     syns = item.get("synonyms") or []
+                    studio_name = AnilistService._extract_anime_studio(item.get("studios"))
                     for raw_t in [t_obj.get("english"), t_obj.get("romaji")] + syns:
                         if raw_t:
                             norm = re.sub(r'[^a-z0-9]', '', raw_t.lower())
-                            if len(norm) >= 4 and norm not in anilist_norms:
-                                anilist_norms.append(norm)
+                            if len(norm) >= 4:
+                                if norm not in anilist_norms:
+                                    anilist_norms.append(norm)
+                                if studio_name and norm not in anilist_studio_by_norm:
+                                    anilist_studio_by_norm[norm] = studio_name
         except Exception as e:
             print(f"Error fetching AniList trending anime: {e}")
+
+        def resolve_anime_creator(show: dict) -> Optional[str]:
+            name_norm = re.sub(r'[^a-z0-9]', '', (show.get("name") or "").lower())
+            if name_norm in anilist_studio_by_norm:
+                return anilist_studio_by_norm[name_norm]
+            for an, st in anilist_studio_by_norm.items():
+                if len(an) >= 5 and (name_norm in an or an in name_norm):
+                    return st
+            return extract_network_or_platform(show)
 
         # 2. Fetch TVMaze anime airing this week (live daily releases)
         today = datetime.date.today()
@@ -890,6 +912,7 @@ class TVMazeService:
                     image_url=image_url,
                     description=show.get("summary", ""),
                     item_type="anime",
+                    creator=resolve_anime_creator(show),
                     release_date=show.get("premiered"),
                     popularity=show.get("weight", 0)
                 ))
@@ -922,6 +945,7 @@ class TVMazeService:
                                     image_url=image_url,
                                     description=show.get("summary", ""),
                                     item_type="anime",
+                                    creator=resolve_anime_creator(show),
                                     release_date=show.get("premiered"),
                                     popularity=show.get("weight", 0)
                                 ))
