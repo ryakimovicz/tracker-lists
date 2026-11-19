@@ -134,8 +134,8 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Los pagos y suscripciones de Pathd Premium son gestionados de forma segura por nuestro Merchant of Record, Dodo Payments (dodopayments.com). Pathd nunca almacena, procesa ni tiene acceso a tus números completos de tarjeta de crédito o información bancaria confidencial. Las suscripciones se renuevan automáticamente cada mes y pueden cancelarse en cualquier momento desde tu panel de usuario.'
-              : 'Payments and subscriptions for Pathd Premium are securely handled by our Merchant of Record, Dodo Payments (dodopayments.com). Pathd never stores, processes, or has access to your full credit card numbers or sensitive banking details. Subscriptions renew automatically on a monthly basis and can be cancelled at any time from your account settings.'}
+              ? 'Los pagos y suscripciones de Pathd (Pack de Streaming, Pack de Lectura y Pack Premium) son gestionados de forma segura por nuestro Merchant of Record, Dodo Payments (dodopayments.com). Pathd nunca almacena, procesa ni tiene acceso a tus números completos de tarjeta de crédito o información bancaria confidencial. Las suscripciones se renuevan automáticamente de forma mensual o anual según el plan elegido y pueden cancelarse en cualquier momento desde tu panel de usuario.'
+              : 'Payments and subscriptions for Pathd (Streaming Pack, Reading Pack, and Premium Pack) are securely handled by our Merchant of Record, Dodo Payments (dodopayments.com). Pathd never stores, processes, or has access to your full credit card numbers or sensitive banking details. Subscriptions renew automatically on a monthly or annual basis depending on the selected plan and can be cancelled at any time from your account settings.'}
           </p>
         </section>
 
