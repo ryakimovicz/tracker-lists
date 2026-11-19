@@ -303,43 +303,66 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               transition: 'all 0.15s ease'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Star size={15} fill="#f59e0b" color="#f59e0b" /> {isEs ? 'Pack Premium' : 'Premium Pack'}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedPlan('premium');
-                    setPremiumBilling(prev => prev === 'annual' ? 'monthly' : 'annual');
-                  }}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontWeight: 800, fontSize: '1rem', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Star size={15} fill="#f59e0b" color="#f59e0b" /> {isEs ? 'Pack Premium' : 'Premium Pack'}
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: premiumBilling === 'annual' ? '#0f172a' : 'var(--text-secondary)',
-                    background: premiumBilling === 'annual' ? '#f59e0b' : 'var(--bg-secondary)',
-                    border: `1px solid ${premiumBilling === 'annual' ? '#f59e0b' : 'var(--border-color)'}`,
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '999px',
-                    padding: '0.18rem 0.55rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    padding: '0.15rem',
+                    gap: '0.15rem'
                   }}
                 >
-                  <Check size={12} strokeWidth={3} style={{ opacity: premiumBilling === 'annual' ? 1 : 0.45 }} />
-                  <span>{isEs ? 'Anual -37%' : 'Annual -37%'}</span>
-                </button>
-              </div>
-              <span style={{ fontWeight: 800, fontSize: '1.02rem', color: 'var(--text-primary)' }}>
-                {premiumBilling === 'monthly' ? '$3.99' : '$29.99'}{' '}
-                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>
-                  / {premiumBilling === 'monthly' ? (isEs ? 'mes' : 'mo') : (isEs ? 'año' : 'yr')}
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedPlan('premium'); setPremiumBilling('monthly'); }}
+                    style={{
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '999px',
+                      border: 'none',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: premiumBilling === 'monthly' ? '#f59e0b' : 'transparent',
+                      color: premiumBilling === 'monthly' ? '#0f172a' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isEs ? 'Mes' : 'Mo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedPlan('premium'); setPremiumBilling('annual'); }}
+                    style={{
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '999px',
+                      border: 'none',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: premiumBilling === 'annual' ? '#f59e0b' : 'transparent',
+                      color: premiumBilling === 'annual' ? '#0f172a' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isEs ? 'Año -37%' : 'Yr -37%'}
+                  </button>
+                </div>
+
+                <span style={{ fontWeight: 800, fontSize: '1.02rem', color: 'var(--text-primary)' }}>
+                  {premiumBilling === 'monthly' ? '$3.99' : '$29.99'}
+                  <span style={{ fontSize: '0.74rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                    /{premiumBilling === 'monthly' ? (isEs ? 'mes' : 'mo') : (isEs ? 'año' : 'yr')}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
 
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.28rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -410,16 +433,29 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   padding: '0.85rem',
                   fontSize: '1rem',
                   fontWeight: 700,
-                  background: 'var(--accent-primary)',
+                  background: selectedPlan === 'streaming'
+                    ? 'var(--color-movie)'
+                    : selectedPlan === 'reading'
+                      ? 'var(--color-manga)'
+                      : '#f59e0b',
                   border: 'none',
-                  color: 'var(--accent-text, #0f172a)',
+                  color: selectedPlan === 'streaming'
+                    ? 'var(--color-text-movie, #0f172a)'
+                    : selectedPlan === 'reading'
+                      ? 'var(--color-text-manga, #0f172a)'
+                      : '#0f172a',
                   borderRadius: '10px',
-                  boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                  boxShadow: selectedPlan === 'streaming'
+                    ? '0 4px 15px color-mix(in srgb, var(--color-movie) 35%, transparent)'
+                    : selectedPlan === 'reading'
+                      ? '0 4px 15px color-mix(in srgb, var(--color-manga) 35%, transparent)'
+                      : '0 4px 15px rgba(245, 158, 11, 0.4)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
                   cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s ease, box-shadow 0.15s ease'
                 }}
                 onClick={handleSubscribe}
                 disabled={loading}
