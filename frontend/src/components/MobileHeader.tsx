@@ -60,9 +60,9 @@ export const MobileHeader: React.FC = () => {
   return (
     <>
       <header className="mobile-header">
-        {/* Left Slot: Brand Logo (always links to home /) */}
+        {/* Left Slot: Brand Logo (tap triggers letter animation only, does not redirect) */}
         <div className="mobile-header-left">
-          <BrandLogo fontSize="1.65rem" />
+          <BrandLogo fontSize="1.65rem" disableLink={true} />
         </div>
 
         {/* Right Slot: Premium, Notifications, Auth Actions & Settings */}
