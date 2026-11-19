@@ -44,8 +44,8 @@ const translations: Translations = {
   featSearchTitle: { en: 'Guides & Cross-Media Universes', es: 'Guías y universos cronológicos' },
   featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. Organize complex sagas and franchises interleaving books, movies, shows, and games.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta ideal para organizar sagas y franquicias complejas intercalando libros, películas, series y juegos.' },
   
-  featModsTitle: { en: 'Community & Reviews Without Spoilers', es: 'Comunidad y reseñas sin spoilers' },
-  featModsDesc: { en: 'Follow friends\' progress, share reviews, and join comments with Klipy GIFs, stickers, and clips, with one-click anti-spoiler blurs.', es: 'Sigue el progreso de tus amigos, comparte opiniones y participa en comentarios con GIFs, stickers y clips de Klipy, con desenfoque anti-spoilers con un solo clic.' },
+  featModsTitle: { en: 'Community & Reviews', es: 'Comunidad y reseñas' },
+  featModsDesc: { en: 'Follow your friends\' progress, discover new profiles, share your reviews, and reply in comments with GIFs, reactions, and clips.', es: 'Sigue el progreso de tus amigos, descubre nuevos perfiles, comparte tus reseñas y participa en comentarios con GIFs, reacciones y clips.' },
 
   featMusicStatsTitle: { en: 'Music & Listening Stats', es: 'Música y estadísticas' },
   featMusicStatsDesc: { en: 'Connect your Last.fm profile, explore artists and albums, and see your real-time scrobbles directly in your unified profile.', es: 'Conecta tu cuenta de Last.fm, explora artistas y álbumes, y visualiza tus scrobbles en tiempo real junto al resto de tu entretenimiento.' },
