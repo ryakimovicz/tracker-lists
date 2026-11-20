@@ -1030,13 +1030,14 @@ export const CustomizePage: React.FC = () => {
               display: 'flex', 
               flexWrap: 'wrap', 
               justifyContent: 'center', 
-              gap: '0.85rem' 
+              gap: '0.85rem',
             }}
           >
             {PROFILE_THEME_COLORS.map((col) => {
               const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
               const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent || (col.id === 'amber' && (!selectedProfileColor || selectedProfileColor === 'default'));
               const isDefault = col.id === 'amber';
+              const isColorAllowed = isDefault || canCustomizeColor(user);
 
               return (
                 <button
@@ -1057,7 +1058,8 @@ export const CustomizePage: React.FC = () => {
                     borderRadius: '12px',
                     border: isSelected ? `2px solid ${activeColor}` : '1px solid var(--border-color)',
                     background: isSelected ? (theme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)') : 'var(--bg-secondary)',
-                    cursor: user?.is_pro ? 'pointer' : 'default',
+                    cursor: isColorAllowed ? 'pointer' : 'not-allowed',
+                    opacity: isColorAllowed ? 1 : 0.45,
                     transition: 'all 0.2s ease',
                     boxShadow: isSelected ? `0 0 14px ${activeColor}40` : 'none',
                     transform: isSelected ? 'scale(1.03)' : 'scale(1)',
@@ -1262,10 +1264,10 @@ export const CustomizePage: React.FC = () => {
                       borderBottom: isRowBeingDragged && pointerDrag?.isDragging ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
                       borderLeft: `4px solid ${catColor}`,
                       transition: 'all 0.15s ease',
-                      opacity: isRowBeingDragged && pointerDrag?.isDragging ? 0.45 : 1,
+                      opacity: isRowBeingDragged && pointerDrag?.isDragging ? 0.45 : (!isCategoryInPlan(user, cat) ? 0.45 : 1),
                       transform: isRowBeingDragged && pointerDrag?.isDragging ? 'scale(0.98)' : 'none',
                       userSelect: 'none',
-                      cursor: user?.is_pro ? (pointerDrag?.isDragging ? 'grabbing' : 'grab') : 'default',
+                      cursor: isCategoryInPlan(user, cat) ? (pointerDrag?.isDragging ? 'grabbing' : 'grab') : 'not-allowed',
                       touchAction: pointerDrag?.isDragging ? 'none' : 'pan-y',
                     }}
                   >
@@ -1274,7 +1276,7 @@ export const CustomizePage: React.FC = () => {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          color: user?.is_pro ? 'var(--text-muted)' : 'rgba(255, 255, 255, 0.2)',
+                          color: isCategoryInPlan(user, cat) ? 'var(--text-muted)' : 'rgba(255, 255, 255, 0.2)',
                           padding: '0.2rem 0.15rem',
                           borderRadius: '4px',
                         }}
