@@ -12,6 +12,8 @@ interface UserProfile {
   is_admin: boolean;
   is_pro?: boolean;
   is_pro_cancelled?: boolean;
+  plan_tier?: string;
+  billing_cycle?: string | null;
   is_vip?: boolean;
   has_active_subscription?: boolean;
   pro_expires_at?: string;
