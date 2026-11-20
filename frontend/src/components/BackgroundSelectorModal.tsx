@@ -3,10 +3,10 @@ import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { Search, X, Check, Monitor, Trash2, Sparkles } from 'lucide-react';
+import { Search, X, Check, Monitor, Trash2, Sparkles, Lock } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 import { PathdLoader } from './PathdLoader';
-import { hasPremiumBadge } from '../utils/planPermissions';
+import { hasPremiumBadge, isCategoryInPlan } from '../utils/planPermissions';
 
 interface BackgroundItem {
   title: string;
@@ -614,10 +614,17 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
 
             const itemsToDisplay = filteredResults.slice(0, visibleCount).map((b, idx) => {
               const isSelected = selectedUrl === b.image_url;
+              const isAllowed = isCategoryInPlan(user, b.category);
               return (
                 <div
                   key={`${b.title}-${idx}`}
-                  onClick={() => setSelectedUrl(b.image_url)}
+                  onClick={() => {
+                    if (!isAllowed) {
+                      window.location.search = '?modal=premium';
+                      return;
+                    }
+                    setSelectedUrl(b.image_url);
+                  }}
                   style={{
                     position: 'relative',
                     display: 'flex',
@@ -632,6 +639,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                     transition: 'all 0.2s ease',
                     transform: isSelected ? 'scale(1.02)' : 'scale(1)',
                     boxShadow: isSelected ? '0 0 15px rgba(16, 185, 129, 0.4)' : 'none',
+                    opacity: isAllowed ? 1 : 0.65,
                   }}
                 >
                   <div
@@ -645,9 +653,35 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                     <img
                       src={b.image_url}
                       alt={b.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        filter: isAllowed ? 'none' : 'grayscale(50%)',
+                      }}
                       loading="lazy"
                     />
+                    {!isAllowed && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          left: '8px',
+                          background: 'rgba(0, 0, 0, 0.72)',
+                          color: '#f59e0b',
+                          borderRadius: '6px',
+                          padding: '0.25rem 0.4rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          backdropFilter: 'blur(4px)',
+                        }}
+                      >
+                        <Lock size={12} />
+                      </div>
+                    )}
                     {isSelected && (
                       <div
                         style={{
