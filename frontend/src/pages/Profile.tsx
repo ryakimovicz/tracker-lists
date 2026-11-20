@@ -863,13 +863,32 @@ export const Profile: React.FC = () => {
     const status = searchParams.get('status');
 
     if (payment === 'success') {
+      if (status && ['failed', 'cancelled', 'canceled', 'expired'].includes(status.toLowerCase())) {
+        showErrorMessage(
+          null,
+          language === 'es'
+            ? 'El pago no pudo completarse. Puedes intentarlo nuevamente cuando quieras.'
+            : 'The payment could not be completed. You can try again anytime.'
+        );
+        return;
+      }
+
       apiClient.post('/payments/verify-success', {
         subscription_id: subscriptionId,
         status: status || 'active'
-      }).then(async () => {
-        await refreshProfile();
-        await fetchProfileAndLibrary();
-        showSuccessMessage(language === 'es' ? '⭐ ¡Bienvenido a Pathd Premium! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd Premium! Your subscription was successfully activated.', 6000);
+      }).then(async (res) => {
+        if (res.data?.status === 'success') {
+          await refreshProfile();
+          await fetchProfileAndLibrary();
+          showSuccessMessage(language === 'es' ? '⭐ ¡Bienvenido a Pathd! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd! Your subscription was successfully activated.', 6000);
+        } else {
+          showErrorMessage(
+            null,
+            language === 'es'
+              ? 'El pago no pudo completarse o aún está pendiente.'
+              : 'The payment could not be completed or is still pending.'
+          );
+        }
       }).catch(err => {
         console.error('Error verifying payment:', err);
       });
