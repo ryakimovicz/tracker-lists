@@ -39,7 +39,7 @@ import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
-import { isCategoryInPlan, canCustomizeColor } from '../utils/planPermissions';
+import { isCategoryInPlan, canCustomizeColor, hasPremiumBadge } from '../utils/planPermissions';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
 import { MusicDetailsModal } from '../components/MusicDetailsModal';
@@ -597,7 +597,7 @@ export const CustomizePage: React.FC = () => {
               
               {/* Badges / Labels row below username */}
               <div className="profile-badges-row" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                {profile.is_pro && (
+                {hasPremiumBadge(profile) && (
                   <span
                     style={{
                       fontSize: '0.75rem',
@@ -912,14 +912,14 @@ export const CustomizePage: React.FC = () => {
                     }}
                   >
                     <Star size={10} fill="#f59e0b" />
-                    PREMIUM
+                    PACKS
                   </span>
                 </div>
               </div>
               <Pencil size={15} color="var(--text-muted)" />
             </button>
 
-            {/* Imagen de Fondo (Premium) */}
+            {/* Imagen de Fondo (Packs) */}
             <button
               type="button"
               onClick={() => {
@@ -1134,7 +1134,7 @@ export const CustomizePage: React.FC = () => {
               }}
             >
               <Star size={10} fill="#f59e0b" />
-              PREMIUM
+              PACKS
             </span>
           </div>
 

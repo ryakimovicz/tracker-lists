@@ -424,6 +424,12 @@ async def dodo_webhook(
         logger.info(f"User {user.username} (ID: {user.id}) upgraded/maintained Pro via webhook event: {event_type}")
 
     elif event_type in pro_revoked_events:
+        if subscription_id and user.dodo_subscription_id and str(subscription_id) != str(user.dodo_subscription_id):
+            logger.info(
+                f"Ignoring {event_type} for old/different subscription {subscription_id} "
+                f"(user {user.username} has active subscription {user.dodo_subscription_id})"
+            )
+            return {"status": "ignored", "reason": "Different subscription_id"}
         user.is_pro = False
         user.is_pro_cancelled = False
         user.plan_tier = "free"
