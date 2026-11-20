@@ -419,6 +419,8 @@ async def dodo_webhook(
     elif event_type in pro_revoked_events:
         user.is_pro = False
         user.is_pro_cancelled = False
+        user.plan_tier = "free"
+        user.billing_cycle = None
         user.dodo_subscription_id = None
         user.pro_expires_at = None
         user.banner_url = None
