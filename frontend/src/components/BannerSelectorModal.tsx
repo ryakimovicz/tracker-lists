@@ -3,8 +3,9 @@ import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { Search, X, Check, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
+import { Search, X, Check, Image as ImageIcon, Sparkles, Trash2, Lock } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
+import { isCategoryInPlan, hasPremiumBadge } from '../utils/planPermissions';
 import { PathdLoader } from './PathdLoader';
 
 interface BannerItem {
@@ -241,7 +242,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                     fontWeight: 700,
                   }}
                 >
-                  PREMIUM
+                  PACKS
                 </span>
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -360,6 +361,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
               <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                 {user?.username || 'Username'}
               </span>
+              {hasPremiumBadge(user) && (
               <span
                 style={{
                   fontSize: '0.65rem',
@@ -372,6 +374,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
               >
                 PREMIUM
               </span>
+              )}
             </div>
             <span style={{ fontSize: '0.75rem', color: selectedUrl ? (isLight ? 'var(--text-secondary)' : 'rgba(255,255,255,0.75)') : 'var(--text-muted)' }}>
               {selectedUrl
@@ -600,10 +603,20 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
             const itemsToDisplay = filteredResults.slice(0, visibleCount).map((b, idx) => {
               const isSelected = selectedUrl === b.image_url;
+              const isAllowed = isCategoryInPlan(user, b.category);
               return (
                 <div
                   key={`${b.title}-${idx}`}
-                  onClick={() => setSelectedUrl(b.image_url)}
+                  onClick={() => {
+                    if (!isAllowed) {
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('modal', 'premium');
+                      window.history.pushState(window.history.state, '', url.pathname + url.search + url.hash);
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                      return;
+                    }
+                    setSelectedUrl(b.image_url);
+                  }}
                   style={{
                     position: 'relative',
                     display: 'flex',
@@ -615,11 +628,34 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                     border: isSelected
                       ? '2px solid #f59e0b'
                       : '1px solid var(--border-color)',
+                    opacity: isAllowed ? 1 : 0.72,
                     transition: 'all 0.2s ease',
                     transform: isSelected ? 'scale(1.02)' : 'scale(1)',
                     boxShadow: isSelected ? '0 0 15px rgba(245, 158, 11, 0.4)' : 'none',
                   }}
                 >
+                  {!isAllowed && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        zIndex: 5,
+                        background: 'rgba(0, 0, 0, 0.78)',
+                        color: '#f59e0b',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                        borderRadius: '6px',
+                        padding: '0.2rem 0.4rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        fontSize: '0.68rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <Lock size={11} />
+                    </div>
+                  )}
 
                 <div
                   style={{
