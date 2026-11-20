@@ -912,7 +912,6 @@ export const CustomizePage: React.FC = () => {
                     }}
                   >
                     <Star size={10} fill="#f59e0b" />
-                    PACKS
                   </span>
                 </div>
               </div>
@@ -987,7 +986,6 @@ export const CustomizePage: React.FC = () => {
                     }}
                   >
                     <Star size={10} fill="#f59e0b" />
-                    PREMIUM
                   </span>
                 </div>
               </div>
@@ -1134,7 +1132,6 @@ export const CustomizePage: React.FC = () => {
               }}
             >
               <Star size={10} fill="#f59e0b" />
-              PACKS
             </span>
           </div>
 

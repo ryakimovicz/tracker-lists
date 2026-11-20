@@ -6,6 +6,7 @@ import { apiClient } from '../api/client';
 import { Search, X, Check, Monitor, Trash2, Sparkles } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 import { PathdLoader } from './PathdLoader';
+import { hasPremiumBadge } from '../utils/planPermissions';
 
 interface BackgroundItem {
   title: string;
@@ -242,7 +243,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                     letterSpacing: '0.04em',
                   }}
                 >
-                  PREMIUM
+                  ★
                 </span>
               </h2>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
@@ -382,9 +383,11 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                   {user?.username || 'Usuario'}
                 </span>
-                <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
-                  ★ PREMIUM
-                </span>
+                {hasPremiumBadge(user) && (
+                  <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
+                    ★ PREMIUM
+                  </span>
+                )}
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {selectedUrl

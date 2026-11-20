@@ -242,7 +242,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                     fontWeight: 700,
                   }}
                 >
-                  PACKS
+                  ★
                 </span>
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
