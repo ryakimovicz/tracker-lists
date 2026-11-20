@@ -17,6 +17,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'streaming' | 'reading' | 'premium'>('premium');
   const [premiumBilling, setPremiumBilling] = useState<'monthly' | 'annual'>('monthly');
+  const [showPlanChangeConfirm, setShowPlanChangeConfirm] = useState(false);
+  const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
 
   // Synchronize URL query parameter with modal visibility: ?modal=premium or ?premium=true
   useEffect(() => {
@@ -83,8 +85,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   };
 
 
-  const handleSubscribe = async () => {
-
+  const executeSubscribe = async () => {
     setLoading(true);
     setErrorMsg('');
     try {
@@ -105,6 +106,32 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
       const msg = err.response?.data?.detail || (language === 'es' ? 'Error al iniciar la pasarela de pago.' : 'Error initiating checkout.');
       setErrorMsg(msg);
       setLoading(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (user?.has_active_subscription && !showPlanChangeConfirm) {
+      setShowPlanChangeConfirm(true);
+      return;
+    }
+    await executeSubscribe();
+  };
+
+  const handleUpdatePaymentMethod = async () => {
+    setUpdatingPaymentMethod(true);
+    setErrorMsg('');
+    try {
+      const res = await apiClient.post('/payments/update-payment-method');
+      if (res.data?.payment_link) {
+        window.location.href = res.data.payment_link;
+      } else {
+        throw new Error('No payment link received');
+      }
+    } catch (err: any) {
+      console.error('Update payment method error:', err);
+      const msg = err.response?.data?.detail || (language === 'es' ? 'Error al abrir el portal de método de pago.' : 'Error opening payment method update.');
+      setErrorMsg(msg);
+      setUpdatingPaymentMethod(false);
     }
   };
 
@@ -513,6 +540,91 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                         ? 'Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
                         : 'Local taxes may apply depending on your country. Cancel anytime.')}
                 </p>
+              )}
+
+              {showPlanChangeConfirm && (
+                <div
+                  style={{
+                    marginTop: '0.85rem',
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f59e0b' }}>
+                    {isEs ? 'Confirmar cambio de plan' : 'Confirm Plan Change'}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                    {isEs
+                      ? 'Ya tienes una suscripción activa. Al confirmar este cambio, se cobrará inmediatamente la diferencia prorrateada en tu método de pago guardado.'
+                      : 'You already have an active subscription. Confirming this change will immediately charge the prorated difference to your saved payment method.'}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={executeSubscribe}
+                      disabled={loading || updatingPaymentMethod}
+                      style={{
+                        flex: 1,
+                        minWidth: '140px',
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: 'var(--accent-primary)',
+                        color: '#000',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {loading
+                        ? (isEs ? 'Procesando...' : 'Processing...')
+                        : (isEs ? 'Confirmar y pagar' : 'Confirm & Pay')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUpdatePaymentMethod}
+                      disabled={loading || updatingPaymentMethod}
+                      style={{
+                        flex: 1,
+                        minWidth: '150px',
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        cursor: updatingPaymentMethod ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {updatingPaymentMethod
+                        ? (isEs ? 'Abriendo...' : 'Opening...')
+                        : (isEs ? 'Cambiar método de pago' : 'Change Payment Method')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlanChangeConfirm(false)}
+                      disabled={loading || updatingPaymentMethod}
+                      style={{
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isEs ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
             );

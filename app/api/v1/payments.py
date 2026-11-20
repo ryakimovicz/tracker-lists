@@ -296,6 +296,35 @@ async def cancel_my_subscription(
         }
 
 
+@router.post("/update-payment-method")
+async def update_payment_method(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Generates a Dodo Payments link to update the payment method for an active subscription."""
+    if not current_user.dodo_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active Dodo Payments subscription found."
+        )
+
+    origin = request.headers.get("origin") or "https://pathd.net"
+    return_url = f"{origin}/profile"
+
+    try:
+        client = get_dodo_client()
+        resp = await client.subscriptions.update_payment_method(
+            subscription_id=current_user.dodo_subscription_id,
+            payment_method={"type": "new", "return_url": return_url}
+        )
+        return {"payment_link": getattr(resp, "payment_link", None)}
+    except Exception as e:
+        logger.error(f"Error generating payment method update link: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not generate payment method update link: {str(e)}"
+        )
+
 
 @router.post("/webhook")
 async def dodo_webhook(
