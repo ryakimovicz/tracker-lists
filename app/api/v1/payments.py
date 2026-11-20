@@ -85,8 +85,15 @@ async def create_checkout_session(
                 proration_billing_mode="prorated_immediately",
                 quantity=1
             )
+            prev_tier = current_user.plan_tier
             current_user.plan_tier = plan
             current_user.billing_cycle = billing_cycle
+            if plan != "premium":
+                current_user.profile_color = None
+            if plan == "reading":
+                current_user.blur_unwatched_episodes = False
+            if prev_tier in ("streaming", "reading") and plan in ("streaming", "reading") and prev_tier != plan:
+                current_user.category_order = None
             db.commit()
             db.refresh(current_user)
             return {
@@ -426,6 +433,7 @@ async def dodo_webhook(
         user.banner_url = None
         user.background_url = None
         user.profile_color = None
+        user.category_order = None
         user.blur_unwatched_episodes = False
         trim_downgraded_user_favorites(db, user.id)
         db.commit()

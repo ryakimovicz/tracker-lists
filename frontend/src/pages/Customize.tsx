@@ -1223,7 +1223,7 @@ export const CustomizePage: React.FC = () => {
                         });
 
                         categoryLongPressTimerRef.current = setTimeout(() => {
-                          if (!canCustomizeColor(user)) {
+                          if (!isCategoryInPlan(user, cat)) {
                             setShowProModal(true);
                             setPointerDrag(null);
                             return;
@@ -1238,7 +1238,7 @@ export const CustomizePage: React.FC = () => {
                         }, 380);
                       } else {
                         // Desktop: click and drag directly
-                        if (!canCustomizeColor(user)) {
+                        if (!isCategoryInPlan(user, cat)) {
                           setShowProModal(true);
                           return;
                         }
