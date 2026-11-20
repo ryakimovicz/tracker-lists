@@ -23,7 +23,7 @@ router = APIRouter()
 DODO_PRODUCT_IDS = {
     ("streaming", "monthly"): os.environ.get("DODO_PRODUCT_STREAMING", "pdt_0NqE4c0UAsxsdIbYnD6sp"),
     ("reading", "monthly"): os.environ.get("DODO_PRODUCT_READING", "pdt_0NqE4q3p8OhLRrxSfs4Wf"),
-    ("premium", "monthly"): os.environ.get("DODO_PRODUCT_PREMIUM_MONTHLY", settings.DODO_PAYMENTS_PRODUCT_ID or "pdt_0NsJVLl0Ryscu40GvFXXa"),
+    ("premium", "monthly"): os.environ.get("DODO_PRODUCT_PREMIUM_MONTHLY", "pdt_0NsJVLl0Ryscu40GvFXXa"),
     ("premium", "annual"): os.environ.get("DODO_PRODUCT_PREMIUM_ANNUAL", "pdt_0NqE5BtFYSASvu9BDo3W9"),
 }
 

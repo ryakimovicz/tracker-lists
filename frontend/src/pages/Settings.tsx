@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { ProModal } from '../components/ProModal';
+import { getUserPlanTier } from '../utils/planPermissions';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PrivacyPolicy } from './PrivacyPolicy';
 import { TermsOfService } from './TermsOfService';
@@ -858,9 +859,18 @@ export const SettingsPage: React.FC = () => {
                     ? 'Tienes acceso exclusivo e ilimitado a todas las funciones Premium de Pathd como invitado de honor.'
                     : 'You have exclusive unlimited access to all Pathd Premium features as an honored guest.')
                   : user?.has_active_subscription
-                  ? (isEs
-                    ? `Tu suscripción recurrente está activa. Tu próximo cobro automático está programado para el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'próximo ciclo de facturación'}. Puedes cancelar la renovación automática en cualquier momento.`
-                    : `Your recurring subscription is active. Your next auto-charge is scheduled for ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'the next billing cycle'}. You can cancel auto-renewal at any time.`)
+                  ? (() => {
+                    const tier = getUserPlanTier(user);
+                    const planName = tier === 'streaming'
+                      ? (isEs ? 'Pack de Streaming' : 'Streaming Pack')
+                      : tier === 'reading'
+                        ? (isEs ? 'Pack de Lectura' : 'Reading Pack')
+                        : (isEs ? 'Pack Premium' : 'Premium Pack');
+                    const dateStr = user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : (isEs ? 'el próximo ciclo de facturación' : 'the next billing cycle');
+                    return isEs
+                      ? `Tu suscripción a ${planName} está activa. Tu próximo cobro automático está programado para el ${dateStr}. Puedes cambiar de plan o cancelar la renovación automática en cualquier momento.`
+                      : `Your ${planName} subscription is active. Your next auto-charge is scheduled for ${dateStr}. You can change your plan or cancel auto-renewal at any time.`;
+                  })()
                   : (user?.is_pro && user?.is_pro_cancelled)
                   ? (isEs
                     ? `La renovación automática está desactivada. Mantienes todos tus beneficios Premium hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'final de tu período'} y luego pasarás al plan Gratuito sin cobros adicionales.`
@@ -870,22 +880,32 @@ export const SettingsPage: React.FC = () => {
                     ? `Tienes acceso de regalo activo hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'fin del período'}. Puedes activar tu suscripción ahora y el primer cobro se realizará recién al vencer el regalo.`
                     : `You have gifted access active until ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'end of period'}. You can subscribe now and your first billing will occur only after the gift expires.`)
                   : (isEs
-                    ? 'Disfruta de la mejor experiencia: desenfoque anti-spoilers en episodios, temas y personalización exclusiva de perfil, insignia dorada de distinción y apoyo directo al desarrollo de Pathd.'
-                    : 'Enjoy the best experience: anti-spoiler blur on episodes, exclusive profile themes and customization, distinctive gold badge, and direct support to Pathd development.')}
+                    ? 'Elige entre Pack de Streaming ($1.99/mes), Pack de Lectura ($1.99/mes) o Pack Premium ($3.99/mes o $29.99/año con prueba gratis de 7 días) para desbloquear más destacados, personalización, anti-spoiler e historial.'
+                    : 'Choose between Streaming Pack ($1.99/mo), Reading Pack ($1.99/mo), or Premium Pack ($3.99/mo or $29.99/yr with a 7-day free trial) to unlock more favorites, customization, anti-spoiler, and history.')}
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
               {user?.has_active_subscription && !user?.is_pro_cancelled && !user?.is_admin && !user?.is_vip && (
-                <button
-                  type="button"
-                  disabled={cancelSubLoading}
-                  onClick={handleCancelSubscription}
-                  className="btn-secondary"
-                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
-                >
-                  {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowProModal(true)}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+                  >
+                    {isEs ? 'Cambiar de plan' : 'Change Plan'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelSubLoading}
+                    onClick={handleCancelSubscription}
+                    className="btn-secondary"
+                    style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+                  >
+                    {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
+                  </button>
+                </>
               )}
 
               {(!user?.is_pro || (!user?.has_active_subscription && !user?.is_admin && !user?.is_vip)) && (
@@ -908,8 +928,8 @@ export const SettingsPage: React.FC = () => {
                 >
                   <Crown size={15} />
                   {user?.is_pro
-                    ? (isEs ? 'Mantener suscripción ($4,99/mes)' : 'Keep subscription ($4.99/mo)')
-                    : (isEs ? 'Prueba gratis de 7 días (luego $4,99/mes)' : '7-day free trial (then $4.99/mo)')}
+                    ? (isEs ? 'Mantener suscripción' : 'Keep subscription')
+                    : (isEs ? 'Ver planes' : 'View plans')}
                 </button>
               )}
             </div>
