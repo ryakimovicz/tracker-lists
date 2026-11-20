@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as Sentry from '@sentry/react';
 import { apiClient } from '../api/client';
 
 interface UserProfile {
@@ -164,6 +165,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('user-suspended', handleUserSuspended);
     };
   }, []);
+
+  useEffect(() => {
+    if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
+      Sentry.setUser(user ? { id: String(user.id), username: user.username } : null);
+    }
+  }, [user]);
 
   return (
     <AuthContext.Provider

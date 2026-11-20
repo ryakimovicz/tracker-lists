@@ -5,7 +5,7 @@ import App from './App.tsx'
 import * as Sentry from '@sentry/react'
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
-if (sentryDsn) {
+if (sentryDsn && import.meta.env.PROD) {
   Sentry.init({
     dsn: sentryDsn,
     environment: import.meta.env.MODE,
