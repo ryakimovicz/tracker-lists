@@ -692,7 +692,16 @@ export const SettingsPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
                   <Star size={20} color="#f59e0b" fill="#f59e0b" />
-                  {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
+                  {(() => {
+                    if (!user?.is_pro && !user?.is_admin && !user?.is_vip) {
+                      return isEs ? 'Membresía Pathd' : 'Pathd Membership';
+                    }
+                    const tier = getUserPlanTier(user);
+                    if (tier === 'streaming') return isEs ? 'Membresía Pack de Streaming' : 'Streaming Pack Membership';
+                    if (tier === 'reading') return isEs ? 'Membresía Pack de Lectura' : 'Reading Pack Membership';
+                    if (user?.billing_cycle === 'annual') return isEs ? 'Membresía Pathd Premium Anual' : 'Annual Pathd Premium Membership';
+                    return isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership';
+                  })()}
                 </h2>
                 {user?.is_admin ? (
                   <span
