@@ -5,9 +5,12 @@ const READING_CATEGORIES = new Set(['book', 'comic', 'manga']);
 
 export function getUserPlanTier(user: any): PlanTier {
   if (!user) return 'free';
+  const tier = String(user.plan_tier || '').toLowerCase();
+  if (user.has_active_subscription && (tier === 'streaming' || tier === 'reading' || tier === 'premium')) {
+    return tier;
+  }
   if (user.is_admin || user.is_vip) return 'premium';
   if (!user.is_pro) return 'free';
-  const tier = String(user.plan_tier || '').toLowerCase();
   if (tier === 'streaming' || tier === 'reading' || tier === 'premium') {
     return tier;
   }
