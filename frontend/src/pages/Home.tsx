@@ -919,8 +919,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     return { nextEp: null, isCaughtUp: false, initialLoad: true };
   };
 
-  const initialCachedList = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
-  const initialComputed = computeNextCandidate(Array.isArray(initialCachedList) ? initialCachedList : []);
+  const rawInitialCachedList = item.tracking_list_id ? getCachedSeries(`list_${item.tracking_list_id}`) : [];
+  const hasInitialCachedList = Array.isArray(rawInitialCachedList);
+  const initialCachedList = hasInitialCachedList ? rawInitialCachedList : [];
+  const initialComputed = hasInitialCachedList
+    ? computeNextCandidate(initialCachedList)
+    : { nextEp: null, isCaughtUp: false, initialLoad: true };
   const initialSavedNext = getCachedSeries(`next_candidate_${item.id}`);
 
   const initialNextEp = initialComputed.nextEp || initialSavedNext?.nextEp || null;
@@ -941,13 +945,15 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
   const fetchNextEpisode = async (force = false) => {
     // Check if we already have a valid candidate from cache to avoid flicker
-    const cachedList = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
-    const syncCandidate = computeNextCandidate(Array.isArray(cachedList) ? cachedList : []);
-    if (syncCandidate.nextEp && Date.now() >= optimisticLockUntilRef.current) {
-      setNextEp(syncCandidate.nextEp);
-      setIsCaughtUp(false);
-      setIsInitialLoad(false);
-      setCachedSeries(`next_candidate_${item.id}`, { nextEp: syncCandidate.nextEp, isCaughtUp: false });
+    const rawCachedList = item.tracking_list_id ? getCachedSeries(`list_${item.tracking_list_id}`) : [];
+    if (Array.isArray(rawCachedList)) {
+      const syncCandidate = computeNextCandidate(rawCachedList);
+      if (syncCandidate.nextEp && Date.now() >= optimisticLockUntilRef.current) {
+        setNextEp(syncCandidate.nextEp);
+        setIsCaughtUp(false);
+        setIsInitialLoad(false);
+        setCachedSeries(`next_candidate_${item.id}`, { nextEp: syncCandidate.nextEp, isCaughtUp: false });
+      }
     }
 
     setIsLoading(true);
