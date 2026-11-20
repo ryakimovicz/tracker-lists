@@ -407,9 +407,15 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </p>
           )}
 
-          {!user?.is_pro || (!user?.has_active_subscription && !user?.is_admin && !user?.is_vip) ? (
+          {(!user?.is_admin && !user?.is_vip) ? (() => {
+            const hasSub = Boolean(user?.has_active_subscription && !user?.is_pro_cancelled);
+            const currentTier = String(user?.plan_tier || (user?.is_pro ? 'premium' : 'free')).toLowerCase();
+            const currentCycle = String(user?.billing_cycle || 'monthly').toLowerCase();
+            const isSameCurrentPlan = hasSub && currentTier === selectedPlan && (selectedPlan !== 'premium' || currentCycle === premiumBilling);
+
+            return (
             <div>
-              {user?.is_pro && user?.pro_expires_at && (
+              {user?.is_pro && !hasSub && user?.pro_expires_at && (
                 <div style={{
                   background: 'rgba(245, 158, 11, 0.1)',
                   border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -457,24 +463,35 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: (loading || isSameCurrentPlan) ? 'not-allowed' : 'pointer',
+                  opacity: isSameCurrentPlan ? 0.65 : 1,
                   transition: 'background 0.15s ease, box-shadow 0.15s ease'
                 }}
                 onClick={handleSubscribe}
-                disabled={loading}
+                disabled={loading || isSameCurrentPlan}
               >
                 <Crown size={18} />
                 {loading
-                  ? (isEs ? 'Preparando pago...' : 'Preparing checkout...')
-                  : selectedPlan === 'streaming'
-                    ? (isEs ? 'Suscribirse a Pack de Streaming ($1.99/mes)' : 'Subscribe to Streaming Pack ($1.99/mo)')
-                    : selectedPlan === 'reading'
-                      ? (isEs ? 'Suscribirse a Pack de Lectura ($1.99/mes)' : 'Subscribe to Reading Pack ($1.99/mo)')
-                      : user?.is_pro
-                        ? (premiumBilling === 'annual'
-                            ? (isEs ? 'Mantener Premium Anual ($29.99/año)' : 'Keep Annual Premium ($29.99/yr)')
-                            : (isEs ? 'Mantener Premium ($3.99/mes)' : 'Keep Premium ($3.99/mo)'))
-                        : (isEs ? 'Comenzar prueba gratis de 7 días' : 'Start 7-day free trial')}
+                  ? (isEs ? 'Procesando...' : 'Processing...')
+                  : isSameCurrentPlan
+                    ? (isEs ? 'Este es tu plan actual' : 'This is your current plan')
+                    : hasSub
+                      ? (selectedPlan === 'streaming'
+                          ? (isEs ? 'Cambiar a Pack de Streaming ($1.99/mes)' : 'Switch to Streaming Pack ($1.99/mo)')
+                          : selectedPlan === 'reading'
+                            ? (isEs ? 'Cambiar a Pack de Lectura ($1.99/mes)' : 'Switch to Reading Pack ($1.99/mo)')
+                            : (premiumBilling === 'annual'
+                                ? (isEs ? 'Cambiar a Premium Anual ($29.99/año)' : 'Switch to Annual Premium ($29.99/yr)')
+                                : (isEs ? 'Cambiar a Premium ($3.99/mes)' : 'Switch to Premium ($3.99/mo)')))
+                      : selectedPlan === 'streaming'
+                        ? (isEs ? 'Suscribirse a Pack de Streaming ($1.99/mes)' : 'Subscribe to Streaming Pack ($1.99/mo)')
+                        : selectedPlan === 'reading'
+                          ? (isEs ? 'Suscribirse a Pack de Lectura ($1.99/mes)' : 'Subscribe to Reading Pack ($1.99/mo)')
+                          : user?.is_pro
+                            ? (premiumBilling === 'annual'
+                                ? (isEs ? 'Mantener Premium Anual ($29.99/año)' : 'Keep Annual Premium ($29.99/yr)')
+                                : (isEs ? 'Mantener Premium ($3.99/mes)' : 'Keep Premium ($3.99/mo)'))
+                            : (isEs ? 'Comenzar prueba gratis de 7 días' : 'Start 7-day free trial')}
               </button>
 
               {!user?.is_pro && (
@@ -498,7 +515,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                 </p>
               )}
             </div>
-          ) : (
+            );
+          })() : (
             <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
               <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: 0 }}>
                 <Check size={18} /> {isEs ? '¡Ya eres usuario Premium!' : 'You are a Premium user!'}

@@ -200,7 +200,14 @@ async def verify_payment_success(
             db.commit()
             db.refresh(current_user)
             logger.info(f"User {current_user.username} verified and activated Pro via Dodo API (sub={sub_id})")
-            return {"status": "success", "is_pro": True, "is_pro_cancelled": False, "pro_expires_at": current_user.pro_expires_at}
+            return {
+                "status": "success",
+                "is_pro": True,
+                "is_pro_cancelled": False,
+                "plan_tier": current_user.plan_tier,
+                "billing_cycle": current_user.billing_cycle,
+                "pro_expires_at": current_user.pro_expires_at
+            }
         else:
             logger.warning(f"Subscription check failed for user {current_user.username}: status={sub_status}, matches={matches_user}")
     except Exception as e:
@@ -385,6 +392,14 @@ async def dodo_webhook(
     if event_type in pro_active_events:
         user.is_pro = True
         user.is_pro_cancelled = False
+        product_id_hook = data.get("product_id") or ((data.get("product_cart") or [{}])[0].get("product_id") if isinstance(data.get("product_cart"), list) and len(data.get("product_cart")) > 0 else None)
+        if product_id_hook:
+            tier, cycle = resolve_plan_from_product_id(product_id_hook)
+            user.plan_tier = tier
+            user.billing_cycle = cycle
+        elif metadata.get("plan_tier") in ("streaming", "reading", "premium"):
+            user.plan_tier = metadata.get("plan_tier")
+            user.billing_cycle = metadata.get("billing_cycle") or "monthly"
         if subscription_id:
             user.dodo_subscription_id = str(subscription_id)
         if customer_id:

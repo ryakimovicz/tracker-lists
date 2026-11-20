@@ -20,7 +20,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
-import { getMaxFavoritesForCategory } from '../utils/planPermissions';
+import { getMaxFavoritesForCategory, hasPremiumBadge } from '../utils/planPermissions';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
 import { SwipeViewPager } from '../components/SwipeViewPager';
 
@@ -4978,7 +4978,7 @@ export const Profile: React.FC = () => {
               
               {/* Badges / Labels row below username */}
               <div className="profile-badges-row" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                {profile.is_pro && (
+                {hasPremiumBadge(profile) && (
                   <span 
                     style={{ 
                       fontSize: '0.75rem',
