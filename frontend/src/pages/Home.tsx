@@ -1146,6 +1146,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     // for the last episode, we wait until the 450ms animation finishes so it doesn't vanish prematurely!
     if (!isLastEpisodeOfAll) {
       setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: false });
+      const optimisticMovedItem = { ...item, updated_at: new Date().toISOString() };
+      updateCachedShelfItem(optimisticMovedItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticMovedItem } }));
     }
 
     if (isComic) {
