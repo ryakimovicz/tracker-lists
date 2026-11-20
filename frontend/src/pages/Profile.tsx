@@ -864,13 +864,15 @@ export const Profile: React.FC = () => {
 
     if (payment === 'success') {
       if (status && ['failed', 'cancelled', 'canceled', 'expired'].includes(status.toLowerCase())) {
-        showErrorMessage(
-          null,
-          language === 'es'
-            ? 'El pago no pudo completarse. Puedes intentarlo nuevamente cuando quieras.'
-            : 'The payment could not be completed. You can try again anytime.'
-        );
-        return;
+        const errTimer = setTimeout(() => {
+          showErrorMessage(
+            null,
+            language === 'es'
+              ? 'El pago no pudo completarse. Puedes intentarlo nuevamente cuando quieras.'
+              : 'The payment could not be completed. You can try again anytime.'
+          );
+        }, 350);
+        return () => clearTimeout(errTimer);
       }
 
       apiClient.post('/payments/verify-success', {
@@ -880,7 +882,18 @@ export const Profile: React.FC = () => {
         if (res.data?.status === 'success') {
           await refreshProfile();
           await fetchProfileAndLibrary();
-          showSuccessMessage(language === 'es' ? '⭐ ¡Bienvenido a Pathd! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd! Your subscription was successfully activated.', 6000);
+          const tier = String(res.data?.plan_tier || 'premium').toLowerCase();
+          const planLabel = tier === 'streaming'
+            ? (language === 'es' ? 'Pack de Streaming' : 'Streaming Pack')
+            : tier === 'reading'
+              ? (language === 'es' ? 'Pack de Lectura' : 'Reading Pack')
+              : 'Pathd Premium';
+          showSuccessMessage(
+            language === 'es'
+              ? `⭐ ¡Bienvenido a ${planLabel}! Tu suscripción se activó con éxito.`
+              : `⭐ Welcome to ${planLabel}! Your subscription was successfully activated.`,
+            6000
+          );
         } else {
           showErrorMessage(
             null,
