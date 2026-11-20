@@ -454,11 +454,17 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   textAlign: 'center'
                 }}>
                   <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '0.15rem' }}>
-                    {isEs ? 'Tienes acceso de regalo activo' : 'You have gifted access active'}
+                    {user?.is_pro_cancelled
+                      ? (isEs ? 'Tu suscripción está cancelada' : 'Your subscription is cancelled')
+                      : (isEs ? 'Tienes acceso de regalo activo' : 'You have gifted access active')}
                   </strong>
-                  {isEs
-                    ? `Tu regalo vence el ${new Date(user.pro_expires_at).toLocaleDateString()}. Si te suscribes hoy, no se te cobrará nada hasta esa fecha.`
-                    : `Your gift expires on ${new Date(user.pro_expires_at).toLocaleDateString()}. If you subscribe now, you will not be charged until then.`}
+                  {user?.is_pro_cancelled
+                    ? (isEs
+                        ? `La renovación automática está desactivada. Tu acceso sigue activo hasta el ${new Date(user.pro_expires_at).toLocaleDateString()}.`
+                        : `Auto-renewal is turned off. Your access remains active until ${new Date(user.pro_expires_at).toLocaleDateString()}.`)
+                    : (isEs
+                        ? `Tu regalo vence el ${new Date(user.pro_expires_at).toLocaleDateString()}. Si te suscribes hoy, no se te cobrará nada hasta esa fecha.`
+                        : `Your gift expires on ${new Date(user.pro_expires_at).toLocaleDateString()}. If you subscribe now, you will not be charged until then.`)}
                 </div>
               )}
 
