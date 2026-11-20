@@ -2911,11 +2911,6 @@ export const Home: React.FC = () => {
           return [updatedItem, ...prev];
         });
         return; // Targeted update handled cleanly, do NOT reload entire dashboard!
-      } else {
-        const cached = getCachedShelfItems();
-        if (cached && cached.length > 0) {
-          setLibraryItems(cached as any);
-        }
       }
       fetchDashboard(true);
     };
