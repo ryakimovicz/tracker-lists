@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProModal } from '../components/ProModal';
+import { canCreatePrivateGuides } from '../utils/planPermissions';
 import { AdBanner } from '../components/AdBanner';
 
 // ============================================================================
@@ -1489,11 +1490,11 @@ export const CreateGuide: React.FC = () => {
                 style={{ flex: 1 }}
               >
                 <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
-                <option value="unlisted" disabled={!currentUser?.is_pro}>{language === 'es' ? 'No Listada (Pro)' : 'Unlisted (Pro)'}</option>
-                <option value="private" disabled={!currentUser?.is_pro}>{language === 'es' ? 'Privada (Pro)' : 'Private (Pro)'}</option>
+                <option value="unlisted" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'No Listada (Pro)' : 'Unlisted (Pro)'}</option>
+                <option value="private" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'Privada (Pro)' : 'Private (Pro)'}</option>
               </select>
             </div>
-            {!currentUser?.is_pro && (
+            {!canCreatePrivateGuides(currentUser) && (
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Lock size={12} /> {language === 'es' ? 'Hazte Pro para guías ocultas.' : 'Go Pro for hidden guides.'}
               </p>

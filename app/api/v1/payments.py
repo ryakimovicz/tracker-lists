@@ -20,6 +20,25 @@ from app.api.v1.users import trim_downgraded_user_favorites
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+DODO_PRODUCT_IDS = {
+    ("streaming", "monthly"): os.environ.get("DODO_PRODUCT_STREAMING", "pdt_0NqE4c0UAsxsdIbYnD6sp"),
+    ("reading", "monthly"): os.environ.get("DODO_PRODUCT_READING", "pdt_0NqE4q3p8OhLRrxSfs4Wf"),
+    ("premium", "monthly"): os.environ.get("DODO_PRODUCT_PREMIUM_MONTHLY", settings.DODO_PAYMENTS_PRODUCT_ID or "pdt_0NsJVLl0Ryscu40GvFXXa"),
+    ("premium", "annual"): os.environ.get("DODO_PRODUCT_PREMIUM_ANNUAL", "pdt_0NqE5BtFYSASvu9BDo3W9"),
+}
+
+def resolve_plan_from_product_id(product_id: str | None) -> tuple[str, str]:
+    if not product_id:
+        return ("premium", "monthly")
+    for (tier, cycle), pid in DODO_PRODUCT_IDS.items():
+        if pid == product_id:
+            return (tier, cycle)
+    return ("premium", "monthly")
+
+class CreateCheckoutRequest(BaseModel):
+    plan: str = "premium"  # 'streaming', 'reading', 'premium'
+    billing_cycle: str = "monthly"  # 'monthly', 'annual'
+
 def get_dodo_client() -> AsyncDodoPayments:
     api_key = settings.DODO_PAYMENTS_API_KEY or os.environ.get("DODO_PAYMENTS_API_KEY", "")
     env = settings.DODO_PAYMENTS_ENVIRONMENT or os.environ.get("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
@@ -31,14 +50,23 @@ def get_dodo_client() -> AsyncDodoPayments:
 @router.post("/create-checkout")
 async def create_checkout_session(
     request: Request,
+    payload: CreateCheckoutRequest | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Creates a Dodo Payments checkout session for the current user
+    Creates a Dodo Payments checkout session for the current user,
+    or changes the plan on an existing active subscription.
     """
     api_key = settings.DODO_PAYMENTS_API_KEY
-    product_id = settings.DODO_PAYMENTS_PRODUCT_ID
+    plan = (payload.plan if payload else "premium").lower().strip()
+    billing_cycle = (payload.billing_cycle if payload else "monthly").lower().strip()
+    if plan not in ("streaming", "reading", "premium"):
+        plan = "premium"
+    if plan != "premium" or billing_cycle not in ("monthly", "annual"):
+        billing_cycle = "monthly"
+
+    product_id = DODO_PRODUCT_IDS.get((plan, billing_cycle)) or settings.DODO_PAYMENTS_PRODUCT_ID
 
     if not api_key or not product_id:
         raise HTTPException(
@@ -47,6 +75,31 @@ async def create_checkout_session(
         )
 
     client = get_dodo_client()
+
+    # If user already has an active subscription, change plan instead of creating a duplicate
+    if current_user.dodo_subscription_id and current_user.is_pro and not current_user.is_pro_cancelled:
+        try:
+            await client.subscriptions.change_plan(
+                subscription_id=current_user.dodo_subscription_id,
+                product_id=product_id,
+                proration_billing_mode="prorated_immediately",
+                quantity=1
+            )
+            current_user.plan_tier = plan
+            current_user.billing_cycle = billing_cycle
+            db.commit()
+            db.refresh(current_user)
+            return {
+                "changed_plan": True,
+                "plan_tier": plan,
+                "billing_cycle": billing_cycle
+            }
+        except Exception as e:
+            logger.error(f"Error changing Dodo subscription plan: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not change subscription plan: {str(e)}"
+            )
 
     # Determine return URL based on request origin or default to settings
     origin = request.headers.get("origin") or "https://pathd.net"
@@ -75,7 +128,9 @@ async def create_checkout_session(
         },
         "metadata": {
             "user_id": str(current_user.id),
-            "username": current_user.username
+            "username": current_user.username,
+            "plan_tier": plan,
+            "billing_cycle": billing_cycle
         },
         "return_url": return_url
     }
@@ -127,8 +182,11 @@ async def verify_payment_success(
         sub_status = getattr(sub, 'status', '').lower()
         
         if matches_user and sub_status in ['active', 'succeeded', 'trialing', 'on_trial']:
+            tier, cycle = resolve_plan_from_product_id(getattr(sub, 'product_id', None))
             current_user.is_pro = True
             current_user.is_pro_cancelled = False
+            current_user.plan_tier = tier
+            current_user.billing_cycle = cycle
             current_user.dodo_subscription_id = sub_id
             next_billing = getattr(sub, 'next_billing_date', None) or getattr(sub, 'expires_at', None)
             if next_billing:
@@ -306,6 +364,7 @@ async def dodo_webhook(
         "subscription.active",
         "subscription.renewed",
         "subscription.unpaused",
+        "subscription.plan_changed",
         "entitlement_grant.created"
     ]
 

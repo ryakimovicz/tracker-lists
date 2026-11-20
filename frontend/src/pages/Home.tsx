@@ -14,6 +14,7 @@ import { PathdLoader } from '../components/PathdLoader';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon, sortFilterTabs } from '../utils/categoryOrder';
+import { getMaxFavoritesForCategory, canUseAntiSpoiler } from '../utils/planPermissions';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
 import { SwipeViewPager } from '../components/SwipeViewPager';
@@ -1362,7 +1363,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const coverUrl = getCoverUrl();
 
   const isPoster = variant === 'poster';
-  const canBlurSetting = !user || ((user?.is_pro || user?.is_admin || user?.is_vip) && user?.blur_unwatched_episodes);
+  const canBlurSetting = !user || (canUseAntiSpoiler(user) && user?.blur_unwatched_episodes);
   const shouldBlurEpisodeCover = Boolean(
     canBlurSetting &&
     !isPoster &&
@@ -4472,9 +4473,8 @@ export const Home: React.FC = () => {
               return;
             }
 
-            const isPro = Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
             const sameCategoryFavs = libraryItems.filter(f => f.item_type === targetItem.item_type && f.is_favorite);
-            const maxAllowed = isPro ? 10 : 1;
+            const maxAllowed = getMaxFavoritesForCategory(currentUser, targetItem.item_type);
 
             if (sameCategoryFavs.length >= maxAllowed) {
               setReplaceModalState({

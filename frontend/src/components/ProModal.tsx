@@ -92,7 +92,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         plan: selectedPlan,
         billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly'
       });
-      if (res.data?.checkout_url) {
+      if (res.data?.changed_plan) {
+        await refreshProfile();
+        handleModalClose();
+      } else if (res.data?.checkout_url) {
         window.location.href = res.data.checkout_url;
       } else {
         throw new Error('No checkout URL received');
@@ -467,9 +470,11 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                     ? (isEs ? 'Suscribirse a Pack de Streaming ($1.99/mes)' : 'Subscribe to Streaming Pack ($1.99/mo)')
                     : selectedPlan === 'reading'
                       ? (isEs ? 'Suscribirse a Pack de Lectura ($1.99/mes)' : 'Subscribe to Reading Pack ($1.99/mo)')
-                      : (premiumBilling === 'annual'
-                          ? (isEs ? 'Suscribirse a Premium Anual ($29.99/año)' : 'Subscribe to Annual Premium ($29.99/yr)')
-                          : (isEs ? 'Suscribirse a Premium ($3.99/mes)' : 'Subscribe to Premium ($3.99/mo)'))}
+                      : user?.is_pro
+                        ? (premiumBilling === 'annual'
+                            ? (isEs ? 'Mantener Premium Anual ($29.99/año)' : 'Keep Annual Premium ($29.99/yr)')
+                            : (isEs ? 'Mantener Premium ($3.99/mes)' : 'Keep Premium ($3.99/mo)'))
+                        : (isEs ? 'Comenzar prueba gratis de 7 días' : 'Start 7-day free trial')}
               </button>
 
               {!user?.is_pro && (
@@ -479,9 +484,17 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   textAlign: 'center',
                   margin: '0.55rem 0 0 0'
                 }}>
-                  {isEs 
-                    ? 'Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
-                    : 'Local taxes may apply depending on your country. Cancel anytime.'}
+                  {selectedPlan === 'premium'
+                    ? (premiumBilling === 'annual'
+                        ? (isEs
+                            ? 'Luego $29.99/año. Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
+                            : 'Then $29.99/yr. Local taxes may apply depending on your country. Cancel anytime.')
+                        : (isEs
+                            ? 'Luego $3.99/mes. Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
+                            : 'Then $3.99/mo. Local taxes may apply depending on your country. Cancel anytime.'))
+                    : (isEs
+                        ? 'Pueden aplicarse impuestos locales según tu país. Cancela cuando quieras.'
+                        : 'Local taxes may apply depending on your country. Cancel anytime.')}
                 </p>
               )}
             </div>

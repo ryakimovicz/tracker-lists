@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../context/LanguageContext';
+import { canUseAntiSpoiler, canUseReconsumptionHistory } from '../utils/planPermissions';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
@@ -4654,7 +4655,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   );
 
   const shouldBlurEpisodeCover = Boolean(
-    (user?.is_pro || user?.is_admin || user?.is_vip) &&
+    canUseAntiSpoiler(user) &&
     user?.blur_unwatched_episodes &&
     isEpisode &&
     !isComicOrIssue &&
@@ -8276,7 +8277,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* PRO Consumption History for Single Items (Movies, Games, Books, Comic Issues, Manga Volumes) */}
-                  {user?.is_pro && (!['series', 'anime', 'comic'].includes(selectedItem?.item_type) || isEpisode || isComicIssue) && consumptionHistory.length > 1 && (
+                  {canUseReconsumptionHistory(user, selectedItem?.item_type) && (!['series', 'anime', 'comic'].includes(selectedItem?.item_type) || isEpisode || isComicIssue) && consumptionHistory.length > 1 && (
                     <div style={{
                       marginTop: '0.75rem',
                       padding: '0.65rem 0.85rem',
@@ -9359,7 +9360,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
 
                       {/* PRO Consumption History for Series (Rendered below seasons & episodes) */}
-                      {user?.is_pro && consumptionHistory.length > 1 && (
+                      {canUseReconsumptionHistory(user, selectedItem?.item_type) && consumptionHistory.length > 1 && (
                         <div style={{
                           marginTop: '0.85rem',
                           padding: '0.65rem 0.85rem',

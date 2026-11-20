@@ -20,6 +20,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
+import { getMaxFavoritesForCategory } from '../utils/planPermissions';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
 import { SwipeViewPager } from '../components/SwipeViewPager';
 
@@ -3003,9 +3004,8 @@ export const Profile: React.FC = () => {
         return;
       }
 
-      const isPro = Boolean(profile?.is_pro || currentUser?.is_pro);
       const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === targetItem.item_type);
-      const maxAllowed = isPro ? 10 : 1;
+      const maxAllowed = getMaxFavoritesForCategory(currentUser || profile, targetItem.item_type);
 
       if (sameCategoryFavs.length >= maxAllowed) {
         // Open confirmation/replace modal instead of hard blocking or blind swapping
@@ -3168,9 +3168,8 @@ export const Profile: React.FC = () => {
     }
 
     // Artist is not yet in library
-    const isPro = Boolean(profile?.is_pro || currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
     const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === 'music');
-    const maxAllowed = isPro ? 10 : 1;
+    const maxAllowed = getMaxFavoritesForCategory(currentUser || profile, 'music');
 
     const syntheticId = -Date.now();
     const nowIso = new Date().toISOString();

@@ -12,6 +12,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
+import { getMaxFavoritesForCategory } from '../utils/planPermissions';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, updateCachedShelfItem, createShelfMap, findInShelfMap } from '../utils/shelfCache';
@@ -1568,9 +1569,8 @@ export const Search: React.FC = () => {
         return;
       }
 
-      const isPro = Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
       const sameCategoryFavs = shelfItems.filter(f => f.item_type === targetItem.item_type && f.is_favorite);
-      const maxAllowed = isPro ? 10 : 1;
+      const maxAllowed = getMaxFavoritesForCategory(currentUser, targetItem.item_type);
 
       if (sameCategoryFavs.length >= maxAllowed) {
         setReplaceModalState({

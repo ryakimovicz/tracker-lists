@@ -39,6 +39,7 @@ import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
+import { isCategoryInPlan, canCustomizeColor } from '../utils/planPermissions';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
 import { MusicDetailsModal } from '../components/MusicDetailsModal';
@@ -268,7 +269,8 @@ export const CustomizePage: React.FC = () => {
   }, [pointerDrag]);
 
   const handleMoveCategory = (index: number, direction: 'up' | 'down') => {
-    if (!user?.is_pro) {
+    const cat = localCategoryOrder[index];
+    if (!isCategoryInPlan(user, cat)) {
       setShowProModal(true);
       return;
     }
@@ -318,7 +320,7 @@ export const CustomizePage: React.FC = () => {
   };
 
   const handleSelectProfileColor = async (colorId: string) => {
-    if (!user?.is_pro) {
+    if (!canCustomizeColor(user)) {
       setShowProModal(true);
       return;
     }
@@ -430,7 +432,7 @@ export const CustomizePage: React.FC = () => {
         maxWidth: '1200px',
         margin: '0 auto',
         padding: '2rem 1rem',
-        ...(profile?.is_pro && profile?.profile_color ? activeProfileTheme.cssVariables : {})
+        ...(canCustomizeColor(profile) && profile?.profile_color ? activeProfileTheme.cssVariables : {})
       }}
     >
       {/* Immersive Ambient Background Wallpaper (Fixed Background Layer - Matching Profile) */}
@@ -1221,7 +1223,7 @@ export const CustomizePage: React.FC = () => {
                         });
 
                         categoryLongPressTimerRef.current = setTimeout(() => {
-                          if (!user?.is_pro) {
+                          if (!canCustomizeColor(user)) {
                             setShowProModal(true);
                             setPointerDrag(null);
                             return;
@@ -1236,7 +1238,7 @@ export const CustomizePage: React.FC = () => {
                         }, 380);
                       } else {
                         // Desktop: click and drag directly
-                        if (!user?.is_pro) {
+                        if (!canCustomizeColor(user)) {
                           setShowProModal(true);
                           return;
                         }

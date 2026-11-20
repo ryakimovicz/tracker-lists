@@ -27,6 +27,8 @@ class User(Base):
     blur_unwatched_episodes = Column(Boolean, default=False, nullable=False)
     is_pro = Column(Boolean, default=False, nullable=False)
     is_pro_cancelled = Column(Boolean, default=False, nullable=False)
+    plan_tier = Column(String(30), default="free", nullable=False)  # 'free', 'streaming', 'reading', 'premium'
+    billing_cycle = Column(String(20), nullable=True)  # 'monthly', 'annual'
     is_vip = Column(Boolean, default=False, nullable=False)
     pro_expires_at = Column(DateTime(timezone=True), nullable=True)
     is_suspended = Column(Boolean, default=False, nullable=False)

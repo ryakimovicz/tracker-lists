@@ -18,6 +18,8 @@ class UserResponse(UserBase):
     show_nsfw: bool = False
     is_pro: bool = False
     is_pro_cancelled: bool = False
+    plan_tier: str = "free"
+    billing_cycle: str | None = None
     is_vip: bool = False
     has_active_subscription: bool = False
     pro_expires_at: datetime | None = None
@@ -61,6 +63,8 @@ class UserDashboardResponse(BaseModel):
     show_nsfw: bool = False
     is_pro: bool = False
     is_pro_cancelled: bool = False
+    plan_tier: str = "free"
+    billing_cycle: str | None = None
     is_vip: bool = False
     has_active_subscription: bool = False
     pro_expires_at: datetime | None = None
