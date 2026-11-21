@@ -581,8 +581,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   </div>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
                     {isEs
-                      ? 'Ya tienes una suscripción activa. Al confirmar este cambio, se cobrará inmediatamente la diferencia prorrateada en tu método de pago guardado.'
-                      : 'You already have an active subscription. Confirming this change will immediately charge the prorated difference to your saved payment method.'}
+                      ? 'Ya tienes una suscripción activa. Serás redirigido a Dodo Payments para completar el pago prorrateado de este cambio de plan.'
+                      : 'You already have an active subscription. You will be redirected to Dodo Payments to complete the prorated payment for this plan change.'}
                   </p>
                   <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {loadingPreview
@@ -616,7 +616,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                     >
                       {loading
                         ? (isEs ? 'Procesando...' : 'Processing...')
-                        : (isEs ? 'Confirmar y pagar' : 'Confirm & Pay')}
+                        : (isEs ? 'Continuar en Dodo Payments' : 'Continue to Dodo Payments')}
                     </button>
                     <button
                       type="button"
