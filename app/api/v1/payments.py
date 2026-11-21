@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -328,7 +328,7 @@ async def update_payment_method(
 
 @router.post("/preview-change-plan")
 async def preview_change_plan(
-    payload: CheckoutRequest | None = Body(default=None),
+    payload: CreateCheckoutRequest | None = Body(default=None),
     current_user: User = Depends(get_current_user),
 ):
     """Previews the exact prorated immediate charge for changing a subscription plan."""
