@@ -19,6 +19,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const [premiumBilling, setPremiumBilling] = useState<'monthly' | 'annual'>('monthly');
   const [showPlanChangeConfirm, setShowPlanChangeConfirm] = useState(false);
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
+  const [previewCharge, setPreviewCharge] = useState<{ total_amount: number | null; currency: string } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   // Synchronize URL query parameter with modal visibility: ?modal=premium or ?premium=true
   useEffect(() => {
@@ -112,6 +114,19 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const handleSubscribe = async () => {
     if (user?.has_active_subscription && !showPlanChangeConfirm) {
       setShowPlanChangeConfirm(true);
+      setPreviewCharge(null);
+      setLoadingPreview(true);
+      try {
+        const res = await apiClient.post('/payments/preview-change-plan', {
+          plan: selectedPlan,
+          billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly'
+        });
+        setPreviewCharge(res.data);
+      } catch (err) {
+        console.error('Preview plan change error:', err);
+      } finally {
+        setLoadingPreview(false);
+      }
       return;
     }
     await executeSubscribe();
@@ -569,6 +584,18 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                       ? 'Ya tienes una suscripción activa. Al confirmar este cambio, se cobrará inmediatamente la diferencia prorrateada en tu método de pago guardado.'
                       : 'You already have an active subscription. Confirming this change will immediately charge the prorated difference to your saved payment method.'}
                   </p>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {loadingPreview
+                      ? (isEs ? 'Calculando monto exacto...' : 'Calculating exact amount...')
+                      : previewCharge && previewCharge.total_amount !== null && previewCharge.total_amount !== undefined
+                        ? (() => {
+                            const formatted = `${(previewCharge.total_amount / 100).toFixed(2)} ${previewCharge.currency || 'USD'}`;
+                            return isEs
+                              ? `Monto a cobrar ahora: $${formatted}`
+                              : `Amount to be charged now: $${formatted}`;
+                          })()
+                        : (isEs ? 'No se pudo calcular el monto exacto.' : 'Could not calculate exact amount.')}
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <button
                       type="button"

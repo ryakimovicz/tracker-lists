@@ -326,6 +326,56 @@ async def update_payment_method(
         )
 
 
+@router.post("/preview-change-plan")
+async def preview_change_plan(
+    payload: CheckoutRequest | None = Body(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    """Previews the exact prorated immediate charge for changing a subscription plan."""
+    if not current_user.dodo_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active Dodo Payments subscription found."
+        )
+
+    plan = (payload.plan if payload else "premium").lower().strip()
+    billing_cycle = (payload.billing_cycle if payload else "monthly").lower().strip()
+    if plan not in ("streaming", "reading", "premium"):
+        plan = "premium"
+    if plan != "premium" or billing_cycle not in ("monthly", "annual"):
+        billing_cycle = "monthly"
+
+    product_id = DODO_PRODUCT_IDS.get((plan, billing_cycle)) or settings.DODO_PAYMENTS_PRODUCT_ID
+    if not product_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payments service is not configured"
+        )
+
+    try:
+        client = get_dodo_client()
+        resp = await client.subscriptions.preview_change_plan(
+            subscription_id=current_user.dodo_subscription_id,
+            product_id=product_id,
+            proration_billing_mode="prorated_immediately",
+            quantity=1
+        )
+        immediate_charge = getattr(resp, "immediate_charge", None)
+        summary = getattr(immediate_charge, "summary", None) if immediate_charge else None
+        total_amount = getattr(summary, "total_amount", None) if summary else None
+        currency = getattr(summary, "currency", "USD") if summary else "USD"
+        return {
+            "total_amount": total_amount,
+            "currency": currency,
+        }
+    except Exception as e:
+        logger.error(f"Error previewing plan change: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not preview plan change: {str(e)}"
+        )
+
+
 @router.post("/webhook")
 async def dodo_webhook(
     request: Request,
