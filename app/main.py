@@ -131,6 +131,8 @@ def auto_migrate_schema():
                 ("category_order", "VARCHAR(200)"),
                 ("profile_color", "VARCHAR(20)"),
                 ("preferred_language", "VARCHAR(10) DEFAULT 'es'"),
+                ("banner_category", "VARCHAR(50)"),
+                ("background_category", "VARCHAR(50)"),
             ]
             for col_name, col_type in columns_to_add:
                 if col_name not in existing_cols:

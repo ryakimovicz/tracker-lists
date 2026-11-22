@@ -52,3 +52,15 @@ export function canCreatePrivateGuides(user: any): boolean {
 export function hasPremiumBadge(user: any): boolean {
   return getUserPlanTier(user) === 'premium';
 }
+
+export function getVisibleBannerUrl(user: any): string | null {
+  if (!user?.is_pro || !user?.banner_url) return null;
+  if (user.banner_category && !isCategoryInPlan(user, user.banner_category)) return null;
+  return user.banner_url;
+}
+
+export function getVisibleBackgroundUrl(user: any): string | null {
+  if (!user?.is_pro || !user?.background_url) return null;
+  if (user.background_category && !isCategoryInPlan(user, user.background_category)) return null;
+  return user.background_url;
+}

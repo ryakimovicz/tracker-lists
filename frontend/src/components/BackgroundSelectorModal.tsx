@@ -44,6 +44,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentBackgroundUrl || null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -133,7 +134,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/background', { background_url: selectedUrl });
+      await apiClient.put('/users/me/background', { background_url: selectedUrl, background_category: selectedCategory });
       await refreshProfile();
       onBackgroundUpdated(selectedUrl);
       onClose();
@@ -624,6 +625,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                       return;
                     }
                     setSelectedUrl(b.image_url);
+                    setSelectedCategory(b.category || null);
                   }}
                   style={{
                     position: 'relative',

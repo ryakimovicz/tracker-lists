@@ -875,6 +875,10 @@ def search_banners(
             clean_results.append(b)
     return clean_results
 
+class BannerUpdateRequest(BaseModel):
+    banner_url: str | None = None
+    banner_category: str | None = None
+
 @router.put("/me/banner", response_model=UserResponse)
 def update_banner(
     req: BannerUpdateRequest,
@@ -884,6 +888,7 @@ def update_banner(
     if not (current_user.is_pro or current_user.is_admin):
         raise HTTPException(status_code=403, detail="Setting a custom profile banner is a Pro feature")
     current_user.banner_url = req.banner_url
+    current_user.banner_category = req.banner_category if req.banner_url else None
     db.commit()
     db.refresh(current_user)
 
@@ -902,6 +907,7 @@ def update_banner(
 
 class BackgroundUpdateRequest(BaseModel):
     background_url: str | None = None
+    background_category: str | None = None
 
 @router.put("/me/background", response_model=UserResponse)
 def update_background(
@@ -912,6 +918,7 @@ def update_background(
     if not (current_user.is_pro or current_user.is_admin):
         raise HTTPException(status_code=403, detail="Setting a custom profile background is a Pro feature")
     current_user.background_url = req.background_url
+    current_user.background_category = req.background_category if req.background_url else None
     db.commit()
     db.refresh(current_user)
 

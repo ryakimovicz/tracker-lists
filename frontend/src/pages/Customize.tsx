@@ -39,7 +39,7 @@ import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
-import { isCategoryInPlan, canCustomizeColor, hasPremiumBadge } from '../utils/planPermissions';
+import { isCategoryInPlan, canCustomizeColor, hasPremiumBadge, getVisibleBannerUrl, getVisibleBackgroundUrl } from '../utils/planPermissions';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
 import { MusicDetailsModal } from '../components/MusicDetailsModal';
@@ -436,12 +436,12 @@ export const CustomizePage: React.FC = () => {
       }}
     >
       {/* Immersive Ambient Background Wallpaper (Fixed Background Layer - Matching Profile) */}
-      {profile?.is_pro && profile?.background_url && (
+      {getVisibleBackgroundUrl(profile) && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundImage: `url(${profile.background_url})`,
+            backgroundImage: `url(${getVisibleBackgroundUrl(profile)})`,
             backgroundPosition: 'center',
             backgroundSize: 'cover',
             backgroundRepeat: 'no-repeat',

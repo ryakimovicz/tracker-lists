@@ -20,7 +20,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
-import { getMaxFavoritesForCategory, hasPremiumBadge } from '../utils/planPermissions';
+import { getMaxFavoritesForCategory, hasPremiumBadge, getVisibleBannerUrl, getVisibleBackgroundUrl } from '../utils/planPermissions';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
 import { SwipeViewPager } from '../components/SwipeViewPager';
 
@@ -4818,12 +4818,12 @@ export const Profile: React.FC = () => {
     >
 
       {/* Immersive Ambient Background Wallpaper (Fixed Background Layer - Only for Premium) */}
-      {profile?.is_pro && profile?.background_url && (
+      {getVisibleBackgroundUrl(profile) && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundImage: `url(${profile.background_url})`,
+            backgroundImage: `url(${getVisibleBackgroundUrl(profile)})`,
             backgroundPosition: 'center',
             backgroundSize: 'cover',
             backgroundRepeat: 'no-repeat',

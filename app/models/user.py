@@ -44,6 +44,8 @@ class User(Base):
 
     custom_banner_url = Column(String(500), nullable=True)
     custom_background_url = Column(String(500), nullable=True)
+    banner_category = Column(String(50), nullable=True)
+    background_category = Column(String(50), nullable=True)
 
     # Relationships
 
