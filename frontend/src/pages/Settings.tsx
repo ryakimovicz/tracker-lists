@@ -894,7 +894,7 @@ export const SettingsPage: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'stretch' }}>
               {user?.has_active_subscription && !user?.is_pro_cancelled && !user?.is_admin && !user?.is_vip && (
                 <>
                   <button
