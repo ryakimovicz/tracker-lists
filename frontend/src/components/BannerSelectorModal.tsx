@@ -44,7 +44,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentBannerUrl || null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedItemCategory, setSelectedItemCategory] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -135,7 +135,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/banner', { banner_url: selectedUrl, banner_category: selectedCategory });
+      await apiClient.put('/users/me/banner', { banner_url: selectedUrl, banner_category: selectedItemCategory });
       await refreshProfile();
       onBannerUpdated(selectedUrl);
       onClose();
@@ -617,7 +617,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                       return;
                     }
                     setSelectedUrl(b.image_url);
-                    setSelectedCategory(b.category || null);
+                    setSelectedItemCategory(b.category || null);
                   }}
                   style={{
                     position: 'relative',
