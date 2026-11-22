@@ -21,6 +21,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
   const [previewCharge, setPreviewCharge] = useState<{ total_amount: number | null; currency: string } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
+  const [discountInput, setDiscountInput] = useState('');
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState('');
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
 
   // Synchronize URL query parameter with modal visibility: ?modal=premium or ?premium=true
   useEffect(() => {
@@ -93,7 +97,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
     try {
       const res = await apiClient.post('/payments/create-checkout', {
         plan: selectedPlan,
-        billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly'
+        billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly',
+        ...(appliedDiscountCode ? { discount_code: appliedDiscountCode } : {})
       });
       if (res.data?.changed_plan) {
         await refreshProfile();
@@ -130,6 +135,29 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
       return;
     }
     await executeSubscribe();
+  };
+
+  const handleApplyDiscount = async () => {
+    const code = discountInput.trim();
+    if (!code) return;
+    setApplyingDiscount(true);
+    setErrorMsg('');
+    try {
+      const res = await apiClient.post('/payments/preview-change-plan', {
+        plan: selectedPlan,
+        billing_cycle: selectedPlan === 'premium' ? premiumBilling : 'monthly',
+        discount_code: code
+      });
+      setPreviewCharge(res.data);
+      setAppliedDiscountCode(code);
+    } catch (err: any) {
+      console.error('Discount preview error:', err);
+      setAppliedDiscountCode('');
+      const msg = err.response?.data?.detail || (language === 'es' ? 'El código de descuento no es válido o no aplica.' : 'Discount code is invalid or not applicable.');
+      setErrorMsg(msg);
+    } finally {
+      setApplyingDiscount(false);
+    }
   };
 
   const handleUpdatePaymentMethod = async () => {
@@ -584,6 +612,67 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                           })()
                         : (isEs ? 'No se pudo calcular el monto exacto.' : 'Could not calculate exact amount.')}
                   </div>
+                  {!showDiscountInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscountInput(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#f59e0b',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      {isEs ? 'Tengo un código de descuento' : 'I have a discount code'}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <input
+                          type="text"
+                          value={discountInput}
+                          onChange={(e) => setDiscountInput(e.target.value)}
+                          placeholder={isEs ? 'Código de descuento' : 'Discount code'}
+                          style={{
+                            flex: 1,
+                            padding: '0.45rem 0.65rem',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.8rem',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyDiscount}
+                          disabled={applyingDiscount || !discountInput.trim()}
+                          style={{
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                            cursor: applyingDiscount || !discountInput.trim() ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {applyingDiscount ? '...' : (isEs ? 'Aplicar' : 'Apply')}
+                        </button>
+                      </div>
+                      {appliedDiscountCode && (
+                        <span style={{ fontSize: '0.76rem', color: '#10b981', fontWeight: 600 }}>
+                          {isEs ? `Descuento "${appliedDiscountCode}" aplicado` : `Discount "${appliedDiscountCode}" applied`}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <button
                       type="button"

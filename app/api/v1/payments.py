@@ -38,6 +38,7 @@ def resolve_plan_from_product_id(product_id: str | None) -> tuple[str, str]:
 class CreateCheckoutRequest(BaseModel):
     plan: str = "premium"  # 'streaming', 'reading', 'premium'
     billing_cycle: str = "monthly"  # 'monthly', 'annual'
+    discount_code: str | None = None
 
 def get_dodo_client() -> AsyncDodoPayments:
     api_key = settings.DODO_PAYMENTS_API_KEY or os.environ.get("DODO_PAYMENTS_API_KEY", "")
@@ -79,12 +80,16 @@ async def create_checkout_session(
     # If user already has an active subscription, change plan instead of creating a duplicate
     if current_user.dodo_subscription_id and current_user.is_pro and not current_user.is_pro_cancelled:
         try:
-            await client.subscriptions.change_plan(
-                subscription_id=current_user.dodo_subscription_id,
-                product_id=product_id,
-                proration_billing_mode="prorated_immediately",
-                quantity=1
-            )
+            discount_code = (payload.discount_code or "").strip() if payload and payload.discount_code else None
+            change_kwargs: dict = {
+                "subscription_id": current_user.dodo_subscription_id,
+                "product_id": product_id,
+                "proration_billing_mode": "prorated_immediately",
+                "quantity": 1,
+            }
+            if discount_code:
+                change_kwargs["discount_code"] = discount_code
+            await client.subscriptions.change_plan(**change_kwargs)
 
             prev_tier = current_user.plan_tier
             current_user.plan_tier = plan
@@ -355,12 +360,16 @@ async def preview_change_plan(
 
     try:
         client = get_dodo_client()
-        resp = await client.subscriptions.preview_change_plan(
-            subscription_id=current_user.dodo_subscription_id,
-            product_id=product_id,
-            proration_billing_mode="prorated_immediately",
-            quantity=1
-        )
+        discount_code = (payload.discount_code or "").strip() if payload and payload.discount_code else None
+        preview_kwargs: dict = {
+            "subscription_id": current_user.dodo_subscription_id,
+            "product_id": product_id,
+            "proration_billing_mode": "prorated_immediately",
+            "quantity": 1,
+        }
+        if discount_code:
+            preview_kwargs["discount_code"] = discount_code
+        resp = await client.subscriptions.preview_change_plan(**preview_kwargs)
         immediate_charge = getattr(resp, "immediate_charge", None)
         summary = getattr(immediate_charge, "summary", None) if immediate_charge else None
         total_amount = getattr(summary, "total_amount", None) if summary else None
