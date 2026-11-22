@@ -232,12 +232,6 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           </p>
         </div>
 
-        {errorMsg && (
-          <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
-            {errorMsg}
-          </div>
-        )}
-
         {/* Scrollable Plans Selector */}
         <div 
           className="pro-modal-benefits-list"
@@ -443,12 +437,6 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
 
         {/* Sticky Bottom Action */}
         <div style={{ flexShrink: 0 }}>
-          {errorMsg && (
-            <p style={{ color: '#ef4444', fontSize: '0.85rem', textAlign: 'center', margin: '0 0 0.75rem 0' }}>
-              {errorMsg}
-            </p>
-          )}
-
           {(!user?.is_admin && !user?.is_vip) ? (() => {
             const hasSub = Boolean(user?.has_active_subscription && !user?.is_pro_cancelled);
             const currentTier = String(user?.plan_tier || (user?.is_pro ? 'premium' : 'free')).toLowerCase();
@@ -581,8 +569,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   </div>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
                     {isEs
-                      ? 'Ya tienes una suscripción activa. Serás redirigido a Dodo Payments para completar el pago prorrateado de este cambio de plan.'
-                      : 'You already have an active subscription. You will be redirected to Dodo Payments to complete the prorated payment for this plan change.'}
+                      ? 'Ya tienes una suscripción activa. Al confirmar este cambio, se cobrará el monto prorrateado en tu método de pago guardado.'
+                      : 'You already have an active subscription. Confirming this change will charge the prorated amount to your saved payment method.'}
                   </p>
                   <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {loadingPreview
@@ -616,7 +604,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                     >
                       {loading
                         ? (isEs ? 'Procesando...' : 'Processing...')
-                        : (isEs ? 'Continuar en Dodo Payments' : 'Continue to Dodo Payments')}
+                        : (isEs ? 'Confirmar y pagar' : 'Confirm & Pay')}
                     </button>
                     <button
                       type="button"
@@ -671,6 +659,48 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         </div>
 
       </div>
+      {errorMsg && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100001,
+            maxWidth: 'min(92vw, 460px)',
+            background: 'rgba(127, 29, 29, 0.96)',
+            color: '#fecaca',
+            border: '1px solid rgba(239, 68, 68, 0.55)',
+            borderRadius: '12px',
+            padding: '0.8rem 1rem',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            fontSize: '0.85rem',
+            lineHeight: 1.4,
+          }}
+        >
+          <span style={{ flex: 1 }}>{errorMsg}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fecaca',
+              cursor: 'pointer',
+              padding: '0.15rem',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 

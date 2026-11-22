@@ -79,17 +79,12 @@ async def create_checkout_session(
     # If user already has an active subscription, change plan instead of creating a duplicate
     if current_user.dodo_subscription_id and current_user.is_pro and not current_user.is_pro_cancelled:
         try:
-            resp = await client.subscriptions.change_plan(
+            await client.subscriptions.change_plan(
                 subscription_id=current_user.dodo_subscription_id,
                 product_id=product_id,
                 proration_billing_mode="prorated_immediately",
-                quantity=1,
-                collect_via_payment_link=True,
-                on_payment_failure="prevent_change"
+                quantity=1
             )
-            payment_link = getattr(resp, "payment_link", None) or getattr(resp, "checkout_url", None)
-            if payment_link:
-                return {"checkout_url": payment_link}
 
             prev_tier = current_user.plan_tier
             current_user.plan_tier = plan
