@@ -314,7 +314,28 @@ export const CreateGuide: React.FC = () => {
     return detail || err.message || 'An error occurred';
   };
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Sync ?addWork=1 query param with searchTarget so browser Back closes the modal
+  useEffect(() => {
+    const hasAddWork = searchParams.get('addWork') === '1';
+    if (searchTarget && !hasAddWork) {
+      const next = new URLSearchParams(searchParams);
+      next.set('addWork', '1');
+      setSearchParams(next);
+    } else if (!searchTarget && hasAddWork) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('addWork');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchTarget]);
+
+  useEffect(() => {
+    if (searchParams.get('addWork') !== '1' && searchTarget) {
+      setSearchTarget(null);
+      setSearchPanels(['initial']);
+    }
+  }, [searchParams]);
   const editId = searchParams.get('edit') || searchParams.get('id');
 
   // Load existing guide if editing (fetch the draft state)
