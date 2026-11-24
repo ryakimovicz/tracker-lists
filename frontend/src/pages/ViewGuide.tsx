@@ -839,7 +839,13 @@ export const ViewGuide: React.FC = () => {
                 currentSectionCollapsed = isCollapsed;
                 
                 return (
-                  <div id={el.id} key={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', transition: 'background-color 2.5s ease-out' }}>
+                  <React.Fragment key={el.id}>
+                    {el.banner_url && (
+                      <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', marginTop: '0.5rem', border: '1px solid var(--border-color)' }}>
+                        <img src={el.banner_url} alt={el.title || 'Section cover'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <div id={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: el.banner_url ? '0.25rem' : '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', transition: 'background-color 2.5s ease-out' }}>
                     <button
                       onClick={() => toggleNodeCollapse(el.id)}
                       style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }}
@@ -875,6 +881,7 @@ export const ViewGuide: React.FC = () => {
                       {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: '0.25rem 0 0 0' }}>{el.description}</p>}
                     </div>
                   </div>
+                  </React.Fragment>
                 );
               }
 

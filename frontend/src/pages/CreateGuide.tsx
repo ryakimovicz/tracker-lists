@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { SearchPanel } from '../components/SearchPanel';
 import { GuideBannerPicker } from '../components/GuideBannerPicker';
 import { GuideBackgroundPicker } from '../components/GuideBackgroundPicker';
+import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import {
   ArrowRight,
   PlusCircle,
@@ -25,11 +27,12 @@ import {
   Eye,
   Crown,
   Sparkles,
-  Compass
+  Compass,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProModal } from '../components/ProModal';
-import { canCreatePrivateGuides } from '../utils/planPermissions';
+import { canCreatePrivateGuides, getUserPlanTier } from '../utils/planPermissions';
 import { AdBanner } from '../components/AdBanner';
 
 // ============================================================================
@@ -58,6 +61,7 @@ interface DocElement {
   type: 'section' | 'block' | 'subblock';
   title: string;
   description: string;
+  banner_url?: string | null;
   importance_rank?: number | null;
   items?: any[]; // For blocks/subblocks containing media items
   subblocks?: DocElement[]; // Nested subblocks (only inside blocks)
@@ -345,6 +349,7 @@ export const CreateGuide: React.FC = () => {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerItemType, setBannerItemType] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  const [sectionBannerTargetId, setSectionBannerTargetId] = useState<string | null>(null);
 
   // Step 2: Word-style Document Flow Editor state
   const [docFlow, setDocFlow] = useState<DocElement[]>([]);
@@ -2209,6 +2214,38 @@ export const CreateGuide: React.FC = () => {
                           )}
                         </div>
 
+                        {getUserPlanTier(currentUser) !== 'free' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setSectionBannerTargetId(element.id)}
+                              className="btn-secondary"
+                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                              <ImageIcon size={13} />
+                              {element.banner_url
+                                ? (language === 'es' ? 'Cambiar portada' : 'Change cover')
+                                : (language === 'es' ? 'Portada de sección' : 'Section cover')}
+                            </button>
+                            {element.banner_url && (
+                              <button
+                                type="button"
+                                onClick={() => updateDocElement(element.id, { banner_url: null })}
+                                className="btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', color: '#ef4444' }}
+                              >
+                                {language === 'es' ? 'Quitar' : 'Remove'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {element.banner_url && (
+                          <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                            <img src={element.banner_url} alt={element.title || 'Section cover'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
+
                         {/* Title Row with Drag Handle at Left */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%' }}>
                           <div 
@@ -3441,6 +3478,19 @@ export const CreateGuide: React.FC = () => {
       {/* Pro Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
+      )}
+      {sectionBannerTargetId && createPortal(
+        <BannerSelectorModal
+          isOpen={true}
+          onClose={() => setSectionBannerTargetId(null)}
+          currentBannerUrl={docFlow.find(el => el.id === sectionBannerTargetId)?.banner_url || null}
+          onBannerUpdated={(newUrl) => {
+            updateDocElement(sectionBannerTargetId, { banner_url: newUrl });
+            setSectionBannerTargetId(null);
+          }}
+          mode="guide"
+        />,
+        document.body
       )}
     </div>
   );
