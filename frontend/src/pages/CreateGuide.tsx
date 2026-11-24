@@ -261,19 +261,70 @@ export const CreateGuide: React.FC = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     try {
+      const now = Date.now();
+      const initialFlow: DocElement[] = [
+        {
+          id: `sec-${now}-1`,
+          type: 'section',
+          title: 'Sección 1',
+          description: ''
+        },
+        {
+          id: `blk-${now}-1`,
+          type: 'block',
+          title: 'Bloque 1_1',
+          description: '',
+          importance_rank: 3,
+          items: [],
+          subblocks: []
+        },
+        {
+          id: `blk-${now}-2`,
+          type: 'block',
+          title: 'Bloque 1_2',
+          description: '',
+          importance_rank: 3,
+          items: [],
+          subblocks: []
+        },
+        {
+          id: `sec-${now}-2`,
+          type: 'section',
+          title: 'Sección 2',
+          description: ''
+        },
+        {
+          id: `blk-${now}-3`,
+          type: 'block',
+          title: 'Bloque 2_1',
+          description: '',
+          importance_rank: 3,
+          items: [],
+          subblocks: []
+        }
+      ];
+
       const response = await apiClient.post('/lists/', {
         title,
         description,
         visibility, // Enforced as draft in backend, which saves this value in intended_visibility
         section_descriptions: {
           flow: [],
-          draft_flow: [],
+          draft_flow: initialFlow,
           draft_title: title.trim(),
           draft_description: description.trim(),
           intended_visibility: visibility
         }
       });
-      setGuide(response.data);
+      const createdGuide = response.data;
+      if (!createdGuide.section_descriptions?.draft_flow?.length) {
+        createdGuide.section_descriptions = {
+          ...(createdGuide.section_descriptions || {}),
+          draft_flow: initialFlow
+        };
+      }
+      setGuide(createdGuide);
+      setDocFlow(initialFlow);
       setSuccessMsg(language === 'es' ? '¡Guía creada con éxito en modo Borrador!' : 'Guide created successfully as Draft!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
