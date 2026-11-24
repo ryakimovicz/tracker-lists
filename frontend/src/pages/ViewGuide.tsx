@@ -3,11 +3,14 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
+import { getUserPlanTier } from '../utils/planPermissions';
 import {
   ChevronDown,
   ChevronRight,
   ArrowLeft,
   Check,
+  Share2,
+  ArrowDownCircle,
   Heart,
   Star,
   MessageSquare,
@@ -58,6 +61,7 @@ export const ViewGuide: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
+  const [minImportanceFilter, setMinImportanceFilter] = useState<number | null>(null);
 
   // Ratings state
   const [userRating, setUserRating] = useState<number | null>(null);
@@ -532,6 +536,16 @@ export const ViewGuide: React.FC = () => {
     return (subblockEl.items || []).map((item: any) => item.id);
   };
 
+  const canShowGuideImages = (() => {
+    if (currentUser && guide && currentUser.id === guide.creator_id) {
+      return getUserPlanTier(currentUser) !== 'free';
+    }
+    if ((guide as any)?.creator_plan_tier) {
+      return (guide as any).creator_plan_tier !== 'free';
+    }
+    return true;
+  })();
+
   return (
     <div className="container" style={{ padding: '2rem 1rem', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -540,7 +554,7 @@ export const ViewGuide: React.FC = () => {
         </button>
       </div>
 
-      {guide.section_descriptions?.background_url && createPortal(
+      {canShowGuideImages && guide.section_descriptions?.background_url && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -557,7 +571,7 @@ export const ViewGuide: React.FC = () => {
       )}
 
       <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1 }}>
-        {guide.section_descriptions?.banner_url && (
+        {canShowGuideImages && guide.section_descriptions?.banner_url && (
           <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
             <img src={guide.section_descriptions.banner_url} alt={guide.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
@@ -714,6 +728,26 @@ export const ViewGuide: React.FC = () => {
             >
               <Heart size={22} fill={isSaved ? '#ef4444' : 'none'} />
             </button>
+            <button
+              type="button"
+              onClick={() => {}}
+              title={language === 'es' ? 'Compartir' : 'Share'}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)',
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Share2 size={20} />
+            </button>
           </div>
         </div>
 
@@ -789,6 +823,58 @@ export const ViewGuide: React.FC = () => {
           </div>
         </div>
 
+        {/* Importance Filters & Next Pending Shortcut */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {[
+              { value: null, label: language === 'es' ? 'Todos' : 'All' },
+              { value: 5, label: language === 'es' ? 'Obligatorio' : 'Mandatory' },
+              { value: 4, label: language === 'es' ? 'Importante' : 'Important' },
+              { value: 3, label: language === 'es' ? 'Recomendado' : 'Recommended' },
+              { value: 2, label: language === 'es' ? 'Opcional' : 'Optional' },
+              { value: 1, label: language === 'es' ? 'Extra' : 'Extra' }
+            ].map(opt => {
+              const active = minImportanceFilter === opt.value;
+              return (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => setMinImportanceFilter(opt.value)}
+                  style={{
+                    padding: '0.28rem 0.7rem',
+                    borderRadius: '999px',
+                    fontSize: '0.78rem',
+                    fontWeight: active ? 600 : 400,
+                    cursor: 'pointer',
+                    border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                    background: active ? 'var(--accent-primary)' : 'transparent',
+                    color: active ? '#fff' : 'var(--text-secondary)'
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {itemsList.some((i: any) => !i.is_completed && !i.is_skipped) && (
+            <button
+              type="button"
+              onClick={() => {
+                const nextPending = itemsList.find((i: any) => !i.is_completed && !i.is_skipped);
+                if (nextPending) {
+                  const el = document.querySelector(`[data-guide-item-id="${nextPending.id}"]`) || document.getElementById(`item-${nextPending.id}`);
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }}
+              className="btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <ArrowDownCircle size={14} />
+              {language === 'es' ? 'Ir al siguiente pendiente' : 'Jump to next pending'}
+            </button>
+          )}
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
           {(() => {
             if (docFlowList.length === 0) {
@@ -840,7 +926,7 @@ export const ViewGuide: React.FC = () => {
                 
                 return (
                   <React.Fragment key={el.id}>
-                    {el.banner_url && (
+                    {canShowGuideImages && el.banner_url && (
                       <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', marginTop: '0.5rem', border: '1px solid var(--border-color)' }}>
                         <img src={el.banner_url} alt={el.title || 'Section cover'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
@@ -889,7 +975,17 @@ export const ViewGuide: React.FC = () => {
                 if (currentSectionCollapsed) return null;
 
                 const blockItemsIds = (el.items || []).map((i: any) => i.id);
-                const blockItems = blockItemsIds.map((id: number) => itemsList.find((i: any) => i.id === id)).filter(Boolean);
+                const blockItems = blockItemsIds
+                  .map((id: number) => itemsList.find((i: any) => i.id === id))
+                  .filter(Boolean)
+                  .filter((item: any) => {
+                    if (minImportanceFilter === null) return true;
+                    const rank = item.importance_rank ?? item.inherited_importance_rank ?? el.importance_rank ?? 0;
+                    return rank >= minImportanceFilter;
+                  });
+                if (minImportanceFilter !== null && blockItems.length === 0 && (el.importance_rank ?? 0) < minImportanceFilter) {
+                  return null;
+                }
                 const allBlockIds = getBlockItemIds(el);
                 const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                 const isCollapsed = collapsedNodes[el.id] || false;
@@ -1020,7 +1116,17 @@ export const ViewGuide: React.FC = () => {
 
                         {(el.subblocks || []).map((sub: any) => {
                           const subItemsIds = (sub.items || []).map((i: any) => i.id);
-                          const subItems = subItemsIds.map((id: number) => itemsList.find((i: any) => i.id === id)).filter(Boolean);
+                          const subItems = subItemsIds
+                            .map((id: number) => itemsList.find((i: any) => i.id === id))
+                            .filter(Boolean)
+                            .filter((item: any) => {
+                              if (minImportanceFilter === null) return true;
+                              const rank = item.importance_rank ?? item.inherited_importance_rank ?? sub.importance_rank ?? el.importance_rank ?? 0;
+                              return rank >= minImportanceFilter;
+                            });
+                          if (minImportanceFilter !== null && subItems.length === 0 && (sub.importance_rank ?? el.importance_rank ?? 0) < minImportanceFilter) {
+                            return null;
+                          }
                           const allSubblockIds = getSubblockItemIds(sub);
                           const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;

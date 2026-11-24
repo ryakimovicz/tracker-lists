@@ -175,6 +175,7 @@ const InsertZone = ({
       />
       {!isHovered ? (
         <span
+          onClick={() => setIsHovered(true)}
           style={{
             position: 'relative',
             zIndex: 1,
@@ -187,7 +188,8 @@ const InsertZone = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: 0.55
+            opacity: 0.55,
+            cursor: 'pointer'
           }}
         >
           <Plus size={11} />
@@ -291,6 +293,7 @@ const SubblockInsertZone = ({
       />
       {!isHovered ? (
         <span
+          onClick={() => setIsHovered(true)}
           style={{
             position: 'relative',
             zIndex: 1,
@@ -303,7 +306,8 @@ const SubblockInsertZone = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: 0.55
+            opacity: 0.55,
+            cursor: 'pointer'
           }}
         >
           <Plus size={11} />
@@ -401,6 +405,26 @@ export const CreateGuide: React.FC = () => {
     if (searchParams.get('addWork') !== '1' && searchTarget) {
       setSearchTarget(null);
       setSearchPanels(['initial']);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const secCover = searchParams.get('secCover');
+    if (sectionBannerTargetId && secCover !== sectionBannerTargetId) {
+      const next = new URLSearchParams(searchParams);
+      next.set('secCover', sectionBannerTargetId);
+      setSearchParams(next);
+    } else if (!sectionBannerTargetId && secCover) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('secCover');
+      setSearchParams(next, { replace: true });
+    }
+  }, [sectionBannerTargetId]);
+
+  useEffect(() => {
+    const secCover = searchParams.get('secCover');
+    if (!secCover && sectionBannerTargetId) {
+      setSectionBannerTargetId(null);
     }
   }, [searchParams]);
   const editId = searchParams.get('edit') || searchParams.get('id');
@@ -2052,14 +2076,71 @@ export const CreateGuide: React.FC = () => {
 
             {/* Document Flow Elements */}
             {docFlow.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--text-secondary)' }}>
-                <BookOpen size={48} style={{ strokeWidth: 1, marginBottom: '1rem', color: 'var(--text-muted)' }} />
+              <div style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                <BookOpen size={48} style={{ strokeWidth: 1, color: 'var(--text-muted)' }} />
                 <p style={{ margin: 0, fontSize: '1.05rem' }}>
-                  {language === 'es' ? 'Tu documento está vacío. Utiliza los botones de arriba para añadir Secciones o Bloques.' : 'Your document is empty. Use the buttons above to add Sections or Blocks.'}
+                  {language === 'es' ? 'Tu documento está vacío. Agregá una Sección o un Bloque para empezar.' : 'Your document is empty. Add a Section or a Block to get started.'}
                 </p>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => addSection(0)}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 0 1px var(--accent-primary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+                    style={{
+                      fontSize: '0.85rem',
+                      padding: '0.4rem 0.95rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      borderRadius: '999px',
+                      border: '1px solid var(--accent-primary)',
+                      background: 'transparent',
+                      color: 'var(--accent-primary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Plus size={14} /> {language === 'es' ? 'Sección' : 'Section'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addBlock(0)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--text-primary)';
+                      e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }}
+                    style={{
+                      fontSize: '0.85rem',
+                      padding: '0.4rem 0.95rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      borderRadius: '999px',
+                      border: '1px solid var(--border-color)',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Plus size={14} /> {language === 'es' ? 'Bloque' : 'Block'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+                {!pointerDrag && !clipboard && (
+                  <InsertZone
+                    onAddSection={() => addSection(0)}
+                    onAddBlock={() => addBlock(0)}
+                    language={language}
+                  />
+                )}
                 {docFlow.map((element, index) => {
                   const rootPasteZone = (
                     <PasteZone 
