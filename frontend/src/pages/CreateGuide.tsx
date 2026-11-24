@@ -1805,7 +1805,7 @@ export const CreateGuide: React.FC = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {bannerUrl && (
-              <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
                 <img src={bannerUrl} alt="Guide banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
             )}
@@ -2015,7 +2015,7 @@ export const CreateGuide: React.FC = () => {
                 </div>
               </div>
               {bannerUrl && (
-                <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
+                <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <img src={bannerUrl} alt="Guide banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               )}
