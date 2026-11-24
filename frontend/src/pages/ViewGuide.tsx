@@ -505,6 +505,7 @@ export const ViewGuide: React.FC = () => {
 
   const docFlowList = guide.section_descriptions?.flow || [];
   const itemsList = guide.items || [];
+  const itemsById = new Map<number, any>(itemsList.map((i: any) => [i.id, i]));
 
   const getSectionItemIds = (sectionEl: any) => {
     const ids: number[] = [];
@@ -570,10 +571,10 @@ export const ViewGuide: React.FC = () => {
         document.body
       )}
 
-      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1 }}>
+      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1, backdropFilter: 'none', WebkitBackdropFilter: 'none' }}>
         {canShowGuideImages && guide.section_descriptions?.banner_url && (
           <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-            <img src={guide.section_descriptions.banner_url} alt={guide.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={guide.section_descriptions.banner_url} alt={guide.title} decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
         )}
         <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
@@ -894,6 +895,8 @@ export const ViewGuide: React.FC = () => {
                             <img
                               src={item.image_url}
                               alt={item.title}
+                              loading="lazy"
+                              decoding="async"
                               onClick={() => setZoomedImage(item.image_url)}
                               style={{ width: '36px', height: '54px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
                             />
@@ -920,7 +923,7 @@ export const ViewGuide: React.FC = () => {
             return docFlowList.map((el: any) => {
               if (el.type === 'section') {
                 const sectionIds = getSectionItemIds(el);
-                const isSectionCompleted = sectionIds.length > 0 && sectionIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
+                const isSectionCompleted = sectionIds.length > 0 && sectionIds.every((id: number) => itemsById.get(id)?.is_completed);
                 const isCollapsed = collapsedNodes[el.id] || false;
                 currentSectionCollapsed = isCollapsed;
                 
@@ -928,7 +931,7 @@ export const ViewGuide: React.FC = () => {
                   <React.Fragment key={el.id}>
                     {canShowGuideImages && el.banner_url && (
                       <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', marginTop: '0.5rem', border: '1px solid var(--border-color)' }}>
-                        <img src={el.banner_url} alt={el.title || 'Section cover'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={el.banner_url} alt={el.title || 'Section cover'} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     )}
                     <div id={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: el.banner_url ? '0.25rem' : '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', transition: 'background-color 2.5s ease-out' }}>
@@ -976,7 +979,7 @@ export const ViewGuide: React.FC = () => {
 
                 const blockItemsIds = (el.items || []).map((i: any) => i.id);
                 const blockItems = blockItemsIds
-                  .map((id: number) => itemsList.find((i: any) => i.id === id))
+                  .map((id: number) => itemsById.get(id))
                   .filter(Boolean)
                   .filter((item: any) => {
                     if (minImportanceFilter === null) return true;
@@ -987,7 +990,7 @@ export const ViewGuide: React.FC = () => {
                   return null;
                 }
                 const allBlockIds = getBlockItemIds(el);
-                const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
+                const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsById.get(id)?.is_completed);
                 const isCollapsed = collapsedNodes[el.id] || false;
                 
                 const priorityLabel = getPriorityLabel(el.importance_rank, language);
@@ -1069,6 +1072,8 @@ export const ViewGuide: React.FC = () => {
                                     <img
                                       src={item.image_url}
                                       alt={item.title}
+                                      loading="lazy"
+                                      decoding="async"
                                       onClick={() => setZoomedImage(item.image_url)}
                                       style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
                                     />
@@ -1117,7 +1122,7 @@ export const ViewGuide: React.FC = () => {
                         {(el.subblocks || []).map((sub: any) => {
                           const subItemsIds = (sub.items || []).map((i: any) => i.id);
                           const subItems = subItemsIds
-                            .map((id: number) => itemsList.find((i: any) => i.id === id))
+                            .map((id: number) => itemsById.get(id))
                             .filter(Boolean)
                             .filter((item: any) => {
                               if (minImportanceFilter === null) return true;
@@ -1128,7 +1133,7 @@ export const ViewGuide: React.FC = () => {
                             return null;
                           }
                           const allSubblockIds = getSubblockItemIds(sub);
-                          const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
+                          const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsById.get(id)?.is_completed);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;
                           
                           const blockImportance = el.importance_rank ?? 3;
@@ -1211,6 +1216,8 @@ export const ViewGuide: React.FC = () => {
                                             <img
                                               src={item.image_url}
                                               alt={item.title}
+                                              loading="lazy"
+                                              decoding="async"
                                               onClick={() => setZoomedImage(item.image_url)}
                                               style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in' }}
                                             />

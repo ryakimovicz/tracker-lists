@@ -215,7 +215,9 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
         display: 'flex',
         flexDirection: 'column',
         gap: '0.65rem',
-        flexShrink: 0
+        flexShrink: 0,
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none'
       }}
     >
       <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => onOpenDetails(item)}>
@@ -253,7 +255,6 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
                   alignItems: "center",
                   justifyContent: "center",
                   opacity: 0.95,
-                  backdropFilter: 'blur(4px)',
                   zIndex: 1
                 }}
                 title={label}
@@ -265,7 +266,7 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
 
           if (isGame && specialGameLabel) {
             return (
-              <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+              <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, zIndex: 1 }}>
                 {specialGameLabel}
               </div>
             );
@@ -6842,7 +6843,9 @@ export const Profile: React.FC = () => {
                                 userSelect: 'none',
                                 WebkitUserDrag: 'none',
                                 touchAction: canReorderFavorites ? 'none' : 'auto',
-                                transition: 'opacity 0.2s ease, transform 0.2s ease'
+                                transition: 'opacity 0.2s ease, transform 0.2s ease',
+                                backdropFilter: 'none',
+                                WebkitBackdropFilter: 'none'
                               } as React.CSSProperties}
                             >
                               <div
@@ -6908,7 +6911,6 @@ export const Profile: React.FC = () => {
                                           alignItems: "center",
                                           justifyContent: "center",
                                           opacity: 0.95,
-                                          backdropFilter: 'blur(4px)',
                                           zIndex: 1
                                         }}
                                         title={label}
@@ -6919,7 +6921,7 @@ export const Profile: React.FC = () => {
                                   }
                                   if (isGame && specialGameLabel) {
                                     return (
-                                      <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                      <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, zIndex: 1 }}>
                                         {specialGameLabel}
                                       </div>
                                     );

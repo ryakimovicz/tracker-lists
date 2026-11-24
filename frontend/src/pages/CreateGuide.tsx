@@ -2323,7 +2323,7 @@ export const CreateGuide: React.FC = () => {
 
                         {element.banner_url && (
                           <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                            <img src={element.banner_url} alt={element.title || 'Section cover'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={element.banner_url} alt={element.title || 'Section cover'} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         )}
 
@@ -2766,6 +2766,8 @@ export const CreateGuide: React.FC = () => {
                                     <img
                                       src={item.image_url}
                                       alt={item.title}
+                                      loading="lazy"
+                                      decoding="async"
                                       onClick={() => setZoomedImage(item.image_url)}
                                       style={{ width: '36px', height: '52px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in', flexShrink: 0 }}
                                     />
@@ -3158,6 +3160,8 @@ export const CreateGuide: React.FC = () => {
                                         <img
                                           src={item.image_url}
                                           alt={item.title}
+                                          loading="lazy"
+                                          decoding="async"
                                           onClick={() => setZoomedImage(item.image_url)}
                                           style={{ width: '28px', height: '40px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in', flexShrink: 0 }}
                                         />
