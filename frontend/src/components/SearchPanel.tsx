@@ -175,8 +175,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           </form>
 
           {/* Category Tabs */}
-          {searchResults.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem', paddingBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem', paddingBottom: '0.5rem' }}>
               {sortFilterTabs([
                 { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
@@ -210,8 +209,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                   </button>
                 );
               })}
-            </div>
-          )}
+          </div>
 
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
             {searchResults.length === 0 && !isSearching && (
