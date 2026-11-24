@@ -563,16 +563,26 @@ def update_list(
 
     from app.services.activity_service import ActivityService
 
-    # Record guide_edited activity
-    ActivityService.record_activity(
-        db=db,
-        user_id=current_user.id,
-        activity_type="guide_edited",
-        item_title=reading_list.title,
-        item_type="guide",
-        list_id=reading_list.id,
-        details="edited"
+    new_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
+    is_published_update = (
+        reading_list.visibility != VisibilityEnum.DRAFT
+        and (
+            old_visibility == VisibilityEnum.DRAFT
+            or new_flow != old_flow
+            or list_in.title is not None
+            or list_in.description is not None
+        )
     )
+    if is_published_update:
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="guide_edited",
+            item_title=reading_list.title,
+            item_type="guide",
+            list_id=reading_list.id,
+            details="edited"
+        )
 
     return reading_list
 
