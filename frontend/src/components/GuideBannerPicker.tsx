@@ -58,12 +58,6 @@ export const GuideBannerPicker: React.FC<GuideBannerPickerProps> = ({
         <ImageIcon size={15} /> {language === 'es' ? 'Portada' : 'Cover'}
       </label>
 
-      {bannerUrl && (
-        <div style={{ position: 'relative', width: '100%', height: '220px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-          <img src={bannerUrl} alt="Guide banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-      )}
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <button
           type="button"

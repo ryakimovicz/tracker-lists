@@ -20,6 +20,7 @@ interface BackgroundSelectorModalProps {
   onClose: () => void;
   currentBackgroundUrl?: string | null;
   onBackgroundUpdated: (newUrl: string | null) => void;
+  mode?: 'profile' | 'guide';
 }
 
 // Client-side session cache for instant subsequent searches
@@ -30,6 +31,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   onClose,
   currentBackgroundUrl,
   onBackgroundUpdated,
+  mode = 'profile',
 }) => {
   const { language, t } = useTranslation();
   const { user, refreshProfile } = useAuth();
@@ -134,8 +136,10 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/background', { background_url: selectedUrl, background_category: selectedItemCategory });
-      await refreshProfile();
+      if (mode === 'profile') {
+        await apiClient.put('/users/me/background', { background_url: selectedUrl, background_category: selectedItemCategory });
+        await refreshProfile();
+      }
       onBackgroundUpdated(selectedUrl);
       onClose();
     } catch (err: any) {
@@ -154,8 +158,10 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/background', { background_url: null });
-      await refreshProfile();
+      if (mode === 'profile') {
+        await apiClient.put('/users/me/background', { background_url: null });
+        await refreshProfile();
+      }
       setSelectedUrl(null);
       onBackgroundUpdated(null);
       onClose();
@@ -270,6 +276,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
         </div>
 
         {/* Live Preview of Selected Profile Background */}
+        {mode === 'profile' && (
         <div
           className="background-preview-box customize-modal-preview"
           style={{
@@ -398,6 +405,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
             </div>
           </div>
         </div>
+        )}
 
         {/* Search Input & Submit Button */}
         <form className="customize-modal-search" onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>

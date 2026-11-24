@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
@@ -539,14 +540,30 @@ export const ViewGuide: React.FC = () => {
         </button>
       </div>
 
-      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
+      {guide.section_descriptions?.background_url && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            backgroundImage: `url(${guide.section_descriptions.background_url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.14,
+            pointerEvents: 'none'
+          }}
+        />,
+        document.body
+      )}
+
+      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1 }}>
+        {guide.section_descriptions?.banner_url && (
+          <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+            <img src={guide.section_descriptions.banner_url} alt={guide.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
         <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          {guide.section_descriptions?.banner_url && (
-            <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
-              <img src={guide.section_descriptions.banner_url} alt={guide.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-          )}
           <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{guide.title}</h1>
             {guide.description && (
               <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: 0, fontStyle: 'italic', lineHeight: '1.4' }}>

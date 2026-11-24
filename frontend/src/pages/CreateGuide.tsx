@@ -4,6 +4,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { SearchPanel } from '../components/SearchPanel';
 import { GuideBannerPicker } from '../components/GuideBannerPicker';
+import { GuideBackgroundPicker } from '../components/GuideBackgroundPicker';
 import {
   ArrowRight,
   PlusCircle,
@@ -343,6 +344,7 @@ export const CreateGuide: React.FC = () => {
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerItemType, setBannerItemType] = useState<string | null>(null);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
 
   // Step 2: Word-style Document Flow Editor state
   const [docFlow, setDocFlow] = useState<DocElement[]>([]);
@@ -428,6 +430,7 @@ export const CreateGuide: React.FC = () => {
       setDocFlow(flowToLoad);
       setBannerUrl(savedStructure?.banner_url || null);
       setBannerItemType(savedStructure?.banner_item_type || null);
+      setBackgroundUrl(savedStructure?.background_url || null);
     }
   }, [guide]);
 
@@ -469,7 +472,8 @@ export const CreateGuide: React.FC = () => {
           draft_title: title.trim(),
           draft_description: description.trim(),
           banner_url: bannerUrl,
-          banner_item_type: bannerItemType
+          banner_item_type: bannerItemType,
+          background_url: backgroundUrl
         };
         await apiClient.put(`/lists/${guide.id}`, {
           section_descriptions: updatedSecDesc
@@ -484,7 +488,7 @@ export const CreateGuide: React.FC = () => {
     }, 1500);
 
     return () => clearTimeout(delayDebounce);
-  }, [docFlow, title, description, bannerUrl, bannerItemType, guide?.id]);
+  }, [docFlow, title, description, bannerUrl, bannerItemType, backgroundUrl, guide?.id]);
 
   const handleCreateGuideSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -547,16 +551,20 @@ export const CreateGuide: React.FC = () => {
           draft_description: description.trim(),
           banner_url: bannerUrl,
           banner_item_type: bannerItemType,
+          background_url: backgroundUrl,
           intended_visibility: visibility
         }
       });
       const createdGuide = response.data;
-      if (!createdGuide.section_descriptions?.draft_flow?.length) {
-        createdGuide.section_descriptions = {
-          ...(createdGuide.section_descriptions || {}),
-          draft_flow: initialFlow
-        };
-      }
+      createdGuide.section_descriptions = {
+        ...(createdGuide.section_descriptions || {}),
+        draft_flow: createdGuide.section_descriptions?.draft_flow?.length
+          ? createdGuide.section_descriptions.draft_flow
+          : initialFlow,
+        banner_url: createdGuide.section_descriptions?.banner_url ?? bannerUrl,
+        banner_item_type: createdGuide.section_descriptions?.banner_item_type ?? bannerItemType,
+        background_url: createdGuide.section_descriptions?.background_url ?? backgroundUrl
+      };
       setGuide(createdGuide);
       setDocFlow(initialFlow);
       setSuccessMsg(language === 'es' ? '¡Guía creada con éxito en modo Borrador!' : 'Guide created successfully as Draft!');
@@ -582,7 +590,8 @@ export const CreateGuide: React.FC = () => {
         draft_title: title.trim(),
         draft_description: description.trim(),
         banner_url: bannerUrl,
-        banner_item_type: bannerItemType
+        banner_item_type: bannerItemType,
+        background_url: backgroundUrl
       };
       
       const response = await apiClient.put(`/lists/${guide.id}`, {
@@ -1753,22 +1762,53 @@ export const CreateGuide: React.FC = () => {
         </div>
       )}
 
+      {backgroundUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            backgroundImage: `url(${backgroundUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.14,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
       {/* STEP 1: CREATE GUIDE DETAILS FORM */}
       {!guide ? (
         <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <h2>{language === 'es' ? 'Crear Nueva Guía' : 'Create New Guide'}</h2>
           
-          <GuideBannerPicker
-            bannerUrl={bannerUrl}
-            onChange={(url, itemType) => {
-              setBannerUrl(url);
-              setBannerItemType(itemType || null);
-            }}
-            currentUser={currentUser}
-            language={language}
-          />
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <GuideBackgroundPicker
+                backgroundUrl={backgroundUrl}
+                onChange={(url) => setBackgroundUrl(url)}
+                currentUser={currentUser}
+                language={language}
+              />
+            </div>
+            <div>
+              <GuideBannerPicker
+                bannerUrl={bannerUrl}
+                onChange={(url, itemType) => {
+                  setBannerUrl(url);
+                  setBannerItemType(itemType || null);
+                }}
+                currentUser={currentUser}
+                language={language}
+              />
+            </div>
+          </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {bannerUrl && (
+              <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
+                <img src={bannerUrl} alt="Guide banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            )}
             <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Guía' : 'Guide Title'}</label>
             <input
               type="text"
@@ -1953,17 +1993,32 @@ export const CreateGuide: React.FC = () => {
             
             {/* Title Block */}
             <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <GuideBannerPicker
-                  bannerUrl={bannerUrl}
-                  onChange={(url, itemType) => {
-                    setBannerUrl(url);
-                    setBannerItemType(itemType || null);
-                  }}
-                  currentUser={currentUser}
-                  language={language}
-                />
+              <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div>
+                  <GuideBackgroundPicker
+                    backgroundUrl={backgroundUrl}
+                    onChange={(url) => setBackgroundUrl(url)}
+                    currentUser={currentUser}
+                    language={language}
+                  />
+                </div>
+                <div>
+                  <GuideBannerPicker
+                    bannerUrl={bannerUrl}
+                    onChange={(url, itemType) => {
+                      setBannerUrl(url);
+                      setBannerItemType(itemType || null);
+                    }}
+                    currentUser={currentUser}
+                    language={language}
+                  />
+                </div>
               </div>
+              {bannerUrl && (
+                <div style={{ width: '100%', height: '280px', borderRadius: '12px', overflow: 'hidden', marginBottom: '0.75rem', border: '1px solid var(--border-color)' }}>
+                  <img src={bannerUrl} alt="Guide banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
               <input
                 type="text"
                 value={title}
