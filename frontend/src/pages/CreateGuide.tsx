@@ -127,6 +127,153 @@ const PasteZone = ({
   );
 };
 
+const InsertZone = ({
+  onAddSection,
+  onAddBlock,
+  language
+}: {
+  onAddSection: () => void;
+  onAddBlock: () => void;
+  language: string;
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        height: isHovered ? '36px' : '18px',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        transition: 'all 0.18s ease',
+        margin: '2px 0'
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '50%',
+          height: '1px',
+          background: isHovered ? 'var(--accent-primary)' : 'rgba(148, 163, 184, 0.28)',
+          opacity: isHovered ? 0.5 : 0.7,
+          transition: 'all 0.18s ease',
+          pointerEvents: 'none'
+        }}
+      />
+      {!isHovered ? (
+        <span
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '18px',
+            height: '18px',
+            borderRadius: '999px',
+            background: 'var(--bg-secondary, #1e293b)',
+            border: '1px solid rgba(148, 163, 184, 0.35)',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.55
+          }}
+        >
+          <Plus size={11} />
+        </span>
+      ) : (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'var(--bg-primary, #0f172a)',
+            padding: '0 0.5rem'
+          }}
+        >
+          <button
+            type="button"
+            onClick={onAddSection}
+            className="btn-secondary"
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.6rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              borderColor: 'var(--accent-primary)',
+              color: 'var(--accent-primary)'
+            }}
+          >
+            <Plus size={12} /> {language === 'es' ? 'Sección' : 'Section'}
+          </button>
+          <button
+            type="button"
+            onClick={onAddBlock}
+            className="btn-secondary"
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.6rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
+          >
+            <Plus size={12} /> {language === 'es' ? 'Bloque' : 'Block'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SubblockInsertZone = ({
+  onAddSubblock,
+  language
+}: {
+  onAddSubblock: () => void;
+  language: string;
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={onAddSubblock}
+      style={{
+        height: isHovered ? '34px' : '20px',
+        width: '100%',
+        marginTop: '0.35rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '6px',
+        border: isHovered ? '1px dashed var(--accent-primary)' : '1px dashed rgba(148, 163, 184, 0.25)',
+        background: isHovered ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+        color: isHovered ? 'var(--accent-primary)' : 'var(--text-secondary)',
+        opacity: isHovered ? 1 : 0.55,
+        cursor: 'pointer',
+        fontSize: '0.78rem',
+        fontWeight: 500,
+        transition: 'all 0.18s ease',
+        gap: '0.35rem'
+      }}
+    >
+      <Plus size={13} />
+      {isHovered && (
+        <span>{language === 'es' ? 'Agregar Subbloque' : 'Add Subblock'}</span>
+      )}
+    </div>
+  );
+};
+
 export const CreateGuide: React.FC = () => {
   const { t, language } = useTranslation();
   const { user: currentUser } = useAuth();
@@ -366,17 +513,24 @@ export const CreateGuide: React.FC = () => {
   };
 
   // Document actions
-  const addSection = () => {
+  const addSection = (insertIndex?: number) => {
     const newSec: DocElement = {
       id: `sec-${Date.now()}`,
       type: 'section',
       title: '',
       description: ''
     };
-    setDocFlow(prev => [...prev, newSec]);
+    setDocFlow(prev => {
+      if (typeof insertIndex === 'number') {
+        const next = [...prev];
+        next.splice(insertIndex, 0, newSec);
+        return next;
+      }
+      return [...prev, newSec];
+    });
   };
 
-  const addBlock = () => {
+  const addBlock = (insertIndex?: number) => {
     const newBlk: DocElement = {
       id: `blk-${Date.now()}`,
       type: 'block',
@@ -386,7 +540,14 @@ export const CreateGuide: React.FC = () => {
       items: [],
       subblocks: []
     };
-    setDocFlow(prev => [...prev, newBlk]);
+    setDocFlow(prev => {
+      if (typeof insertIndex === 'number') {
+        const next = [...prev];
+        next.splice(insertIndex, 0, newBlk);
+        return next;
+      }
+      return [...prev, newBlk];
+    });
   };
 
   const addSubblock = (blockId: string) => {
@@ -1673,15 +1834,9 @@ export const CreateGuide: React.FC = () => {
               </div>
             </div>
 
-            {/* Bottom Row: Document Builders (+ Nueva Sección, + Nuevo Bloque, Pegar Sección) */}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
-              <button onClick={addSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
-                <FolderPlus size={16} /> {language === 'es' ? '+ Nueva Sección' : '+ New Section'}
-              </button>
-              <button onClick={addBlock} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
-                <LayoutGrid size={16} /> {language === 'es' ? '+ Nuevo Bloque' : '+ New Block'}
-              </button>
-              {clipboard && clipboard.type === 'section' && (
+            {/* Bottom Row: Pegar Sección (solo cuando hay sección en portapapeles) */}
+            {clipboard && clipboard.type === 'section' && (
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button onClick={() => handlePasteSection()} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                     <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección al final' : 'Paste Section at end'}
@@ -1690,8 +1845,8 @@ export const CreateGuide: React.FC = () => {
                     {language === 'es' ? 'Cancelar' : 'Cancel'}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Document Canvas Container */}
@@ -1961,6 +2116,13 @@ export const CreateGuide: React.FC = () => {
                         }}>
                           <span>{language === 'es' ? '⬇ Soltar sección aquí' : '⬇ Drop section here'}</span>
                         </div>
+                      )}
+                      {!pointerDrag && !clipboard && (
+                        <InsertZone
+                          onAddSection={() => addSection(index + 1)}
+                          onAddBlock={() => addBlock(index + 1)}
+                          language={language}
+                        />
                       )}
                       </React.Fragment>
                     );
@@ -2799,14 +2961,22 @@ export const CreateGuide: React.FC = () => {
                           handlePaste={handlePaste} 
                         />
 
-                        {/* Add subblock trigger button */}
-                        <button type="button" onClick={() => addSubblock(element.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', borderStyle: 'dashed', marginTop: '0.5rem' }}>
-                          <PlusCircle size={14} /> {language === 'es' ? 'Crear Subbloque' : 'Create Subblock'}
-                        </button>
+                        {/* Add subblock contextual hover zone */}
+                        <SubblockInsertZone
+                          onAddSubblock={() => addSubblock(element.id)}
+                          language={language}
+                        />
 
                         </div>
                       );
                     })()}
+                    {!pointerDrag && !clipboard && (
+                      <InsertZone
+                        onAddSection={() => addSection(index + 1)}
+                        onAddBlock={() => addBlock(index + 1)}
+                        language={language}
+                      />
+                    )}
                     </React.Fragment>
                       );
                     }
