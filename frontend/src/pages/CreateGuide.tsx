@@ -137,6 +137,7 @@ const InsertZone = ({
   language: string;
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [hoveredBtn, setHoveredBtn] = useState<'section' | 'block' | null>(null);
 
   return (
     <div
@@ -160,8 +161,8 @@ const InsertZone = ({
           right: 0,
           top: '50%',
           height: '1px',
-          background: isHovered ? 'var(--accent-primary)' : 'rgba(148, 163, 184, 0.28)',
-          opacity: isHovered ? 0.5 : 0.7,
+          background: 'rgba(148, 163, 184, 0.28)',
+          opacity: isHovered ? 0 : 0.7,
           transition: 'all 0.18s ease',
           pointerEvents: 'none'
         }}
@@ -192,23 +193,27 @@ const InsertZone = ({
             zIndex: 1,
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            background: 'var(--bg-primary, #0f172a)',
-            padding: '0 0.5rem'
+            gap: '0.5rem'
           }}
         >
           <button
             type="button"
             onClick={onAddSection}
-            className="btn-secondary"
+            onMouseEnter={() => setHoveredBtn('section')}
+            onMouseLeave={() => setHoveredBtn(null)}
             style={{
               fontSize: '0.75rem',
               padding: '0.2rem 0.6rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.3rem',
-              borderColor: 'var(--accent-primary)',
-              color: 'var(--accent-primary)'
+              borderRadius: '999px',
+              border: '1px solid var(--accent-primary)',
+              boxShadow: hoveredBtn === 'section' ? '0 0 0 1px var(--accent-primary)' : 'none',
+              background: 'transparent',
+              color: 'var(--accent-primary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
           >
             <Plus size={12} /> {language === 'es' ? 'Sección' : 'Section'}
@@ -216,13 +221,20 @@ const InsertZone = ({
           <button
             type="button"
             onClick={onAddBlock}
-            className="btn-secondary"
+            onMouseEnter={() => setHoveredBtn('block')}
+            onMouseLeave={() => setHoveredBtn(null)}
             style={{
               fontSize: '0.75rem',
               padding: '0.2rem 0.6rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.3rem'
+              gap: '0.3rem',
+              borderRadius: '999px',
+              border: `1px solid ${hoveredBtn === 'block' ? 'var(--text-primary)' : 'var(--border-color)'}`,
+              background: 'transparent',
+              color: hoveredBtn === 'block' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
           >
             <Plus size={12} /> {language === 'es' ? 'Bloque' : 'Block'}
@@ -241,34 +253,79 @@ const SubblockInsertZone = ({
   language: string;
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isBtnHovered, setIsBtnHovered] = useState(false);
 
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={onAddSubblock}
+      onMouseLeave={() => { setIsHovered(false); setIsBtnHovered(false); }}
       style={{
-        height: isHovered ? '34px' : '20px',
+        height: isHovered ? '36px' : '18px',
         width: '100%',
         marginTop: '0.35rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: '6px',
-        border: isHovered ? '1px dashed var(--accent-primary)' : '1px dashed rgba(148, 163, 184, 0.25)',
-        background: isHovered ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
-        color: isHovered ? 'var(--accent-primary)' : 'var(--text-secondary)',
-        opacity: isHovered ? 1 : 0.55,
-        cursor: 'pointer',
-        fontSize: '0.78rem',
-        fontWeight: 500,
-        transition: 'all 0.18s ease',
-        gap: '0.35rem'
+        position: 'relative',
+        transition: 'all 0.18s ease'
       }}
     >
-      <Plus size={13} />
-      {isHovered && (
-        <span>{language === 'es' ? 'Agregar Subbloque' : 'Add Subblock'}</span>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '50%',
+          height: '1px',
+          background: 'rgba(148, 163, 184, 0.28)',
+          opacity: isHovered ? 0 : 0.7,
+          transition: 'all 0.18s ease',
+          pointerEvents: 'none'
+        }}
+      />
+      {!isHovered ? (
+        <span
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '18px',
+            height: '18px',
+            borderRadius: '999px',
+            background: 'var(--bg-secondary, #1e293b)',
+            border: '1px solid rgba(148, 163, 184, 0.35)',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.55
+          }}
+        >
+          <Plus size={11} />
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onAddSubblock}
+          onMouseEnter={() => setIsBtnHovered(true)}
+          onMouseLeave={() => setIsBtnHovered(false)}
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            fontSize: '0.75rem',
+            padding: '0.2rem 0.6rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            borderRadius: '999px',
+            border: `1px solid ${isBtnHovered ? 'var(--text-primary)' : 'var(--border-color)'}`,
+            background: 'transparent',
+            color: isBtnHovered ? 'var(--text-primary)' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Plus size={12} /> {language === 'es' ? 'Subbloque' : 'Subblock'}
+        </button>
       )}
     </div>
   );
