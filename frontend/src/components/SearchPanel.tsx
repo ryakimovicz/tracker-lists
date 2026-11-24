@@ -40,21 +40,25 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   const [manualTitle, setManualTitle] = useState('');
   const [manualDescription, setManualDescription] = useState('');
 
-  const triggerSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runSearch = async (tabValue: string) => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     try {
-      const response = await apiClient.get('/search/all', {
-        params: { q: searchQuery }
-      });
+      const response = tabValue === 'all'
+        ? await apiClient.get('/search/all', { params: { q: searchQuery } })
+        : await apiClient.get('/search/', { params: { q: searchQuery, type: tabValue } });
       setSearchResults(response.data);
     } catch (err: any) {
       console.error(err);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const triggerSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runSearch(activeSearchTab);
   };
 
   const handleManualAdd = (e: React.FormEvent) => {
@@ -194,7 +198,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                   <button
                     key={tab.value}
                     type="button"
-                    onClick={() => setActiveSearchTab(tab.value as any)}
+                    onClick={() => {
+                      setActiveSearchTab(tab.value as any);
+                      if (searchQuery.trim() && tab.value !== activeSearchTab) {
+                        runSearch(tab.value);
+                      }
+                    }}
                     style={{
                       padding: '0.2rem 0.55rem', borderRadius: '15px', border: '1px solid',
                       borderColor: isSelected ? tabColor : 'var(--border-color)',
