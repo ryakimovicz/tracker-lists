@@ -491,13 +491,13 @@ export const CreateGuide: React.FC = () => {
         {
           id: `sec-${now}-1`,
           type: 'section',
-          title: 'Sección 1',
+          title: '',
           description: ''
         },
         {
           id: `blk-${now}-1`,
           type: 'block',
-          title: 'Bloque 1_1',
+          title: '',
           description: '',
           importance_rank: 3,
           items: [],
@@ -506,7 +506,7 @@ export const CreateGuide: React.FC = () => {
         {
           id: `blk-${now}-2`,
           type: 'block',
-          title: 'Bloque 1_2',
+          title: '',
           description: '',
           importance_rank: 3,
           items: [],
@@ -515,13 +515,13 @@ export const CreateGuide: React.FC = () => {
         {
           id: `sec-${now}-2`,
           type: 'section',
-          title: 'Sección 2',
+          title: '',
           description: ''
         },
         {
           id: `blk-${now}-3`,
           type: 'block',
-          title: 'Bloque 2_1',
+          title: '',
           description: '',
           importance_rank: 3,
           items: [],
