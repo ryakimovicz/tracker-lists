@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { SearchPanel } from '../components/SearchPanel';
+import { GuideBannerPicker } from '../components/GuideBannerPicker';
 import {
   ArrowRight,
   PlusCircle,
@@ -340,6 +341,8 @@ export const CreateGuide: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerItemType, setBannerItemType] = useState<string | null>(null);
 
   // Step 2: Word-style Document Flow Editor state
   const [docFlow, setDocFlow] = useState<DocElement[]>([]);
@@ -423,6 +426,8 @@ export const CreateGuide: React.FC = () => {
         ? savedStructure.draft_flow
         : (savedStructure && Array.isArray(savedStructure.flow) ? savedStructure.flow : []);
       setDocFlow(flowToLoad);
+      setBannerUrl(savedStructure?.banner_url || null);
+      setBannerItemType(savedStructure?.banner_item_type || null);
     }
   }, [guide]);
 
@@ -462,7 +467,9 @@ export const CreateGuide: React.FC = () => {
           ...guide.section_descriptions,
           draft_flow: docFlow,
           draft_title: title.trim(),
-          draft_description: description.trim()
+          draft_description: description.trim(),
+          banner_url: bannerUrl,
+          banner_item_type: bannerItemType
         };
         await apiClient.put(`/lists/${guide.id}`, {
           section_descriptions: updatedSecDesc
@@ -477,7 +484,7 @@ export const CreateGuide: React.FC = () => {
     }, 1500);
 
     return () => clearTimeout(delayDebounce);
-  }, [docFlow, title, description, guide?.id]);
+  }, [docFlow, title, description, bannerUrl, bannerItemType, guide?.id]);
 
   const handleCreateGuideSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -538,6 +545,8 @@ export const CreateGuide: React.FC = () => {
           draft_flow: initialFlow,
           draft_title: title.trim(),
           draft_description: description.trim(),
+          banner_url: bannerUrl,
+          banner_item_type: bannerItemType,
           intended_visibility: visibility
         }
       });
@@ -571,7 +580,9 @@ export const CreateGuide: React.FC = () => {
         flow: docFlow,
         draft_flow: docFlow,
         draft_title: title.trim(),
-        draft_description: description.trim()
+        draft_description: description.trim(),
+        banner_url: bannerUrl,
+        banner_item_type: bannerItemType
       };
       
       const response = await apiClient.put(`/lists/${guide.id}`, {
@@ -1747,6 +1758,16 @@ export const CreateGuide: React.FC = () => {
         <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <h2>{language === 'es' ? 'Crear Nueva Guía' : 'Create New Guide'}</h2>
           
+          <GuideBannerPicker
+            bannerUrl={bannerUrl}
+            onChange={(url, itemType) => {
+              setBannerUrl(url);
+              setBannerItemType(itemType || null);
+            }}
+            currentUser={currentUser}
+            language={language}
+          />
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Guía' : 'Guide Title'}</label>
             <input
@@ -1932,6 +1953,17 @@ export const CreateGuide: React.FC = () => {
             
             {/* Title Block */}
             <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <GuideBannerPicker
+                  bannerUrl={bannerUrl}
+                  onChange={(url, itemType) => {
+                    setBannerUrl(url);
+                    setBannerItemType(itemType || null);
+                  }}
+                  currentUser={currentUser}
+                  language={language}
+                />
+              </div>
               <input
                 type="text"
                 value={title}

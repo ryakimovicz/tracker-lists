@@ -20,6 +20,7 @@ interface BannerSelectorModalProps {
   onClose: () => void;
   currentBannerUrl?: string | null;
   onBannerUpdated: (newUrl: string | null) => void;
+  mode?: 'profile' | 'guide';
 }
 
 // Client-side session cache for instant subsequent searches
@@ -30,6 +31,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   onClose,
   currentBannerUrl,
   onBannerUpdated,
+  mode = 'profile',
 }) => {
   const { language, t } = useTranslation();
   const { user, refreshProfile } = useAuth();
@@ -135,8 +137,10 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/banner', { banner_url: selectedUrl, banner_category: selectedItemCategory });
-      await refreshProfile();
+      if (mode === 'profile') {
+        await apiClient.put('/users/me/banner', { banner_url: selectedUrl, banner_category: selectedItemCategory });
+        await refreshProfile();
+      }
       onBannerUpdated(selectedUrl);
       onClose();
     } catch (err: any) {
@@ -153,7 +157,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     setIsSaving(true);
     setErrorMsg('');
     try {
-      await apiClient.put('/users/me/banner', { banner_url: null });
+      if (mode === 'profile') {
+        await apiClient.put('/users/me/banner', { banner_url: null });
+      }
       setSelectedUrl(null);
       await refreshProfile();
       onBannerUpdated(null);
@@ -232,7 +238,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {isEs ? 'Portada de Perfil' : 'Profile Banner'}
+                {mode === 'guide'
+                  ? (isEs ? 'Portada de Guía' : 'Guide Cover')
+                  : (isEs ? 'Portada de Perfil' : 'Profile Banner')}
                 <span
                   style={{
                     fontSize: '0.7rem',
@@ -247,9 +255,13 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                 </span>
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {isEs
-                  ? 'Elige una imagen panorámica de alta definición para el encabezado de tu perfil'
-                  : 'Choose a high-definition panoramic wallpaper for your profile header'}
+                {mode === 'guide'
+                  ? (isEs
+                    ? 'Elige una imagen panorámica de alta definición para la portada de tu guía'
+                    : 'Choose a high-definition panoramic wallpaper for your guide cover')
+                  : (isEs
+                    ? 'Elige una imagen panorámica de alta definición para el encabezado de tu perfil'
+                    : 'Choose a high-definition panoramic wallpaper for your profile header')}
               </span>
             </div>
           </div>
@@ -269,6 +281,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
         </div>
 
         {/* Live Preview of Selected Banner (Matches Profile Header 1:1) */}
+        {mode === 'profile' && (
         <div
           className="banner-preview-box customize-modal-preview"
           style={{
@@ -384,6 +397,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             </span>
           </div>
         </div>
+        )}
 
 
 
