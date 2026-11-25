@@ -126,6 +126,7 @@ class UpNextItemResponse(BaseModel):
     is_addition: bool = False
     addition_id: Optional[int] = None
     addition_item_id: Optional[int] = None
+    next_items: List[dict] = []
 
     class Config:
         from_attributes = True

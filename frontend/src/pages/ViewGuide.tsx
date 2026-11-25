@@ -403,68 +403,64 @@ export const ViewGuide: React.FC = () => {
 
   const handleToggleItemProgress = async (itemId: number) => {
     if (!guide) return;
+    const prevGuide = guide;
+
+    // Optimistic update (0ms UI latency)
+    setGuide((prev: any) => {
+      if (!prev) return null;
+      const updatedItems = (prev.items || []).map((item: any) =>
+        item.id === itemId ? { ...item, is_completed: !item.is_completed } : item
+      );
+      const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
+      const totalCount = updatedItems.length;
+      const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      return {
+        ...prev,
+        items: updatedItems,
+        completed_count: completedCount,
+        progress_percentage: Math.round(progressPercentage * 100) / 100
+      };
+    });
+
     try {
       await apiClient.post(`/lists/items/${itemId}/toggle`);
-      
-      // Update completion status in local viewing state
-      setGuide((prev: any) => {
-        if (!prev) return null;
-        let toggledState = false;
-        const updatedItems = (prev.items || []).map((item: any) => {
-          if (item.id === itemId) {
-            toggledState = !item.is_completed;
-            return { ...item, is_completed: toggledState };
-          }
-          return item;
-        });
-
-        const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
-        const totalCount = updatedItems.length;
-        const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-        return {
-          ...prev,
-          items: updatedItems,
-          completed_count: completedCount,
-          progress_percentage: Math.round(progressPercentage * 100) / 100
-        };
-      });
-
+      window.dispatchEvent(new Event('library-updated'));
     } catch (err: any) {
+      setGuide(prevGuide);
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to toggle item progress.');
     }
   };
 
   const handleBulkToggle = async (itemIds: number[], completed: boolean) => {
     if (!guide || itemIds.length === 0) return;
+    const prevGuide = guide;
+
+    // Optimistic update (0ms UI latency)
+    setGuide((prev: any) => {
+      if (!prev) return null;
+      const idSet = new Set(itemIds);
+      const updatedItems = (prev.items || []).map((item: any) =>
+        idSet.has(item.id) ? { ...item, is_completed: completed } : item
+      );
+      const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
+      const totalCount = updatedItems.length;
+      const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      return {
+        ...prev,
+        items: updatedItems,
+        completed_count: completedCount,
+        progress_percentage: Math.round(progressPercentage * 100) / 100
+      };
+    });
+
     try {
       await apiClient.post(`/lists/${guide.id}/items/bulk-toggle`, {
         item_ids: itemIds,
         completed
       });
-
-      setGuide((prev: any) => {
-        if (!prev) return null;
-        const updatedItems = (prev.items || []).map((item: any) => {
-          if (itemIds.includes(item.id)) {
-            return { ...item, is_completed: completed };
-          }
-          return item;
-        });
-
-        const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
-        const totalCount = updatedItems.length;
-        const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-        return {
-          ...prev,
-          items: updatedItems,
-          completed_count: completedCount,
-          progress_percentage: Math.round(progressPercentage * 100) / 100
-        };
-      });
-
+      window.dispatchEvent(new Event('library-updated'));
     } catch (err: any) {
+      setGuide(prevGuide);
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to update bulk progress.');
     }
   };

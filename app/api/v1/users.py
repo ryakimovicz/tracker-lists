@@ -638,8 +638,8 @@ def get_user_up_next(
             if not inserted:
                 merged_items.append((ai.id, ai, True, ai.addition_id, ai.id))
                 
-        # Find the first item in the merged list that is NOT completed or skipped
-        first_uncompleted = None
+        # Collect up to 10 uncompleted items in the merged list for instant optimistic advancing on the client
+        uncompleted_queue = []
         for item_id, item, is_addition, add_id, add_item_id in merged_items:
             is_completed = False
             if is_addition:
@@ -653,11 +653,31 @@ def get_user_up_next(
                 is_completed = True
                 
             if not is_completed:
-                first_uncompleted = (item, is_addition, add_id, add_item_id)
-                break
+                uncompleted_queue.append((item, is_addition, add_id, add_item_id))
+                if len(uncompleted_queue) >= 10:
+                    break
                 
+        first_uncompleted = uncompleted_queue[0] if uncompleted_queue else None
         if first_uncompleted:
             item, is_addition, add_id, add_item_id = first_uncompleted
+            next_items_payload = [
+                {
+                    "item_id": nxt_item.id,
+                    "list_id": rlist.id,
+                    "list_title": rlist.title,
+                    "order_index": nxt_item.order_index,
+                    "item_type": nxt_item.item_type,
+                    "external_id": nxt_item.external_id,
+                    "title": nxt_item.title,
+                    "image_url": nxt_item.image_url,
+                    "custom_notes": getattr(nxt_item, "custom_notes", None),
+                    "section": getattr(nxt_item, "section", None),
+                    "is_addition": nxt_is_add,
+                    "addition_id": nxt_add_id,
+                    "addition_item_id": nxt_add_item_id,
+                }
+                for (nxt_item, nxt_is_add, nxt_add_id, nxt_add_item_id) in uncompleted_queue[1:]
+            ]
             item_title_val = item.title
             list_title_val = rlist.title
             
@@ -693,7 +713,8 @@ def get_user_up_next(
                 section=item.section,
                 is_addition=is_addition,
                 addition_id=add_id,
-                addition_item_id=add_item_id
+                addition_item_id=add_item_id,
+                next_items=next_items_payload
             )
             
             if rlist.id in personal_tracker_ids or (rlist.title and rlist.title.startswith("Tracker: ")):

@@ -2951,23 +2951,28 @@ export const Home: React.FC = () => {
 
   const handleStartConsuming = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
-    if (item.is_addition) {
-      try {
-        await apiClient.post(`/additions/items/additions/${item.addition_item_id}/toggle`);
-        fetchDashboard(true);
-        window.dispatchEvent(new Event('library-updated'));
-      } catch (err) {
-        console.error(err);
-      }
-      return;
-    }
-
-    if (item.item_id) {
+    if (item.item_id || item.is_addition) {
       const prevGuides = [...upNextGuides];
-      setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
+      if (nextQueue.length > 0) {
+        const [nextItem, ...restQueue] = nextQueue;
+        setUpNextGuides(prev => prev.map(g =>
+          g.list_id === item.list_id
+            ? { ...g, ...nextItem, list_title: g.list_title, next_items: restQueue }
+            : g
+        ));
+      } else {
+        setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      }
       try {
-        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
+        const endpoint = item.is_addition
+          ? `/additions/items/additions/${item.addition_item_id}/toggle`
+          : `/lists/items/${item.item_id}/toggle`;
+        await apiClient.post(endpoint);
         window.dispatchEvent(new Event('library-updated'));
+        if (nextQueue.length <= 1) {
+          fetchDashboard(true);
+        }
       } catch (err) {
         console.error(err);
         setUpNextGuides(prevGuides);
@@ -3001,23 +3006,28 @@ export const Home: React.FC = () => {
 
   const handleMarkCompleted = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
-    if (item.is_addition) {
-      try {
-        await apiClient.post(`/additions/items/additions/${item.addition_item_id}/toggle`);
-        fetchDashboard(true);
-        window.dispatchEvent(new Event('library-updated'));
-      } catch (err) {
-        console.error(err);
-      }
-      return;
-    }
-
-    if (item.item_id) {
+    if (item.item_id || item.is_addition) {
       const prevGuides = [...upNextGuides];
-      setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
+      if (nextQueue.length > 0) {
+        const [nextItem, ...restQueue] = nextQueue;
+        setUpNextGuides(prev => prev.map(g =>
+          g.list_id === item.list_id
+            ? { ...g, ...nextItem, list_title: g.list_title, next_items: restQueue }
+            : g
+        ));
+      } else {
+        setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      }
       try {
-        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
+        const endpoint = item.is_addition
+          ? `/additions/items/additions/${item.addition_item_id}/toggle`
+          : `/lists/items/${item.item_id}/toggle`;
+        await apiClient.post(endpoint);
         window.dispatchEvent(new Event('library-updated'));
+        if (nextQueue.length <= 1) {
+          fetchDashboard(true);
+        }
       } catch (err) {
         console.error(err);
         setUpNextGuides(prevGuides);
@@ -3742,7 +3752,7 @@ export const Home: React.FC = () => {
 
                 return (
                   <CustomCard 
-                    key={g.item_id}
+                    key={g.list_id}
                     title={g.list_title}
                     coverUrl={g.image_url}
                     itemType="guide"
@@ -3806,7 +3816,7 @@ export const Home: React.FC = () => {
 
                   return (
                     <CustomCard 
-                      key={g.item_id}
+                      key={g.list_id}
                       title={g.list_title}
                       coverUrl={g.image_url}
                       itemType="guide"
