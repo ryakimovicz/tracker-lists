@@ -162,7 +162,6 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             <div style={{ flex: 1, position: 'relative' }}>
               <input
                 type="text"
-                required
                 className="input-field"
                 placeholder={language === 'es' ? 'Ej. Batman...' : 'e.g. Batman...'}
                 value={searchQuery}
