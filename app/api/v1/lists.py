@@ -1190,6 +1190,50 @@ def toggle_item_progress(
         "is_completed": progress.is_completed
     }
 
+class UnmarkProgressRequest(BaseModel):
+    external_id: str
+
+@router.post("/progress/unmark", status_code=status.HTTP_200_OK)
+def unmark_item_progress_by_external_id(
+    req: UnmarkProgressRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.consumption import ConsumptionHistory
+    ext_id = req.external_id.strip()
+    latest_ch = db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == current_user.id,
+        ConsumptionHistory.external_id == ext_id
+    ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).first()
+
+    if latest_ch:
+        db.delete(latest_ch)
+        db.flush()
+
+    remaining = db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == current_user.id,
+        ConsumptionHistory.external_id == ext_id
+    ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).all()
+
+    still_completed = len(remaining) > 0
+    new_completed_at = remaining[0].consumed_at if still_completed else None
+
+    progs = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.external_id == ext_id
+    ).all()
+    for p in progs:
+        p.is_completed = still_completed
+        p.completed_at = new_completed_at
+
+    db.commit()
+    return {
+        "external_id": ext_id,
+        "is_completed": still_completed,
+        "completed_at": new_completed_at.isoformat() if new_completed_at else None,
+        "remaining_count": len(remaining)
+    }
+
 # Bulk toggle progress for items in a list
 @router.post("/{list_id}/items/bulk-toggle", status_code=status.HTTP_200_OK)
 def bulk_toggle_items_progress(

@@ -5441,6 +5441,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } catch (e) {
         console.error("Failed to unmark issue from tracking list", e);
       }
+    } else if (extId) {
+      try {
+        const res = await apiClient.post('/lists/progress/unmark', { external_id: extId });
+        stillCompleted = Boolean(res.data?.is_completed);
+        newCompletedAt = res.data?.completed_at || null;
+      } catch (e) {
+        console.error("Failed to unmark issue progress", e);
+      }
     }
 
     const totalP = totalPagesVal !== '' ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || 0);
@@ -6417,44 +6425,50 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleToggleEpisode = async (listId: number, ep: any, action?: 'mark_again' | 'remove') => {
     let effectiveListId = listId || selectedItem?.tracking_list_id;
-    
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('metron_series_');
+    const epIdToSend = isComic
+      ? (ep.external_id || (String(ep.id).startsWith('cv_') || String(ep.id).startsWith('metron_') ? ep.id : `cv_issue_${ep.id}`))
+      : ep.id;
+
+    if (!effectiveListId && action === 'remove') {
+      const extIdToUnmark = isComic ? String(epIdToSend) : `tvm-ep-${ep.id}`;
+      try {
+        const res = await apiClient.post('/lists/progress/unmark', { external_id: extIdToUnmark });
+        const stillCompleted = Boolean(res.data?.is_completed);
+        setGlobalProgress(prev => ({
+          ...prev,
+          [extIdToUnmark]: stillCompleted,
+          [String(ep.id)]: stillCompleted
+        }));
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error("Failed to unmark episode/issue progress", err);
+      }
+      return;
+    }
+
     if (!effectiveListId) {
-      if (selectedItem?.id) {
-        try {
-          const res = await apiClient.post(`/library/${selectedItem.id}/ensure-tracking`);
-          effectiveListId = res.data.tracking_list_id;
-          if (effectiveListId) {
-            setSelectedItem((prev: any) => prev ? { ...prev, tracking_list_id: effectiveListId } : null);
-          }
-        } catch (err) {
-          console.error("Failed to ensure tracking list", err);
-          return;
+      try {
+        const defaultSt = isComic ? 'reading' : 'watching';
+        const tracked = await ensureTracked(defaultSt);
+        if (!tracked) return;
+        if (typeof tracked === 'object') {
+          effectiveListId = tracked.tracking_list_id;
+          setSelectedItem((prev: any) => ({
+            ...prev,
+            ...tracked
+          }));
+        } else {
+          effectiveListId = tracked;
         }
-      } else {
-        try {
-          const defaultSt = selectedItem?.item_type === 'comic' ? 'reading' : 'watching';
-          const tracked = await ensureTracked(defaultSt);
-          if (!tracked) return;
-          if (typeof tracked === 'object') {
-            effectiveListId = tracked.tracking_list_id;
-            setSelectedItem((prev: any) => ({
-              ...prev,
-              ...tracked
-            }));
-          } else {
-            effectiveListId = tracked;
-          }
-        } catch (err) {
-          console.error("Failed to track series automatically", err);
-          return;
-        }
+      } catch (err) {
+        console.error("Failed to track series automatically", err);
+        return;
       }
     }
     
     try {
       const url = action ? `/lists/${effectiveListId}/toggle-series-episode?action=${action}` : `/lists/${effectiveListId}/toggle-series-episode`;
-      const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
-      const epIdToSend = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : ep.id;
       
       let epTitleToSend = ep.title;
       if (!epTitleToSend) {
