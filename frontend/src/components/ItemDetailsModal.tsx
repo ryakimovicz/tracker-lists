@@ -778,6 +778,8 @@ export const RootReviewEditor: React.FC<{
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [text, setText] = useState<string>(initialReview);
   const [isSpoiler, setIsSpoiler] = useState<boolean>(initialIsSpoiler);
+  const [isWritingReview, setIsWritingReview] = useState<boolean>(false);
+  const [isOwnSpoilerRevealed, setIsOwnSpoilerRevealed] = useState<boolean>(false);
 
   useEffect(() => {
     setRating(initialRating);
@@ -797,7 +799,7 @@ export const RootReviewEditor: React.FC<{
   }
 
   // If already published/saved, display fixed review (stars + optional text) with a single "Eliminar reseña" button
-  if (hasExistingReview) {
+  if (hasExistingReview && !isWritingReview) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -850,17 +852,39 @@ export const RootReviewEditor: React.FC<{
         </div>
 
         {initialReview && initialReview.trim() && (
-          <div style={{
-            padding: '0.75rem',
-            background: 'var(--bg-secondary)',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-            fontSize: '0.9rem',
-            color: 'var(--text-primary)',
-            lineHeight: '1.45',
-            whiteSpace: 'pre-wrap'
-          }}>
-            {initialReview}
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              padding: '0.75rem',
+              background: 'var(--bg-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              fontSize: '0.9rem',
+              color: 'var(--text-primary)',
+              lineHeight: '1.45',
+              whiteSpace: 'pre-wrap',
+              filter: initialIsSpoiler && !isOwnSpoilerRevealed ? 'blur(6px)' : 'none',
+              userSelect: initialIsSpoiler && !isOwnSpoilerRevealed ? 'none' : 'auto',
+              transition: 'filter 0.2s ease'
+            }}>
+              {initialReview}
+            </div>
+            {initialIsSpoiler && !isOwnSpoilerRevealed && (
+              <button
+                type="button"
+                onClick={() => setIsOwnSpoilerRevealed(true)}
+                className="btn-secondary"
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: '0.78rem',
+                  padding: '0.3rem 0.8rem'
+                }}
+              >
+                {language === 'es' ? 'Mostrar reseña' : 'Show review'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -889,6 +913,8 @@ export const RootReviewEditor: React.FC<{
     const rawVal = ratio * 5;
     const roundedHalf = Math.max(0.5, Math.min(5, Math.ceil(rawVal * 2) / 2));
     setRating(roundedHalf);
+    setIsWritingReview(true);
+    onSave(roundedHalf, text, isSpoiler);
   };
 
   return (
@@ -989,14 +1015,17 @@ export const RootReviewEditor: React.FC<{
 
             <button
               type="button"
-              onClick={() => onSave(rating, text, isSpoiler)}
+              onClick={() => {
+                setIsWritingReview(false);
+                onSave(rating, text, isSpoiler);
+              }}
               className="btn-primary"
-              disabled={isSaving || !user || rating === 0}
+              disabled={isSaving || !user || rating === 0 || !text.trim()}
               style={{ padding: '0.4rem 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}
             >
               {isSaving
-                ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                : (language === 'es' ? 'Guardar' : 'Save')
+                ? (language === 'es' ? 'Publicando...' : 'Publishing...')
+                : (language === 'es' ? 'Publicar' : 'Publish')
               }
             </button>
           </div>

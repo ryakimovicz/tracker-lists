@@ -12,6 +12,8 @@ import {
   Share2,
   ArrowDownCircle,
   SkipForward,
+  BookOpen,
+  EyeOff,
   Heart,
   Star,
   MessageSquare,
@@ -66,7 +68,7 @@ export const ViewGuide: React.FC = () => {
 
   // Ratings & Reviews state
   const [guideReviews, setGuideReviews] = useState<any[]>([]);
-  const [communityTab, setCommunityTab] = useState<'reviews' | 'comments'>('reviews');
+  const [communityTab, setCommunityTab] = useState<'guide' | 'reviews' | 'comments'>('guide');
   const [hasAcceptedCommentsSpoiler, setHasAcceptedCommentsSpoiler] = useState(false);
   const [revealedReviewSpoilers, setRevealedReviewSpoilers] = useState<Record<number, boolean>>({});
   const [userRating, setUserRating] = useState<number | null>(null);
@@ -200,6 +202,36 @@ export const ViewGuide: React.FC = () => {
       console.error('Failed to save guide review', err);
     } finally {
       setIsSavingRating(false);
+    }
+  };
+
+  const handleVoteGuideReview = async (reviewId: number) => {
+    if (!currentUser) return;
+    setGuideReviews(prev => prev.map(r => {
+      if (r.id !== reviewId) return r;
+      const nextVoted = !r.user_has_voted;
+      return {
+        ...r,
+        user_has_voted: nextVoted,
+        votes_count: Math.max(0, (r.votes_count || 0) + (nextVoted ? 1 : -1))
+      };
+    }));
+    try {
+      const res = await apiClient.post(`/reviews/${reviewId}/vote`);
+      if (res.data) {
+        setGuideReviews(prev => prev.map(r =>
+          r.id === reviewId
+            ? {
+                ...r,
+                user_has_voted: Boolean(res.data.user_has_voted ?? res.data.voted ?? r.user_has_voted),
+                votes_count: typeof res.data.votes_count === 'number' ? res.data.votes_count : r.votes_count
+              }
+            : r
+        ));
+      }
+    } catch (err) {
+      console.error('Failed to vote guide review', err);
+      fetchGuideReviews(currentUser.id);
     }
   };
 
@@ -711,8 +743,9 @@ export const ViewGuide: React.FC = () => {
               </p>
             )}
             
-            {/* Creator Author Pill */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.35rem' }}>
+            {/* Creator Author Pill + Average Rating */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 {language === 'es' ? 'Creada por' : 'Created by'}
               </span>
@@ -767,6 +800,29 @@ export const ViewGuide: React.FC = () => {
                 )}
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {guide.creator_username}
+                </span>
+              </div>
+              </div>
+              <div
+                onClick={() => setCommunityTab('reviews')}
+                title={language === 'es' ? 'Ver reseñas' : 'View reviews'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.2rem 0.65rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Star size={14} fill={averageRating ? '#f59e0b' : 'none'} color={averageRating ? '#f59e0b' : 'var(--text-muted)'} />
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {averageRating !== null ? averageRating.toFixed(1) : '-'}
+                </span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  ({totalRatings} {totalRatings === 1 ? (language === 'es' ? 'voto' : 'vote') : (language === 'es' ? 'votos' : 'votes')})
                 </span>
               </div>
             </div>
@@ -890,22 +946,9 @@ export const ViewGuide: React.FC = () => {
             )}
           </div>
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              {language === 'es' ? 'Valoración Promedio:' : 'Average Rating:'}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
-              <Star size={18} fill={averageRating ? "#f59e0b" : "none"} color={averageRating ? "#f59e0b" : "var(--text-muted)"} />
-              <h4 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>
-                {averageRating !== null ? averageRating.toFixed(1) : '-'}
-              </h4>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                ({totalRatings} {totalRatings === 1 ? (language === 'es' ? 'voto' : 'vote') : (language === 'es' ? 'votos' : 'votes')})
-              </span>
-            </div>
-            
             {/* Interactive Half-Star Rating & Review Box (matches media items) */}
             {currentUser && (
-              <div style={{ marginTop: '0.75rem' }}>
+              <div>
                 <RootReviewEditor
                   initialRating={userRating || 0}
                   initialReview={userReviewText}
@@ -924,6 +967,72 @@ export const ViewGuide: React.FC = () => {
           </div>
         </div>
 
+        {/* Main Guide / Reviews / Comments Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid var(--border-color)', marginTop: '0.25rem' }}>
+          <button
+            type="button"
+            onClick={() => setCommunityTab('guide')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: communityTab === 'guide' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              padding: '0 0 0.75rem 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              cursor: 'pointer',
+              color: communityTab === 'guide' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '1.05rem',
+              fontWeight: 700
+            }}
+          >
+            <BookOpen size={17} color={communityTab === 'guide' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
+            {language === 'es' ? 'Guía' : 'Guide'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCommunityTab('reviews')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: communityTab === 'reviews' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              padding: '0 0 0.75rem 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              cursor: 'pointer',
+              color: communityTab === 'reviews' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '1.05rem',
+              fontWeight: 700
+            }}
+          >
+            <Star size={17} color={communityTab === 'reviews' ? '#f59e0b' : 'var(--text-secondary)'} fill={communityTab === 'reviews' ? '#f59e0b' : 'none'} />
+            {language === 'es' ? 'Reseñas' : 'Reviews'} ({guideReviews.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setCommunityTab('comments')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: communityTab === 'comments' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              padding: '0 0 0.75rem 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              cursor: 'pointer',
+              color: communityTab === 'comments' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '1.05rem',
+              fontWeight: 700
+            }}
+          >
+            <MessageSquare size={17} color={communityTab === 'comments' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
+            {language === 'es' ? 'Comentarios' : 'Comments'} ({comments.length})
+          </button>
+        </div>
+
+        {communityTab === 'guide' ? (
+        <>
         {/* Importance Filters & Next Pending Shortcut */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -1486,57 +1595,8 @@ export const ViewGuide: React.FC = () => {
             });
           })()}
         </div>
-      </div>
-
-      {/* Non-intrusive Guide AdBanner */}
-      <AdBanner />
-
-      {/* Public Reviews & Comments Section */}
-      <div className="glass-card" style={{ marginTop: '2rem', padding: '2.5rem', textAlign: 'left', transform: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-          <button
-            type="button"
-            onClick={() => setCommunityTab('reviews')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: communityTab === 'reviews' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              padding: '0 0 0.75rem 0',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              color: communityTab === 'reviews' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: '1.1rem',
-              fontWeight: 700
-            }}
-          >
-            <Star size={19} color={communityTab === 'reviews' ? '#f59e0b' : 'var(--text-secondary)'} fill={communityTab === 'reviews' ? '#f59e0b' : 'none'} />
-            {language === 'es' ? 'Reseñas' : 'Reviews'} ({guideReviews.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCommunityTab('comments')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: communityTab === 'comments' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              padding: '0 0 0.75rem 0',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              color: communityTab === 'comments' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: '1.1rem',
-              fontWeight: 700
-            }}
-          >
-            <MessageSquare size={19} color={communityTab === 'comments' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
-            {language === 'es' ? 'Comentarios' : 'Comments'} ({comments.length})
-          </button>
-        </div>
-
-        {communityTab === 'reviews' ? (
+        </>
+        ) : communityTab === 'reviews' ? (
           guideReviews.length === 0 ? (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.92rem', fontStyle: 'italic' }}>
               {language === 'es' ? 'Aún no hay reseñas en esta guía. ¡Sé el primero en valorarla!' : 'No reviews on this guide yet. Be the first to review it!'}
@@ -1567,8 +1627,20 @@ export const ViewGuide: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {rev.is_spoiler && (
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 700 }}>
-                            SPOILER
+                          <span style={{
+                            fontSize: '0.72rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            <EyeOff size={11} />
+                            Spoiler
                           </span>
                         )}
                         {typeof rev.rating === 'number' && rev.rating > 0 && (
@@ -1591,11 +1663,34 @@ export const ViewGuide: React.FC = () => {
                             className="btn-secondary"
                             style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '0.78rem', padding: '0.3rem 0.8rem' }}
                           >
-                            {language === 'es' ? 'Ver spoiler' : 'Show spoiler'}
+                            {language === 'es' ? 'Mostrar reseña' : 'Show review'}
                           </button>
                         )}
                       </div>
                     )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.2rem' }}>
+                      <button
+                        type="button"
+                        disabled={!currentUser}
+                        onClick={() => handleVoteGuideReview(rev.id)}
+                        style={{
+                          background: rev.user_has_voted ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                          border: rev.user_has_voted ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                          color: rev.user_has_voted ? '#3b82f6' : 'var(--text-secondary)',
+                          borderRadius: '4px',
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          cursor: currentUser ? 'pointer' : 'default',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <ThumbsUp size={12} fill={rev.user_has_voted ? '#3b82f6' : 'none'} />
+                        <span>{rev.votes_count || 0}</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -2194,6 +2289,9 @@ export const ViewGuide: React.FC = () => {
         </>
         )}
       </div>
+
+      {/* Non-intrusive Guide AdBanner */}
+      <AdBanner />
 
       {selectedItem && (() => {
         const currentLibItem = libraryItems.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) || selectedItem;
