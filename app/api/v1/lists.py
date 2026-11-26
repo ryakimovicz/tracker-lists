@@ -1107,6 +1107,11 @@ def toggle_item_progress(
         # Record activity log with progress metadata
         from app.services.activity_service import ActivityService
         t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
+        show_name = (
+            item.title.split(" - ")[0].strip()
+            if item.title and " - " in item.title
+            else (reading_list.title if reading_list else item.title)
+        )
         ActivityService.record_activity(
             db=db,
             user_id=current_user.id,
