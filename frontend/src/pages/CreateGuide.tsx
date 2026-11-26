@@ -3429,10 +3429,33 @@ export const CreateGuide: React.FC = () => {
               </div>
             </div>
 
-            {modalSuccessMsg && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.5rem', borderRadius: '6px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
-                {modalSuccessMsg}
-              </div>
+            {modalSuccessMsg && createPortal(
+              <div
+                style={{
+                  position: 'fixed',
+                  bottom: '1.5rem',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 2000,
+                  background: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid rgba(16, 185, 129, 0.5)',
+                  color: '#10b981',
+                  padding: '0.6rem 1.15rem',
+                  borderRadius: '999px',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <CheckCircle size={16} />
+                <span>{modalSuccessMsg}</span>
+              </div>,
+              document.body
             )}
             
             <div style={{
