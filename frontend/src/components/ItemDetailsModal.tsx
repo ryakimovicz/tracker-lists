@@ -3377,7 +3377,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
         const processAllEps = (allEps: any[], customProgress?: Record<string, boolean>, customList?: any[]) => {
           const isComic = item.item_type === 'comic';
-          const extIds = allEps.map(e => isComic ? `cv_issue_${e.id}` : `tvm-ep-${e.id}`);
+          const extIds = allEps.map(e => e.external_id || (isComic ? (String(e.id).startsWith('metron_') || String(e.id).startsWith('cv_') ? e.id : `cv_issue_${e.id}`) : `tvm-ep-${e.id}`));
           if (extIds.length > 0) {
             apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
               .then(progRes => {
