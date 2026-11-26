@@ -11,6 +11,7 @@ import {
   Check,
   Share2,
   ArrowDownCircle,
+  SkipForward,
   Heart,
   Star,
   MessageSquare,
@@ -375,7 +376,7 @@ export const ViewGuide: React.FC = () => {
     apiClient.get('/library/')
       .then(res => setLibraryItems(res.data || []))
       .catch(() => {});
-  }, [id, language]);
+  }, [id]);
 
   useEffect(() => {
     const currentFlow = guide?.section_descriptions?.flow;
@@ -401,6 +402,18 @@ export const ViewGuide: React.FC = () => {
     });
   };
 
+  const computeGuideCounts = (updatedItems: any[]) => {
+    const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
+    const skippedCount = updatedItems.filter((i: any) => i.is_skipped && !i.is_completed).length;
+    const effectiveTotal = updatedItems.length - skippedCount;
+    const progressPercentage = effectiveTotal > 0 ? (completedCount / effectiveTotal) * 100 : 0;
+    return {
+      completed_count: completedCount,
+      skipped_count: skippedCount,
+      progress_percentage: Math.round(progressPercentage * 100) / 100
+    };
+  };
+
   const handleToggleItemProgress = async (itemId: number) => {
     if (!guide) return;
     const prevGuide = guide;
@@ -409,16 +422,14 @@ export const ViewGuide: React.FC = () => {
     setGuide((prev: any) => {
       if (!prev) return null;
       const updatedItems = (prev.items || []).map((item: any) =>
-        item.id === itemId ? { ...item, is_completed: !item.is_completed } : item
+        item.id === itemId
+          ? { ...item, is_completed: !item.is_completed, is_skipped: !item.is_completed ? false : item.is_skipped }
+          : item
       );
-      const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
-      const totalCount = updatedItems.length;
-      const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
       return {
         ...prev,
         items: updatedItems,
-        completed_count: completedCount,
-        progress_percentage: Math.round(progressPercentage * 100) / 100
+        ...computeGuideCounts(updatedItems)
       };
     });
 
@@ -431,6 +442,38 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
+  const handleToggleItemSkip = async (itemId: number) => {
+    if (!guide) return;
+    const prevGuide = guide;
+
+    // Optimistic update (0ms UI latency)
+    setGuide((prev: any) => {
+      if (!prev) return null;
+      const updatedItems = (prev.items || []).map((item: any) => {
+        if (item.id !== itemId) return item;
+        const nextSkipped = !item.is_skipped;
+        return {
+          ...item,
+          is_skipped: nextSkipped,
+          is_completed: nextSkipped ? false : item.is_completed
+        };
+      });
+      return {
+        ...prev,
+        items: updatedItems,
+        ...computeGuideCounts(updatedItems)
+      };
+    });
+
+    try {
+      await apiClient.post(`/lists/items/${itemId}/toggle-skip`);
+      window.dispatchEvent(new Event('library-updated'));
+    } catch (err: any) {
+      setGuide(prevGuide);
+      setErrorMsg(language === 'es' ? 'Error al saltear la obra.' : 'Failed to toggle skip.');
+    }
+  };
+
   const handleBulkToggle = async (itemIds: number[], completed: boolean) => {
     if (!guide || itemIds.length === 0) return;
     const prevGuide = guide;
@@ -440,16 +483,14 @@ export const ViewGuide: React.FC = () => {
       if (!prev) return null;
       const idSet = new Set(itemIds);
       const updatedItems = (prev.items || []).map((item: any) =>
-        idSet.has(item.id) ? { ...item, is_completed: completed } : item
+        idSet.has(item.id)
+          ? { ...item, is_completed: completed, is_skipped: completed ? false : item.is_skipped }
+          : item
       );
-      const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
-      const totalCount = updatedItems.length;
-      const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
       return {
         ...prev,
         items: updatedItems,
-        completed_count: completedCount,
-        progress_percentage: Math.round(progressPercentage * 100) / 100
+        ...computeGuideCounts(updatedItems)
       };
     });
 
@@ -752,8 +793,13 @@ export const ViewGuide: React.FC = () => {
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Progreso Completado:' : 'Completed Progress:'}</span>
             <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>
-              {guide.completed_count} / {guide.total_count} ({guide.progress_percentage}%)
+              {guide.completed_count} / {Math.max(0, guide.total_count - (guide.skipped_count || 0))} ({guide.progress_percentage}%)
             </h4>
+            {(guide.skipped_count || 0) > 0 && (
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
+                {guide.skipped_count} {guide.skipped_count === 1 ? (language === 'es' ? 'salteado' : 'skipped') : (language === 'es' ? 'salteados' : 'skipped')}
+              </span>
+            )}
           </div>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -900,6 +946,24 @@ export const ViewGuide: React.FC = () => {
                           <div style={{ flex: 1 }}>
                             <h5 style={{ margin: 0, fontSize: '0.95rem' }}>{item.title}</h5>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleItemSkip(item.id)}
+                            className="btn-secondary"
+                            title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
+                            style={{
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
+                              borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                            }}
+                          >
+                            <SkipForward size={12} />
+                            {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
+                          </button>
                           <button
                             onClick={() => handleOpenItemDetails(item)}
                             className="btn-secondary"
@@ -1103,6 +1167,24 @@ export const ViewGuide: React.FC = () => {
                                     })()}
                                   </div>
                                   <button
+                                    type="button"
+                                    onClick={() => handleToggleItemSkip(item.id)}
+                                    className="btn-secondary"
+                                    title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
+                                    style={{
+                                      padding: '0.2rem 0.5rem',
+                                      fontSize: '0.75rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
+                                      borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                                    }}
+                                  >
+                                    <SkipForward size={12} />
+                                    {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
+                                  </button>
+                                  <button
                                     onClick={() => handleOpenItemDetails(item)}
                                     className="btn-secondary"
                                     style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
@@ -1246,6 +1328,24 @@ export const ViewGuide: React.FC = () => {
                                               );
                                             })()}
                                           </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleItemSkip(item.id)}
+                                            className="btn-secondary"
+                                            title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
+                                            style={{
+                                              padding: '0.15rem 0.45rem',
+                                              fontSize: '0.72rem',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem',
+                                              color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
+                                              borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                                            }}
+                                          >
+                                            <SkipForward size={11} />
+                                            {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
+                                          </button>
                                           <button
                                             onClick={() => handleOpenItemDetails(item)}
                                             className="btn-secondary"

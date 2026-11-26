@@ -480,8 +480,9 @@ def get_list_details(
     merged_total = len(merged_items)
 
     completed_count = sum(1 for i in merged_items if i.is_completed)
-    skipped_count = sum(1 for i in merged_items if i.is_skipped)
-    progress_percentage = (completed_count / merged_total * 100) if merged_total > 0 else 0
+    skipped_count = sum(1 for i in merged_items if i.is_skipped and not i.is_completed)
+    effective_total = merged_total - skipped_count
+    progress_percentage = (completed_count / effective_total * 100) if effective_total > 0 else 0
     skipped_percentage = (skipped_count / merged_total * 100) if merged_total > 0 else 0
 
     all_votes = db.query(ListVote).filter(ListVote.list_id == list_id).all()
