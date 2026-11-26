@@ -858,7 +858,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     target_title = item.title
     target_image_url = item.image_url
     show_name = None
-    
+    show_image = None
     show_ext_id = None
     if item.external_id.startswith("tvm-ep-"):
         ep_id = item.external_id.replace("tvm-ep-", "")
@@ -873,19 +873,32 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
                     if show:
                         show_name = show.get("name")
                         show_ext_id = f"tvm_{show.get('id')}"
+                        show_img_dict = show.get("image") or {}
+                        show_image = show_img_dict.get("original") or show_img_dict.get("medium")
         except Exception:
             pass
 
     # Check if user is following the parent series / comic volume
     existing_series = None
-    if show_name:
+    if show_ext_id or show_name:
+        series_filters = []
+        if show_ext_id:
+            series_filters.append(UserLibraryItem.external_id == show_ext_id)
+        if show_name:
+            series_filters.append(UserLibraryItem.title == show_name)
+        from sqlalchemy import or_
         existing_series = db.query(UserLibraryItem).filter(
             UserLibraryItem.user_id == user_id,
             UserLibraryItem.item_type.in_(["series", "anime"]),
-            UserLibraryItem.title == show_name
+            or_(*series_filters)
         ).first()
 
-    is_cv_issue = item.external_id.startswith("cv_issue_") or item.external_id.startswith("cv_") or item.item_type == ItemTypeEnum.COMIC
+    is_cv_issue = (
+        item.external_id.startswith("cv_issue_")
+        or item.external_id.startswith("metron_issue_")
+        or item.external_id.startswith("cv_")
+        or item.item_type == ItemTypeEnum.COMIC
+    )
 
     # Check if this comic issue belongs to a tracked comic volume
     existing_comic_vol = None
@@ -897,6 +910,38 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         ).first()
 
     if is_cv_issue:
+        vol_ext_id = None
+        vol_title = None
+        vol_image = item.image_url
+
+        if not existing_comic_vol:
+            try:
+                from app.services.metron import MetronService
+                issue_details = MetronService.get_issue_details(item.external_id)
+                if issue_details and isinstance(issue_details.get("volume"), dict):
+                    vol_data = issue_details["volume"]
+                    vol_ext_id = vol_data.get("external_id") or vol_data.get("id")
+                    vol_title = vol_data.get("title") or vol_data.get("name")
+            except Exception:
+                pass
+
+            if not vol_title and item.title:
+                import re
+                vol_title = re.sub(r"\s*#\s*\d+(?:\.\d+)?.*$", "", item.title).strip() or item.title
+
+            from sqlalchemy import or_
+            vol_filters = []
+            if vol_ext_id:
+                vol_filters.append(UserLibraryItem.external_id == vol_ext_id)
+            if vol_title:
+                vol_filters.append(UserLibraryItem.title == vol_title)
+            if vol_filters:
+                existing_comic_vol = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == user_id,
+                    UserLibraryItem.item_type == "comic",
+                    or_(*vol_filters)
+                ).first()
+
         if existing_comic_vol:
             existing_comic_vol.last_seen_episode = item.title
             existing_comic_vol.updated_at = datetime.now(timezone.utc)
@@ -904,30 +949,36 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
                 existing_comic_vol.status = UserLibraryStatusEnum.READING
                 existing_comic_vol.completed_at = None
             db.commit()
-        # Never add a loose comic issue as a library item if it belongs to a tracked volume
-        return
-
-    if item.external_id.startswith("tvm-ep-") and not existing_series:
-        # Add loose episode card to library
-        existing_ep = db.query(UserLibraryItem).filter(
-            UserLibraryItem.user_id == user_id,
-            UserLibraryItem.external_id == item.external_id
-        ).first()
-        
-        if not existing_ep:
+        else:
             lib_item = UserLibraryItem(
                 user_id=user_id,
-                item_type="episode",
-                external_id=item.external_id,
-                title=item.title,
-                image_url=item.image_url,
-                last_seen_episode=show_name or "Serie",
-                status=UserLibraryStatusEnum.COMPLETED,
-                completed_at=datetime.now(timezone.utc),
-                imdb_id=show_ext_id
+                item_type="comic",
+                external_id=vol_ext_id or item.external_id,
+                title=vol_title or item.title,
+                image_url=vol_image,
+                last_seen_episode=item.title,
+                status=UserLibraryStatusEnum.READING,
+                updated_at=datetime.now(timezone.utc)
             )
             db.add(lib_item)
             db.commit()
+        return
+
+    if item.external_id.startswith("tvm-ep-") and not existing_series:
+        # Add parent series/anime card to library showing last seen episode
+        parent_type = "anime" if target_item_type == "anime" else "series"
+        lib_item = UserLibraryItem(
+            user_id=user_id,
+            item_type=parent_type,
+            external_id=show_ext_id or item.external_id,
+            title=show_name or item.title,
+            image_url=show_image or item.image_url,
+            last_seen_episode=item.title,
+            status=UserLibraryStatusEnum.WATCHING,
+            updated_at=datetime.now(timezone.utc)
+        )
+        db.add(lib_item)
+        db.commit()
         return
 
     if existing_series and item.external_id.startswith("tvm-ep-"):
