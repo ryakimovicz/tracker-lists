@@ -608,7 +608,7 @@ export const ViewGuide: React.FC = () => {
         document.body
       )}
 
-      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1, backdropFilter: 'none', WebkitBackdropFilter: 'none' }}>
+      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left', position: 'relative', zIndex: 1, backdropFilter: 'none', WebkitBackdropFilter: 'none', transform: 'none' }}>
         {canShowGuideImages && guide.section_descriptions?.banner_url && (
           <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
             <img src={guide.section_descriptions.banner_url} alt={guide.title} decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

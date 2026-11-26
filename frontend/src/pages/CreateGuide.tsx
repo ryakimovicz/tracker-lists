@@ -1830,7 +1830,7 @@ export const CreateGuide: React.FC = () => {
       )}
       {/* STEP 1: CREATE GUIDE DETAILS FORM */}
       {!guide ? (
-        <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', transform: 'none' }}>
           <h2>{language === 'es' ? 'Crear Nueva Guía' : 'Create New Guide'}</h2>
           
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -2065,7 +2065,7 @@ export const CreateGuide: React.FC = () => {
           </div>
 
           {/* Document Canvas Container */}
-          <div className="glass-card" style={{ padding: '3rem', minHeight: '600px', display: 'flex', flexDirection: 'column', gap: '2.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+          <div className="glass-card" style={{ padding: '3rem', minHeight: '600px', display: 'flex', flexDirection: 'column', gap: '2.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', transform: 'none' }}>
             
             {/* Title Block */}
             <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -3430,7 +3430,7 @@ export const CreateGuide: React.FC = () => {
           justifyContent: 'center',
           zIndex: 2000
         }}>
-          <div className="glass-card" style={{ width: '90vw', maxWidth: '1400px', maxHeight: '90vh', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
+          <div className="glass-card" style={{ width: '90vw', maxWidth: '1400px', maxHeight: '90vh', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden', transform: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Item'}</h3>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
