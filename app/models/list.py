@@ -22,7 +22,7 @@ class ReadingList(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Custom importance levels naming and defaults mapping
-    importance_labels = Column(JSON, nullable=True, default=lambda: {"1": "Optional", "2": "Recommended", "3": "Highly Recommended", "4": "Mandatory", "5": "Essential"})
+    importance_labels = Column(JSON, nullable=True, default=lambda: {"1": "Extra", "2": "Optional", "3": "Recommended", "4": "Important", "5": "Essential"})
     section_importances = Column(JSON, nullable=True, default=dict)
     section_descriptions = Column(JSON, nullable=True, default=dict)
 

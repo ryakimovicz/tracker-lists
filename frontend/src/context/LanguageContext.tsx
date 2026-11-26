@@ -55,7 +55,7 @@ const translations: Translations = {
   priorityOptional: { en: 'Optional', es: 'Opcional' },
   priorityRecommended: { en: 'Recommended', es: 'Recomendado' },
   priorityHighlyRec: { en: 'Highly Recommended', es: 'Altamente Recomendado' },
-  priorityMandatory: { en: 'Mandatory', es: 'Obligatorio' },
+  priorityMandatory: { en: 'Essential', es: 'Esencial' },
   priorityEssential: { en: 'Essential', es: 'Esencial' },
 
   // Authentication & Forms

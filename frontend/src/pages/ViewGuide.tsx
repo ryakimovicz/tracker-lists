@@ -23,7 +23,7 @@ import {
   Lock,
   Flag
 } from 'lucide-react';
-import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { ItemDetailsModal, RootReviewEditor } from '../components/ItemDetailsModal';
 import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
 import { ProModal } from '../components/ProModal';
 import { AdBanner } from '../components/AdBanner';
@@ -64,8 +64,15 @@ export const ViewGuide: React.FC = () => {
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
   const [minImportanceFilter, setMinImportanceFilter] = useState<number | null>(null);
 
-  // Ratings state
+  // Ratings & Reviews state
+  const [guideReviews, setGuideReviews] = useState<any[]>([]);
+  const [communityTab, setCommunityTab] = useState<'reviews' | 'comments'>('reviews');
+  const [hasAcceptedCommentsSpoiler, setHasAcceptedCommentsSpoiler] = useState(false);
+  const [revealedReviewSpoilers, setRevealedReviewSpoilers] = useState<Record<number, boolean>>({});
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [userReviewText, setUserReviewText] = useState<string>('');
+  const [userReviewIsSpoiler, setUserReviewIsSpoiler] = useState<boolean>(false);
+  const [myGuideReviewId, setMyGuideReviewId] = useState<number | null>(null);
   const [averageRating, setAverageRating] = useState<number | null>(null);
   const [totalRatings, setTotalRatings] = useState<number>(0);
   const [isSavingRating, setIsSavingRating] = useState(false);
@@ -103,7 +110,7 @@ export const ViewGuide: React.FC = () => {
       case 2: return lang === 'es' ? 'Opcional' : 'Optional';
       case 3: return lang === 'es' ? 'Recomendado' : 'Recommended';
       case 4: return lang === 'es' ? 'Importante' : 'Important';
-      case 5: return lang === 'es' ? 'Obligatorio' : 'Mandatory';
+      case 5: return lang === 'es' ? 'Esencial' : 'Essential';
       default: return '';
     }
   };
@@ -137,6 +144,81 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
+
+  const fetchGuideReviews = async (userIdOverride?: number) => {
+    if (!id) return;
+    try {
+      const res = await apiClient.get(`/reviews/guide/${id}`);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setGuideReviews(list.filter((r: any) => !r.parent_id && ((typeof r.rating === 'number' && r.rating > 0) || (r.content && r.content.trim()))));
+      const rated = list.filter((r: any) => !r.parent_id && typeof r.rating === 'number' && r.rating > 0);
+      if (rated.length > 0) {
+        const sum = rated.reduce((acc: number, r: any) => acc + Number(r.rating), 0);
+        setAverageRating(Math.round((sum / rated.length) * 10) / 10);
+        setTotalRatings(rated.length);
+      } else {
+        setAverageRating(null);
+        setTotalRatings(0);
+      }
+      const uid = userIdOverride ?? currentUser?.id;
+      if (uid) {
+        const mine = list.find((r: any) => r.user_id === uid && !r.parent_id);
+        if (mine) {
+          setMyGuideReviewId(mine.id);
+          setUserRating(mine.rating ?? null);
+          setUserReviewText(mine.content || '');
+          setUserReviewIsSpoiler(Boolean(mine.is_spoiler));
+        } else {
+          setMyGuideReviewId(null);
+          setUserRating(null);
+          setUserReviewText('');
+          setUserReviewIsSpoiler(false);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch guide reviews', err);
+    }
+  };
+
+  const handleSaveGuideReview = async (ratingVal: number, content: string, isSpoiler: boolean) => {
+    if (!guide || !currentUser || isSavingRating) return;
+    setIsSavingRating(true);
+    try {
+      const res = await apiClient.post(`/reviews/guide/${guide.id}`, {
+        rating: ratingVal > 0 ? ratingVal : null,
+        content: content.trim() ? content : null,
+        is_spoiler: isSpoiler,
+        item_title: guide.title,
+        image_url: guide.section_descriptions?.banner_url || null
+      });
+      if (res.data?.id) setMyGuideReviewId(res.data.id);
+      setUserRating(ratingVal > 0 ? ratingVal : null);
+      setUserReviewText(content);
+      setUserReviewIsSpoiler(isSpoiler);
+      await fetchGuideReviews(currentUser.id);
+    } catch (err) {
+      console.error('Failed to save guide review', err);
+    } finally {
+      setIsSavingRating(false);
+    }
+  };
+
+  const handleDeleteGuideReview = async () => {
+    if (!myGuideReviewId || isSavingRating) return;
+    setIsSavingRating(true);
+    try {
+      await apiClient.delete(`/reviews/${myGuideReviewId}`);
+      setMyGuideReviewId(null);
+      setUserRating(null);
+      setUserReviewText('');
+      setUserReviewIsSpoiler(false);
+      await fetchGuideReviews(currentUser?.id);
+    } catch (err) {
+      console.error('Failed to delete guide review', err);
+    } finally {
+      setIsSavingRating(false);
+    }
+  };
 
   const handleSaveRating = async (ratingVal: number | null) => {
     if (!guide || isSavingRating) return;
@@ -370,8 +452,14 @@ export const ViewGuide: React.FC = () => {
 
     // Fetch user profile and library
     apiClient.get('/users/me')
-      .then(res => setCurrentUser(res.data))
-      .catch(e => console.error(e));
+      .then(res => {
+        setCurrentUser(res.data);
+        fetchGuideReviews(res.data?.id);
+      })
+      .catch(e => {
+        console.error(e);
+        fetchGuideReviews();
+      });
 
     apiClient.get('/library/')
       .then(res => setLibraryItems(res.data || []))
@@ -815,54 +903,24 @@ export const ViewGuide: React.FC = () => {
               </span>
             </div>
             
-            {/* Interactive Stars for Current User */}
-            <div style={{ marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
-                {language === 'es' ? 'Tu Valoración:' : 'Your Rating:'}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    disabled={!currentUser || isSavingRating}
-                    onClick={() => handleSaveRating(star)}
-                    title={`${star} ${star === 1 ? 'estrella' : 'estrellas'}`}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: currentUser ? 'pointer' : 'default',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Star
-                      size={18}
-                      fill={star <= (userRating || 0) ? '#f59e0b' : 'none'}
-                      color={star <= (userRating || 0) ? '#f59e0b' : 'var(--text-muted)'}
-                    />
-                  </button>
-                ))}
-                {userRating && userRating > 0 && (
-                  <button
-                    onClick={() => handleSaveRating(null)}
-                    disabled={isSavingRating}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#ef4444',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      marginLeft: '0.5rem',
-                      padding: 0,
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    {language === 'es' ? 'Quitar' : 'Clear'}
-                  </button>
-                )}
+            {/* Interactive Half-Star Rating & Review Box (matches media items) */}
+            {currentUser && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <RootReviewEditor
+                  initialRating={userRating || 0}
+                  initialReview={userReviewText}
+                  initialIsSpoiler={userReviewIsSpoiler}
+                  onSave={handleSaveGuideReview}
+                  onDelete={handleDeleteGuideReview}
+                  hasExistingReview={myGuideReviewId !== null || (userRating !== null && userRating > 0)}
+                  isSaving={isSavingRating}
+                  isItemTracked={true}
+                  isEpisode={false}
+                  user={currentUser}
+                  language={language}
+                />
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -871,7 +929,7 @@ export const ViewGuide: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
             {[
               { value: null, label: language === 'es' ? 'Todos' : 'All' },
-              { value: 5, label: language === 'es' ? 'Obligatorio' : 'Mandatory' },
+              { value: 5, label: language === 'es' ? 'Esencial' : 'Essential' },
               { value: 4, label: language === 'es' ? 'Importante' : 'Important' },
               { value: 3, label: language === 'es' ? 'Recomendado' : 'Recommended' },
               { value: 2, label: language === 'es' ? 'Opcional' : 'Optional' },
@@ -1433,15 +1491,137 @@ export const ViewGuide: React.FC = () => {
       {/* Non-intrusive Guide AdBanner */}
       <AdBanner />
 
-      {/* Public Comments Section */}
-      <div className="glass-card" style={{ marginTop: '2rem', padding: '2.5rem', textAlign: 'left' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
-          <MessageSquare size={22} color="var(--accent-primary)" />
-          <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>
+      {/* Public Reviews & Comments Section */}
+      <div className="glass-card" style={{ marginTop: '2rem', padding: '2.5rem', textAlign: 'left', transform: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+          <button
+            type="button"
+            onClick={() => setCommunityTab('reviews')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: communityTab === 'reviews' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              padding: '0 0 0.75rem 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              color: communityTab === 'reviews' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '1.1rem',
+              fontWeight: 700
+            }}
+          >
+            <Star size={19} color={communityTab === 'reviews' ? '#f59e0b' : 'var(--text-secondary)'} fill={communityTab === 'reviews' ? '#f59e0b' : 'none'} />
+            {language === 'es' ? 'Reseñas' : 'Reviews'} ({guideReviews.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setCommunityTab('comments')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: communityTab === 'comments' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              padding: '0 0 0.75rem 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              color: communityTab === 'comments' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '1.1rem',
+              fontWeight: 700
+            }}
+          >
+            <MessageSquare size={19} color={communityTab === 'comments' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
             {language === 'es' ? 'Comentarios' : 'Comments'} ({comments.length})
-          </h3>
+          </button>
         </div>
 
+        {communityTab === 'reviews' ? (
+          guideReviews.length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.92rem', fontStyle: 'italic' }}>
+              {language === 'es' ? 'Aún no hay reseñas en esta guía. ¡Sé el primero en valorarla!' : 'No reviews on this guide yet. Be the first to review it!'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {guideReviews.map((rev: any) => {
+                const isSpoilerHidden = Boolean(rev.is_spoiler && !revealedReviewSpoilers[rev.id]);
+                return (
+                  <div key={rev.id} style={{ padding: '1rem 1.25rem', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {rev.user_photo_url ? (
+                          <img src={rev.user_photo_url} alt={rev.username} loading="lazy" decoding="async" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                            {(rev.username || 'U').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{rev.username || 'User'}</span>
+                          {rev.created_at && (
+                            <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {new Date(rev.created_at).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {rev.is_spoiler && (
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 700 }}>
+                            SPOILER
+                          </span>
+                        )}
+                        {typeof rev.rating === 'number' && rev.rating > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', padding: '0.2rem 0.55rem', borderRadius: '999px' }}>
+                            <Star size={13} fill="#f59e0b" color="#f59e0b" />
+                            {Number(rev.rating).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {rev.content && (
+                      <div style={{ position: 'relative' }}>
+                        <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', filter: isSpoilerHidden ? 'blur(6px)' : 'none', userSelect: isSpoilerHidden ? 'none' : 'auto', transition: 'filter 0.2s ease' }}>
+                          {rev.content}
+                        </p>
+                        {isSpoilerHidden && (
+                          <button
+                            type="button"
+                            onClick={() => setRevealedReviewSpoilers(prev => ({ ...prev, [rev.id]: true }))}
+                            className="btn-secondary"
+                            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '0.78rem', padding: '0.3rem 0.8rem' }}
+                          >
+                            {language === 'es' ? 'Ver spoiler' : 'Show spoiler'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : !hasAcceptedCommentsSpoiler && (guide?.progress_percentage ?? 0) < 100 ? (
+          <div style={{ padding: '2rem 1.25rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.85rem', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '999px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+              {language === 'es' ? 'AVISO DE SPOILERS' : 'SPOILER WARNING'}
+            </span>
+            <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-secondary)', maxWidth: '460px', lineHeight: 1.5 }}>
+              {language === 'es'
+                ? 'Esta sección puede contener spoilers sobre las obras incluidas en esta guía. ¿Estás seguro de que querés ver los comentarios?'
+                : 'This section may contain spoilers about the works included in this guide. Are you sure you want to view the comments?'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setHasAcceptedCommentsSpoiler(true)}
+              className="btn-secondary"
+              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', borderColor: 'rgba(239, 68, 68, 0.45)', color: 'var(--text-primary)' }}
+            >
+              {language === 'es' ? 'Ver comentarios de todas formas' : 'Show comments anyway'}
+            </button>
+          </div>
+        ) : (
+        <>
         {/* New Comment Box */}
         {currentUser ? (
           <form onSubmit={handlePostComment} style={{ marginBottom: '2rem', display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
@@ -2010,6 +2190,8 @@ export const ViewGuide: React.FC = () => {
               });
             })()}
           </div>
+        )}
+        </>
         )}
       </div>
 

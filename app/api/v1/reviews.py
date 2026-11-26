@@ -391,7 +391,7 @@ def create_or_update_review(
     db: Session = Depends(get_db)
 ):
     item_type_lower = item_type.lower()
-    valid_types = {"comic", "manga", "book", "movie", "series", "game", "anime", "music", "episode"}
+    valid_types = {"comic", "manga", "book", "movie", "series", "game", "anime", "music", "episode", "guide"}
     if item_type_lower not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

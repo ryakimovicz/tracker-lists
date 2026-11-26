@@ -749,7 +749,7 @@ export const StarRatingDisplay: React.FC<{
   );
 });
 
-const RootReviewEditor: React.FC<{
+export const RootReviewEditor: React.FC<{
   initialRating: number;
   initialReview: string;
   initialIsSpoiler?: boolean;

@@ -2621,7 +2621,7 @@ export const CreateGuide: React.FC = () => {
                               <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
                               <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
                               <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
-                              <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                              <option value="5">5 - {language === 'es' ? 'Esencial' : 'Essential'}</option>
                             </select>
                           </div>
                         </div>
@@ -2765,7 +2765,7 @@ export const CreateGuide: React.FC = () => {
                                       <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
                                       <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
                                       <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
-                                      <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                                      <option value="5">5 - {language === 'es' ? 'Esencial' : 'Essential'}</option>
                                     </select>
                                   </div>
                                 </div>
@@ -3015,7 +3015,7 @@ export const CreateGuide: React.FC = () => {
                                   <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
                                   <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
                                   <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
-                                  <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                                  <option value="5">5 - {language === 'es' ? 'Esencial' : 'Essential'}</option>
                                 </select>
                               </div>
                             </div>
@@ -3159,7 +3159,7 @@ export const CreateGuide: React.FC = () => {
                                           <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
                                           <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
                                           <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
-                                          <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                                          <option value="5">5 - {language === 'es' ? 'Esencial' : 'Essential'}</option>
                                         </select>
                                       </div>
                                     </div>
