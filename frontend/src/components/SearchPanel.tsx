@@ -127,15 +127,13 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       position: 'relative',
       flexShrink: 0
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{language === 'es' ? 'Búsqueda' : 'Search'}</h4>
-        {canRemove && (
-          <button type="button" onClick={() => onRemove(id)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>
+      {canRemove && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
+          <button type="button" onClick={() => onRemove(id)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>
             &times;
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
@@ -144,7 +142,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           onClick={() => setSearchTab('search')}
           style={{ flex: 1, padding: '0.5rem', background: 'transparent', border: 'none', borderBottom: searchTab === 'search' ? '2px solid var(--accent-primary)' : '2px solid transparent', color: searchTab === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}
         >
-          {language === 'es' ? 'Buscar API' : 'Search API'}
+          {language === 'es' ? 'Buscar obra' : 'Search'}
         </button>
         <button
           type="button"
