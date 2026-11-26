@@ -14,6 +14,7 @@ import {
   SkipForward,
   BookOpen,
   EyeOff,
+  Languages,
   Heart,
   Star,
   MessageSquare,
@@ -71,6 +72,11 @@ export const ViewGuide: React.FC = () => {
   const [communityTab, setCommunityTab] = useState<'guide' | 'reviews' | 'comments'>('guide');
   const [hasAcceptedCommentsSpoiler, setHasAcceptedCommentsSpoiler] = useState(false);
   const [revealedReviewSpoilers, setRevealedReviewSpoilers] = useState<Record<number, boolean>>({});
+  const [translatedGuideMap, setTranslatedGuideMap] = useState<Record<string, string>>({});
+  const [isGuideTranslated, setIsGuideTranslated] = useState(false);
+  const [isTranslatingGuide, setIsTranslatingGuide] = useState(false);
+  const [translatedReviews, setTranslatedReviews] = useState<Record<number, { text: string; show: boolean; loading?: boolean }>>({});
+  const [translatedComments, setTranslatedComments] = useState<Record<number, { text: string; show: boolean; loading?: boolean }>>({});
   const [userRating, setUserRating] = useState<number | null>(null);
   const [userReviewText, setUserReviewText] = useState<string>('');
   const [userReviewIsSpoiler, setUserReviewIsSpoiler] = useState<boolean>(false);
@@ -202,6 +208,116 @@ export const ViewGuide: React.FC = () => {
       console.error('Failed to save guide review', err);
     } finally {
       setIsSavingRating(false);
+    }
+  };
+
+  useEffect(() => {
+    setIsGuideTranslated(false);
+    setTranslatedGuideMap({});
+    setTranslatedReviews({});
+    setTranslatedComments({});
+  }, [language]);
+
+  const tGuide = (text?: string | null) => {
+    if (!text) return text || '';
+    if (isGuideTranslated && translatedGuideMap[text]) {
+      return translatedGuideMap[text];
+    }
+    return text;
+  };
+
+  const handleTranslateGuide = async () => {
+    if (!guide || isTranslatingGuide) return;
+    if (isGuideTranslated) {
+      setIsGuideTranslated(false);
+      return;
+    }
+    if (Object.keys(translatedGuideMap).length > 0) {
+      setIsGuideTranslated(true);
+      return;
+    }
+
+    const textsToTranslate = new Set<string>();
+    const addText = (s?: string | null) => {
+      if (s && s.trim()) textsToTranslate.add(s);
+    };
+    addText(guide.title);
+    addText(guide.description);
+    const flow = guide.section_descriptions?.flow || [];
+    for (const el of flow) {
+      addText(el.title);
+      addText(el.description);
+      for (const sub of (el.subblocks || [])) {
+        addText(sub.title);
+        addText(sub.description);
+      }
+    }
+    for (const it of (guide.items || [])) {
+      addText(it.custom_notes);
+    }
+
+    const uniqueTexts = Array.from(textsToTranslate);
+    if (uniqueTexts.length === 0) return;
+
+    setIsTranslatingGuide(true);
+    try {
+      const nextMap: Record<string, string> = {};
+      await Promise.all(
+        uniqueTexts.map(async (txt) => {
+          try {
+            const res = await apiClient.post('/translate/', { text: txt, target_language: language });
+            if (res.data?.translated_text) {
+              nextMap[txt] = res.data.translated_text;
+            }
+          } catch {
+            // keep original on single-item failure
+          }
+        })
+      );
+      setTranslatedGuideMap(nextMap);
+      setIsGuideTranslated(true);
+    } finally {
+      setIsTranslatingGuide(false);
+    }
+  };
+
+  const handleTranslateReview = async (revId: number, content: string) => {
+    if (!content?.trim()) return;
+    const existing = translatedReviews[revId];
+    if (existing?.loading) return;
+    if (existing?.text) {
+      setTranslatedReviews(prev => ({ ...prev, [revId]: { ...existing, show: !existing.show } }));
+      return;
+    }
+    setTranslatedReviews(prev => ({ ...prev, [revId]: { text: '', show: false, loading: true } }));
+    try {
+      const res = await apiClient.post('/translate/', { text: content, target_language: language });
+      setTranslatedReviews(prev => ({
+        ...prev,
+        [revId]: { text: res.data?.translated_text || content, show: true, loading: false }
+      }));
+    } catch {
+      setTranslatedReviews(prev => ({ ...prev, [revId]: { text: '', show: false, loading: false } }));
+    }
+  };
+
+  const handleTranslateComment = async (commentId: number, content: string) => {
+    if (!content?.trim()) return;
+    const existing = translatedComments[commentId];
+    if (existing?.loading) return;
+    if (existing?.text) {
+      setTranslatedComments(prev => ({ ...prev, [commentId]: { ...existing, show: !existing.show } }));
+      return;
+    }
+    setTranslatedComments(prev => ({ ...prev, [commentId]: { text: '', show: false, loading: true } }));
+    try {
+      const res = await apiClient.post('/translate/', { text: content, target_language: language });
+      setTranslatedComments(prev => ({
+        ...prev,
+        [commentId]: { text: res.data?.translated_text || content, show: true, loading: false }
+      }));
+    } catch {
+      setTranslatedComments(prev => ({ ...prev, [commentId]: { text: '', show: false, loading: false } }));
     }
   };
 
@@ -730,10 +846,36 @@ export const ViewGuide: React.FC = () => {
         )}
         <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{guide.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{tGuide(guide.title)}</h1>
+            {currentUser && (
+              <button
+                type="button"
+                onClick={handleTranslateGuide}
+                disabled={isTranslatingGuide}
+                className="btn-secondary"
+                style={{
+                  padding: '0.25rem 0.65rem',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  color: isGuideTranslated ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  borderColor: isGuideTranslated ? 'var(--accent-primary)' : undefined
+                }}
+              >
+                <Languages size={14} />
+                {isTranslatingGuide
+                  ? (language === 'es' ? 'Traduciendo...' : 'Translating...')
+                  : isGuideTranslated
+                    ? (language === 'es' ? 'Ver original' : 'Show original')
+                    : (language === 'es' ? 'Traducir' : 'Translate')}
+              </button>
+            )}
+          </div>
             {guide.description && (
               <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: 0, fontStyle: 'italic', lineHeight: '1.4' }}>
-                {guide.description}
+                {tGuide(guide.description)}
               </p>
             )}
             
@@ -1243,9 +1385,9 @@ export const ViewGuide: React.FC = () => {
                     )}
                     <div style={{ flex: 1 }}>
                       <h3 style={{ color: 'var(--accent-primary)', fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
-                        {el.title.toUpperCase() || (language === 'es' ? 'SECCIÓN SIN TÍTULO' : 'UNTITLED SECTION')}
+                        {tGuide(el.title).toUpperCase() || (language === 'es' ? 'SECCIÓN SIN TÍTULO' : 'UNTITLED SECTION')}
                       </h3>
-                      {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: '0.25rem 0 0 0' }}>{el.description}</p>}
+                      {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: '0.25rem 0 0 0' }}>{tGuide(el.description)}</p>}
                     </div>
                   </div>
                   </React.Fragment>
@@ -1306,10 +1448,10 @@ export const ViewGuide: React.FC = () => {
                       )}
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{el.title || (language === 'es' ? 'Bloque sin título' : 'Untitled Block')}</h4>
+                          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{tGuide(el.title) || (language === 'es' ? 'Bloque sin título' : 'Untitled Block')}</h4>
                           {priorityLabel && <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({priorityLabel})</span>}
                         </div>
-                        {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{el.description}</p>}
+                        {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{tGuide(el.description)}</p>}
                       </div>
                     </div>
 
@@ -1469,10 +1611,10 @@ export const ViewGuide: React.FC = () => {
                                 )}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{sub.title || (language === 'es' ? 'Subbloque sin título' : 'Untitled Subblock')}</h5>
+                                    <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{tGuide(sub.title) || (language === 'es' ? 'Subbloque sin título' : 'Untitled Subblock')}</h5>
                                     {subPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({subPriorityLabel})</span>}
                                   </div>
-                                  {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{sub.description}</p>}
+                                  {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{tGuide(sub.description)}</p>}
                                 </div>
                               </div>
 
@@ -1648,7 +1790,7 @@ export const ViewGuide: React.FC = () => {
                     {rev.content && (
                       <div style={{ position: 'relative' }}>
                         <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', filter: isSpoilerHidden ? 'blur(6px)' : 'none', userSelect: isSpoilerHidden ? 'none' : 'auto', transition: 'filter 0.2s ease' }}>
-                          {rev.content}
+                          {translatedReviews[rev.id]?.show ? translatedReviews[rev.id].text : rev.content}
                         </p>
                         {isSpoilerHidden && (
                           <button
@@ -1684,6 +1826,34 @@ export const ViewGuide: React.FC = () => {
                         <ThumbsUp size={12} fill={rev.user_has_voted ? '#3b82f6' : 'none'} />
                         <span>{rev.votes_count || 0}</span>
                       </button>
+                      {currentUser && rev.content && !isSpoilerHidden && (
+                        <button
+                          type="button"
+                          disabled={translatedReviews[rev.id]?.loading}
+                          onClick={() => handleTranslateReview(rev.id, rev.content)}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            color: translatedReviews[rev.id]?.show ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            borderRadius: '4px',
+                            padding: '0.2rem 0.5rem',
+                            fontSize: '0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Languages size={12} />
+                          <span>
+                            {translatedReviews[rev.id]?.loading
+                              ? '...'
+                              : translatedReviews[rev.id]?.show
+                                ? (language === 'es' ? 'Ver original' : 'Show original')
+                                : (language === 'es' ? 'Traducir' : 'Translate')}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -2001,7 +2171,7 @@ export const ViewGuide: React.FC = () => {
                         </p>
                       ) : (
                         <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                          {renderCommentContent(node.content)}
+                          {renderCommentContent(translatedComments[node.id]?.show ? translatedComments[node.id].text : node.content)}
                         </p>
                       )}
 
@@ -2026,6 +2196,34 @@ export const ViewGuide: React.FC = () => {
                           >
                             <ThumbsUp size={12} fill={node.is_voted_by_me ? '#3b82f6' : 'none'} />
                             <span>{node.vote_count}</span>
+                          </button>
+                        )}
+                        {currentUser && !node.is_deleted && node.content && (
+                          <button
+                            type="button"
+                            disabled={translatedComments[node.id]?.loading}
+                            onClick={() => handleTranslateComment(node.id, node.content)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid var(--border-color)',
+                              color: translatedComments[node.id]?.show ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                              borderRadius: '4px',
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Languages size={12} />
+                            <span>
+                              {translatedComments[node.id]?.loading
+                                ? '...'
+                                : translatedComments[node.id]?.show
+                                  ? (language === 'es' ? 'Ver original' : 'Show original')
+                                  : (language === 'es' ? 'Traducir' : 'Translate')}
+                            </span>
                           </button>
                         )}
 
@@ -2216,7 +2414,7 @@ export const ViewGuide: React.FC = () => {
                                   </p>
                                 ) : (
                                   <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                    {renderCommentContent(reply.content)}
+                                    {renderCommentContent(translatedComments[reply.id]?.show ? translatedComments[reply.id].text : reply.content)}
                                   </p>
                                 )}
 
@@ -2241,6 +2439,34 @@ export const ViewGuide: React.FC = () => {
                                     >
                                       <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
                                       <span>{reply.vote_count}</span>
+                                    </button>
+                                  )}
+                                  {currentUser && !reply.is_deleted && reply.content && (
+                                    <button
+                                      type="button"
+                                      disabled={translatedComments[reply.id]?.loading}
+                                      onClick={() => handleTranslateComment(reply.id, reply.content)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: '1px solid var(--border-color)',
+                                        color: translatedComments[reply.id]?.show ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                        borderRadius: '4px',
+                                        padding: '0.15rem 0.45rem',
+                                        fontSize: '0.73rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <Languages size={11} />
+                                      <span>
+                                        {translatedComments[reply.id]?.loading
+                                          ? '...'
+                                          : translatedComments[reply.id]?.show
+                                            ? (language === 'es' ? 'Ver original' : 'Show original')
+                                            : (language === 'es' ? 'Traducir' : 'Translate')}
+                                      </span>
                                     </button>
                                   )}
 
