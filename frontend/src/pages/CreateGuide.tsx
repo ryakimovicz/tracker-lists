@@ -1990,10 +1990,11 @@ export const CreateGuide: React.FC = () => {
                       };
                     });
                   }}
-                  style={{ width: '110px', fontSize: '0.82rem', padding: '0.25rem 0.5rem', height: '38px', margin: 0 }}
+                  style={{ width: '125px', fontSize: '0.82rem', padding: '0.25rem 0.5rem', height: '38px', margin: 0 }}
                 >
                   <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
-                  <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
+                  <option value="unlisted" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'No Listada' : 'Unlisted'}</option>
+                  <option value="private" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'Privada' : 'Private'}</option>
                 </select>
 
                 {guide && (() => {
