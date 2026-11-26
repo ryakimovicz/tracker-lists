@@ -903,10 +903,67 @@ export const ViewGuide: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const nextPending = itemsList.find((i: any) => !i.is_completed && !i.is_skipped);
-                if (nextPending) {
-                  const el = document.querySelector(`[data-guide-item-id="${nextPending.id}"]`) || document.getElementById(`item-${nextPending.id}`);
-                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Find first pending item in docFlow order (respecting current importance filter)
+                let nextPendingId: number | null = null;
+                let parentIdsToExpand: string[] = [];
+                if (docFlowList.length > 0) {
+                  let currentSecId: string | null = null;
+                  for (const el of docFlowList) {
+                    if (el.type === 'section') {
+                      currentSecId = el.id;
+                    } else if (el.type === 'block') {
+                      for (const bi of (el.items || [])) {
+                        const fullItem = itemsById.get(bi.id);
+                        if (fullItem && !fullItem.is_completed && !fullItem.is_skipped) {
+                          const rank = fullItem.importance_rank ?? fullItem.inherited_importance_rank ?? el.importance_rank ?? 0;
+                          if (minImportanceFilter === null || rank >= minImportanceFilter) {
+                            nextPendingId = fullItem.id;
+                            parentIdsToExpand = [currentSecId, el.id].filter(Boolean) as string[];
+                            break;
+                          }
+                        }
+                      }
+                      if (nextPendingId !== null) break;
+                      for (const sub of (el.subblocks || [])) {
+                        for (const si of (sub.items || [])) {
+                          const fullItem = itemsById.get(si.id);
+                          if (fullItem && !fullItem.is_completed && !fullItem.is_skipped) {
+                            const rank = fullItem.importance_rank ?? fullItem.inherited_importance_rank ?? sub.importance_rank ?? el.importance_rank ?? 0;
+                            if (minImportanceFilter === null || rank >= minImportanceFilter) {
+                              nextPendingId = fullItem.id;
+                              parentIdsToExpand = [currentSecId, el.id, sub.id].filter(Boolean) as string[];
+                              break;
+                            }
+                          }
+                        }
+                        if (nextPendingId !== null) break;
+                      }
+                      if (nextPendingId !== null) break;
+                    }
+                  }
+                }
+                if (nextPendingId === null) {
+                  const fallback = itemsList.find((i: any) => !i.is_completed && !i.is_skipped);
+                  nextPendingId = fallback ? fallback.id : null;
+                }
+                if (nextPendingId !== null) {
+                  if (parentIdsToExpand.length > 0) {
+                    setCollapsedNodes(prev => {
+                      const next = { ...prev };
+                      parentIdsToExpand.forEach(pid => { next[pid] = false; });
+                      return next;
+                    });
+                  }
+                  const targetId = nextPendingId;
+                  setTimeout(() => {
+                    const domEl = document.querySelector(`[data-guide-item-id="${targetId}"]`) as HTMLElement | null;
+                    if (domEl) {
+                      domEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      domEl.style.transition = 'box-shadow 0.4s ease';
+                      domEl.style.boxShadow = '0 0 0 2px var(--accent-primary)';
+                      setTimeout(() => { domEl.style.boxShadow = 'none'; }, 1600);
+                    }
+                  }, 60);
                 }
               }}
               className="btn-secondary"
@@ -925,7 +982,7 @@ export const ViewGuide: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {itemsList.map((item: any) => {
                     return (
-                      <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                           <input
                             type="checkbox"
@@ -1106,7 +1163,7 @@ export const ViewGuide: React.FC = () => {
                             const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
 
                             return (
-                              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                              <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                   <button
                                     type="button"
@@ -1268,7 +1325,7 @@ export const ViewGuide: React.FC = () => {
                                     const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
 
                                     return (
-                                      <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                      <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                           <button
                                             type="button"
