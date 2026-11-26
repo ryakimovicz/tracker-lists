@@ -917,7 +917,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         if not existing_comic_vol:
             try:
                 from app.services.metron import MetronService
-                issue_details = MetronService.get_issue_details(item.external_id)
+                issue_details = MetronService.get_comic_issue_detail(item.external_id)
                 if issue_details and isinstance(issue_details.get("volume"), dict):
                     vol_data = issue_details["volume"]
                     vol_ext_id = vol_data.get("external_id") or vol_data.get("id")
@@ -945,7 +945,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         if existing_comic_vol:
             existing_comic_vol.last_seen_episode = item.title
             existing_comic_vol.updated_at = datetime.now(timezone.utc)
-            if existing_comic_vol.status in (UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.READ):
+            if existing_comic_vol.custom_badge != "from_guide" and existing_comic_vol.status in (UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.READ):
                 existing_comic_vol.status = UserLibraryStatusEnum.READING
                 existing_comic_vol.completed_at = None
             db.commit()
@@ -957,7 +957,8 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
                 title=vol_title or item.title,
                 image_url=vol_image,
                 last_seen_episode=item.title,
-                status=UserLibraryStatusEnum.READING,
+                custom_badge="from_guide",
+                status=UserLibraryStatusEnum.READ,
                 updated_at=datetime.now(timezone.utc)
             )
             db.add(lib_item)
@@ -965,7 +966,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         return
 
     if item.external_id.startswith("tvm-ep-") and not existing_series:
-        # Add parent series/anime card to library showing last seen episode
+        # Add parent series/anime card to library under "from_guide" showing last seen episode
         parent_type = "anime" if target_item_type == "anime" else "series"
         lib_item = UserLibraryItem(
             user_id=user_id,
@@ -974,7 +975,8 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
             title=show_name or item.title,
             image_url=show_image or item.image_url,
             last_seen_episode=item.title,
-            status=UserLibraryStatusEnum.WATCHING,
+            custom_badge="from_guide",
+            status=UserLibraryStatusEnum.COMPLETED,
             updated_at=datetime.now(timezone.utc)
         )
         db.add(lib_item)
@@ -984,7 +986,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     if existing_series and item.external_id.startswith("tvm-ep-"):
         existing_series.last_seen_episode = item.title
         existing_series.updated_at = datetime.now(timezone.utc)
-        if existing_series.status in (UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.COMPLETED):
+        if existing_series.custom_badge != "from_guide" and existing_series.status in (UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.COMPLETED):
             existing_series.status = UserLibraryStatusEnum.WATCHING
             existing_series.completed_at = None
         if existing_series.tracking_list_id:

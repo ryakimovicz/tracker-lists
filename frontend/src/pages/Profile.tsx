@@ -3391,6 +3391,7 @@ export const Profile: React.FC = () => {
   };
 
   const getItemShelfStatus = useCallback((item: LibraryItem): string => {
+    if (item.custom_badge === 'from_guide') return 'from_guide';
     if (item.status === 'dropped') return 'dropped';
 
     const isPlanTo = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status) ||
@@ -3486,6 +3487,7 @@ export const Profile: React.FC = () => {
         { id: 'completed', label: language === 'es' ? 'Terminadas' : 'Completed', count: getCount('completed') },
         { id: 'plan_to', label: language === 'es' ? 'Por ver' : 'Plan to watch', count: getCount('plan_to') },
         { id: 'dropped', label: language === 'es' ? 'Abandonadas' : 'Dropped', count: getCount('dropped') },
+        { id: 'from_guide', label: language === 'es' ? 'De guías' : 'From guides', count: getCount('from_guide') },
       ];
     } else if (mediaType === 'game') {
       return [
@@ -3498,13 +3500,17 @@ export const Profile: React.FC = () => {
       ];
     } else {
       // book, comic, manga
-      return [
+      const base = [
         { id: 'all', label: language === 'es' ? 'Todo' : 'All', count: getCount('all') },
         { id: 'watching', label: language === 'es' ? 'Leyendo' : 'Reading', count: getCount('watching') },
         { id: 'completed', label: language === 'es' ? 'Leídos' : 'Read', count: getCount('completed') },
         { id: 'plan_to', label: language === 'es' ? 'Por leer' : 'Plan to read', count: getCount('plan_to') },
         { id: 'dropped', label: language === 'es' ? 'Abandonados' : 'Dropped', count: getCount('dropped') },
       ];
+      if (mediaType === 'comic') {
+        base.push({ id: 'from_guide', label: language === 'es' ? 'De guías' : 'From guides', count: getCount('from_guide') });
+      }
+      return base;
     }
   }, [getItemShelfStatus, language]);
 

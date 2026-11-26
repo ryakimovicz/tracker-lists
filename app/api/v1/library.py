@@ -556,6 +556,8 @@ def add_to_library(
             existing.is_hundred_percent = item_in.is_hundred_percent
         if item_in.custom_badge is not None:
             existing.custom_badge = item_in.custom_badge
+        elif existing.custom_badge == "from_guide":
+            existing.custom_badge = None
         if item_in.release_date is not None:
             existing.release_date = item_in.release_date
         existing.completed_at = completed_at_val
@@ -1330,6 +1332,8 @@ def update_library_item(
 
     if item_in.custom_badge is not None:
         lib_item.custom_badge = item_in.custom_badge
+    elif item_in.status is not None and lib_item.custom_badge == "from_guide":
+        lib_item.custom_badge = None
     if item_in.release_date is not None:
         lib_item.release_date = item_in.release_date
     if item_in.pages_read is not None:
