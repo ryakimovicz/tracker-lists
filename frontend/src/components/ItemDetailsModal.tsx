@@ -780,6 +780,7 @@ export const RootReviewEditor: React.FC<{
   const [isSpoiler, setIsSpoiler] = useState<boolean>(initialIsSpoiler);
   const [isWritingReview, setIsWritingReview] = useState<boolean>(false);
   const [isOwnSpoilerRevealed, setIsOwnSpoilerRevealed] = useState<boolean>(false);
+  const [isOwnReviewExpanded, setIsOwnReviewExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     setRating(initialRating);
@@ -852,7 +853,7 @@ export const RootReviewEditor: React.FC<{
         </div>
 
         {initialReview && initialReview.trim() && (
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', minWidth: 0, width: '100%' }}>
             <div style={{
               padding: '0.75rem',
               background: 'var(--bg-secondary)',
@@ -862,6 +863,14 @@ export const RootReviewEditor: React.FC<{
               color: 'var(--text-primary)',
               lineHeight: '1.45',
               whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              ...(initialReview.trim().length > 180 && !isOwnReviewExpanded ? {
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden'
+              } : {}),
               filter: initialIsSpoiler && !isOwnSpoilerRevealed ? 'blur(6px)' : 'none',
               userSelect: initialIsSpoiler && !isOwnSpoilerRevealed ? 'none' : 'auto',
               transition: 'filter 0.2s ease'
@@ -883,6 +892,25 @@ export const RootReviewEditor: React.FC<{
                 }}
               >
                 {language === 'es' ? 'Mostrar reseña' : 'Show review'}
+              </button>
+            )}
+            {initialReview.trim().length > 180 && (!initialIsSpoiler || isOwnSpoilerRevealed) && (
+              <button
+                type="button"
+                onClick={() => setIsOwnReviewExpanded(prev => !prev)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '0.25rem 0 0 0',
+                  color: 'var(--accent-primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {isOwnReviewExpanded
+                  ? (language === 'es' ? 'Ver menos' : 'Show less')
+                  : (language === 'es' ? 'Ver más' : 'Show more')}
               </button>
             )}
           </div>

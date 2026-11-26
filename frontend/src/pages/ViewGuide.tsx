@@ -927,8 +927,8 @@ export const ViewGuide: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ minWidth: 0 }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Progreso Completado:' : 'Completed Progress:'}</span>
             <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>
               {guide.completed_count} / {Math.max(0, guide.total_count - (guide.skipped_count || 0))} ({guide.progress_percentage}%)
@@ -942,7 +942,7 @@ export const ViewGuide: React.FC = () => {
           <div>
             {/* Interactive Half-Star Rating & Review Box (matches media items) */}
             {currentUser && (
-              <div>
+              <div style={{ minWidth: 0, width: '100%' }}>
                 <RootReviewEditor
                   initialRating={userRating || 0}
                   initialReview={userReviewText}
@@ -1647,7 +1647,7 @@ export const ViewGuide: React.FC = () => {
                     </div>
                     {rev.content && (
                       <div style={{ position: 'relative' }}>
-                        <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', filter: isSpoilerHidden ? 'blur(6px)' : 'none', userSelect: isSpoilerHidden ? 'none' : 'auto', transition: 'filter 0.2s ease' }}>
+                        <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', filter: isSpoilerHidden ? 'blur(6px)' : 'none', userSelect: isSpoilerHidden ? 'none' : 'auto', transition: 'filter 0.2s ease' }}>
                           {rev.content}
                         </p>
                         {isSpoilerHidden && (
