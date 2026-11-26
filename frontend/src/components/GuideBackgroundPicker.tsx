@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Monitor, Lock, Star } from 'lucide-react';
-import { getUserPlanTier } from '../utils/planPermissions';
+import { Monitor, Star } from 'lucide-react';
 import { BackgroundSelectorModal } from './BackgroundSelectorModal';
 
 interface GuideBackgroundPickerProps {
@@ -15,12 +14,9 @@ interface GuideBackgroundPickerProps {
 export const GuideBackgroundPicker: React.FC<GuideBackgroundPickerProps> = ({
   backgroundUrl,
   onChange,
-  currentUser,
   language
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const planTier = getUserPlanTier(currentUser);
-  const canUseBackground = planTier !== 'free';
   const [isOpen, setIsOpen] = useState(() => searchParams.get('bg') === '1');
 
   useEffect(() => {
@@ -41,16 +37,6 @@ export const GuideBackgroundPicker: React.FC<GuideBackgroundPickerProps> = ({
       setIsOpen(false);
     }
   }, [searchParams]);
-
-  if (!canUseBackground) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Lock size={14} /> {language === 'es' ? 'Fondo (Pro o Packs)' : 'Background (Pro or Packs)'}
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>

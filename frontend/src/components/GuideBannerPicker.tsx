@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Image as ImageIcon, Lock, Star } from 'lucide-react';
-import { getUserPlanTier } from '../utils/planPermissions';
+import { Image as ImageIcon, Star } from 'lucide-react';
 import { BannerSelectorModal } from './BannerSelectorModal';
 
 interface GuideBannerPickerProps {
@@ -15,12 +14,9 @@ interface GuideBannerPickerProps {
 export const GuideBannerPicker: React.FC<GuideBannerPickerProps> = ({
   bannerUrl,
   onChange,
-  currentUser,
   language
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const planTier = getUserPlanTier(currentUser);
-  const canUseBanner = planTier !== 'free';
   const [isOpen, setIsOpen] = useState(() => searchParams.get('cover') === '1');
 
   useEffect(() => {
@@ -41,16 +37,6 @@ export const GuideBannerPicker: React.FC<GuideBannerPickerProps> = ({
       setIsOpen(false);
     }
   }, [searchParams]);
-
-  if (!canUseBanner) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Lock size={14} /> {language === 'es' ? 'Portada (Pro o Packs)' : 'Cover (Pro or Packs)'}
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>

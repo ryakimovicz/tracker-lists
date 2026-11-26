@@ -1882,9 +1882,26 @@ export const CreateGuide: React.FC = () => {
               </select>
             </div>
             {!canCreatePrivateGuides(currentUser) && (
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowProModal(true)}
+                style={{
+                  margin: 0,
+                  padding: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '0.8rem',
+                  color: '#f59e0b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  alignSelf: 'flex-start'
+                }}
+              >
                 <Lock size={12} /> {language === 'es' ? 'Hazte Pro para guías ocultas.' : 'Go Pro for hidden guides.'}
-              </p>
+              </button>
             )}
           </div>
 
@@ -2302,31 +2319,29 @@ export const CreateGuide: React.FC = () => {
                           )}
                         </div>
 
-                        {getUserPlanTier(currentUser) !== 'free' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSectionBannerTargetId(element.id)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            <ImageIcon size={13} />
+                            {element.banner_url
+                              ? (language === 'es' ? 'Cambiar portada' : 'Change cover')
+                              : (language === 'es' ? 'Portada de sección' : 'Section cover')}
+                          </button>
+                          {element.banner_url && (
                             <button
                               type="button"
-                              onClick={() => setSectionBannerTargetId(element.id)}
+                              onClick={() => updateDocElement(element.id, { banner_url: null })}
                               className="btn-secondary"
-                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', color: '#ef4444' }}
                             >
-                              <ImageIcon size={13} />
-                              {element.banner_url
-                                ? (language === 'es' ? 'Cambiar portada' : 'Change cover')
-                                : (language === 'es' ? 'Portada de sección' : 'Section cover')}
+                              {language === 'es' ? 'Quitar' : 'Remove'}
                             </button>
-                            {element.banner_url && (
-                              <button
-                                type="button"
-                                onClick={() => updateDocElement(element.id, { banner_url: null })}
-                                className="btn-secondary"
-                                style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', color: '#ef4444' }}
-                              >
-                                {language === 'es' ? 'Quitar' : 'Remove'}
-                              </button>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         {element.banner_url && (
                           <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
