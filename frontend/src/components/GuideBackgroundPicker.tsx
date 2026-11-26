@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Monitor, Lock } from 'lucide-react';
+import { Monitor, Lock, Star } from 'lucide-react';
 import { getUserPlanTier } from '../utils/planPermissions';
 import { BackgroundSelectorModal } from './BackgroundSelectorModal';
 
@@ -56,6 +56,9 @@ export const GuideBackgroundPicker: React.FC<GuideBackgroundPickerProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
       <label style={{ fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <Monitor size={15} /> {language === 'es' ? 'Fondo' : 'Background'}
+        <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
+          <Star size={10} fill="#f59e0b" />
+        </span>
       </label>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

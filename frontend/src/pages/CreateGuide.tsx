@@ -28,7 +28,8 @@ import {
   Crown,
   Sparkles,
   Compass,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProModal } from '../components/ProModal';
@@ -1861,7 +1862,13 @@ export const CreateGuide: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Visibilidad' : 'Visibility'}</label>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              {language === 'es' ? 'Visibilidad' : 'Visibility'}
+              <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Star size={10} fill="#f59e0b" />
+                PREMIUM
+              </span>
+            </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <select
                 className="input-field"
@@ -1870,8 +1877,8 @@ export const CreateGuide: React.FC = () => {
                 style={{ flex: 1 }}
               >
                 <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
-                <option value="unlisted" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'No Listada (Pro)' : 'Unlisted (Pro)'}</option>
-                <option value="private" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'Privada (Pro)' : 'Private (Pro)'}</option>
+                <option value="unlisted" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'No Listada' : 'Unlisted'}</option>
+                <option value="private" disabled={!canCreatePrivateGuides(currentUser)}>{language === 'es' ? 'Privada' : 'Private'}</option>
               </select>
             </div>
             {!canCreatePrivateGuides(currentUser) && (
