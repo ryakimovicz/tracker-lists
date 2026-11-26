@@ -540,6 +540,7 @@ const CustomCard = ({
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     actionTimerRef.current = setTimeout(() => {
       callback && callback(e);
+      setTimeout(() => setActiveAction(null), 180);
     }, 60);
   };
 
@@ -3006,6 +3007,9 @@ export const Home: React.FC = () => {
 
   const handleMarkCompleted = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
+    try {
+      (e.currentTarget as HTMLButtonElement)?.blur();
+    } catch {}
     if (item.item_id || item.is_addition) {
       const prevGuides = [...upNextGuides];
       const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
