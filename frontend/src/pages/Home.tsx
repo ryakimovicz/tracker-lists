@@ -3738,6 +3738,13 @@ export const Home: React.FC = () => {
                     const e = sMatch[2];
                     bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                     insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                  } else {
+                    const comicMatch = g.title.match(/^(.*?)\s*#\s*(\d+(?:\.\d+)?)(?:\s*[-–:]\s*(.*))?$/);
+                    if (comicMatch) {
+                      insideTop = comicMatch[1].trim();
+                      bottomText1 = `#${comicMatch[2]}`;
+                      bottomText2 = (comicMatch[3] || '').trim();
+                    }
                   }
                 }
 
@@ -3802,6 +3809,13 @@ export const Home: React.FC = () => {
                       const e = sMatch[2];
                       bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                       insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                    } else {
+                      const comicMatch = g.title.match(/^(.*?)\s*#\s*(\d+(?:\.\d+)?)(?:\s*[-–:]\s*(.*))?$/);
+                      if (comicMatch) {
+                        insideTop = comicMatch[1].trim();
+                        bottomText1 = `#${comicMatch[2]}`;
+                        bottomText2 = (comicMatch[3] || '').trim();
+                      }
                     }
                   }
 
