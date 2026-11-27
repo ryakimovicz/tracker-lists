@@ -3648,6 +3648,42 @@ export const Profile: React.FC = () => {
 
   const renderGuideCard = (list: any, isSaved: boolean) => {
     const guideItemsCount = list.items_count ?? list.items?.length ?? 0;
+    const gTheme = list.accent_color ? getProfileTheme(list.accent_color, isLight) : null;
+    const guideAccent = gTheme ? gTheme.accent : 'var(--color-guide, #2DD4BF)';
+    const guideAccentText = gTheme
+      ? ((gTheme.cssVariables as any)['--accent-text'] || '#fff')
+      : '#fff';
+    const guideColorVars: React.CSSProperties = (gTheme
+      ? {
+          '--guide-accent': gTheme.accent,
+          '--title-hover-color': gTheme.accent,
+          '--card-hover-glow': gTheme.glow,
+          '--accent-primary': gTheme.accent,
+        }
+      : {
+          '--guide-accent': 'var(--color-guide)',
+          '--title-hover-color': 'var(--color-guide)',
+        }) as unknown as React.CSSProperties;
+
+    const visibilityLabel = list.visibility === 'draft'
+      ? (language === 'es' ? 'Borrador' : 'Draft')
+      : list.visibility === 'private'
+        ? (language === 'es' ? 'Privada' : 'Private')
+        : list.visibility === 'unlisted'
+          ? (language === 'es' ? 'No listada' : 'Unlisted')
+          : (language === 'es' ? 'Pública' : 'Public');
+
+    const visibilityBg = list.visibility === 'draft'
+      ? 'rgba(245, 158, 11, 0.92)'
+      : list.visibility === 'private'
+        ? 'rgba(15, 23, 42, 0.88)'
+        : list.visibility === 'unlisted'
+          ? 'rgba(100, 116, 139, 0.9)'
+          : 'rgba(45, 212, 191, 0.9)';
+
+    const visibilityColor = list.visibility === 'draft' ? '#0f172a' : '#ffffff';
+    const creatorName = list.creator_username || 'Comunidad de Pathd';
+
     return (
       <div
         key={list.id}
@@ -3663,7 +3699,8 @@ export const Profile: React.FC = () => {
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+          ...guideColorVars
         }}
         onClick={() => handleOpenGuide(list.id)}
       >
@@ -3676,7 +3713,8 @@ export const Profile: React.FC = () => {
             borderBottom: '1px solid var(--border-color)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            transition: 'color 0.2s ease'
           }}
           title={list.title}
         >
@@ -3696,7 +3734,14 @@ export const Profile: React.FC = () => {
             overflow: 'hidden'
           }}
         >
-          {list.covers && list.covers.length > 0 ? (
+          {list.banner_url ? (
+            <img
+              src={list.banner_url}
+              alt={list.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          ) : list.covers && list.covers.length > 0 ? (
             <div
               style={{
                 display: 'grid',
@@ -3720,11 +3765,11 @@ export const Profile: React.FC = () => {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-              <BookOpen size={28} color="var(--color-guide, #2DD4BF)" />
+              <BookOpen size={28} color={guideAccent} />
             </div>
           )}
 
-          {!isSaved && (
+          {!isSaved && isOwnProfile && (
             <span
               className="guide-visibility-badge"
               style={{
@@ -3734,20 +3779,14 @@ export const Profile: React.FC = () => {
                 fontSize: '0.7rem',
                 padding: '0.15rem 0.45rem',
                 borderRadius: '4px',
-                background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
-                color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
+                background: visibilityBg,
+                color: visibilityColor,
                 fontWeight: 700,
                 backdropFilter: 'blur(4px)',
                 zIndex: 2
               }}
             >
-              {list.visibility === 'draft'
-                ? (language === 'es' ? 'Borrador' : 'Draft')
-                : (list.visibility === 'private'
-                    ? (language === 'es' ? 'Privada' : 'Private')
-                    : (language === 'es' ? 'Pública' : 'Public')
-                  )
-              }
+              {visibilityLabel}
             </span>
           )}
 
@@ -3777,53 +3816,54 @@ export const Profile: React.FC = () => {
             padding: '0.75rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.35rem',
+            gap: '0.25rem',
             flex: 1,
             minHeight: '2.5rem',
             justifyContent: 'center'
           }}
         >
-          {list.description ? (
-            <p
-              className="profile-guide-desc"
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.78rem',
-                margin: 0,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                lineHeight: 1.25
-              }}
-            >
-              {list.description}
-            </p>
-          ) : null}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            <span>{guideItemsCount} {t('guidesWorksCount')}</span>
-            {list.media_types && list.media_types.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
-              </div>
-            )}
-            {!isSaved && (
-              <span
-                className="profile-guide-status-inline"
+          {isSaved && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div
                 style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  color: list.visibility === 'draft' ? '#f59e0b' : list.visibility === 'private' ? 'var(--text-secondary)' : 'var(--color-guide, #2DD4BF)'
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: guideAccent,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  color: guideAccentText,
+                  overflow: 'hidden',
+                  flexShrink: 0
                 }}
               >
-                • {list.visibility === 'draft'
-                    ? (language === 'es' ? 'Borrador' : 'Draft')
-                    : (list.visibility === 'private'
-                        ? (language === 'es' ? 'Privada' : 'Private')
-                        : (language === 'es' ? 'Pública' : 'Public')
-                      )
-                  }
+                {list.creator_photo_url ? (
+                  <img src={list.creator_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  creatorName.charAt(0).toUpperCase() || 'P'
+                )}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {creatorName}
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+            <span>{guideItemsCount} {t('guidesWorksCount')}</span>
+            {list.average_rating != null && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
+                <Star size={11} fill="#eab308" color="#eab308" />
+                {list.average_rating}
+              </span>
+            )}
+            {(list.saves_count || 0) > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
+                <Plus size={11} strokeWidth={2.5} />
+                {list.saves_count}
               </span>
             )}
           </div>
@@ -3835,21 +3875,13 @@ export const Profile: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
             style={{
               display: 'flex',
-              gap: '0.35rem',
+              gap: '0.4rem',
               alignItems: 'center',
               padding: '0.5rem 0.75rem',
               borderTop: '1px solid var(--border-color)',
               background: 'rgba(0,0,0,0.15)'
             }}
           >
-            <button
-              type="button"
-              onClick={() => handleOpenGuide(list.id)}
-              className="btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', flex: 1, justifyContent: 'center' }}
-            >
-              <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -3863,21 +3895,24 @@ export const Profile: React.FC = () => {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                justifyContent: 'center',
+                gap: '0.35rem',
                 fontSize: '0.78rem',
-                padding: '0.25rem 0.55rem',
+                padding: '0.28rem 0.55rem',
+                flex: 1,
                 color: list.can_edit === false ? '#f59e0b' : 'inherit',
                 borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
               }}
               title={language === 'es' ? 'Editar' : 'Edit'}
             >
               {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
+              <span>{language === 'es' ? 'Editar' : 'Edit'}</span>
             </button>
             <button
               type="button"
               onClick={() => handleDeleteGuide(list.id)}
               className="btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.78rem', padding: '0.28rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.25)' }}
               title={language === 'es' ? 'Eliminar' : 'Delete'}
             >
               <Trash2 size={13} />

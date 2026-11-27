@@ -358,10 +358,19 @@ export const CreateGuide: React.FC = () => {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerItemType, setBannerItemType] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
-  const [accentColor, setAccentColor] = useState<string | null>(null);
+  const [accentColor, setAccentColor] = useState<string | null>(() =>
+    canCustomizeColor(currentUser) ? (currentUser?.profile_color || null) : null
+  );
+  const hasUserPickedAccentRef = useRef(false);
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const [sectionBannerTargetId, setSectionBannerTargetId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!guide && !hasUserPickedAccentRef.current && canCustomizeColor(currentUser) && currentUser?.profile_color) {
+      setAccentColor(currentUser.profile_color);
+    }
+  }, [guide, currentUser]);
 
   // Step 2: Word-style Document Flow Editor state
   const [docFlow, setDocFlow] = useState<DocElement[]>([]);
@@ -1861,7 +1870,10 @@ export const CreateGuide: React.FC = () => {
             <div>
               <GuideAccentColorPicker
                 accentColor={accentColor}
-                onChange={(colorId) => setAccentColor(colorId)}
+                onChange={(colorId) => {
+                  hasUserPickedAccentRef.current = true;
+                  setAccentColor(colorId);
+                }}
                 currentUser={currentUser}
                 language={language}
                 onRequirePro={() => setShowProModal(true)}
@@ -2030,7 +2042,10 @@ export const CreateGuide: React.FC = () => {
                 />
                 <GuideAccentColorPicker
                   accentColor={accentColor}
-                  onChange={(colorId) => setAccentColor(colorId)}
+                  onChange={(colorId) => {
+                    hasUserPickedAccentRef.current = true;
+                    setAccentColor(colorId);
+                  }}
                   currentUser={currentUser}
                   language={language}
                   compact

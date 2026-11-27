@@ -64,6 +64,14 @@ class ReadingListResponse(ReadingListBase):
     creator_id: Optional[int] = None
     created_at: datetime
     can_edit: bool = True
+    creator_username: Optional[str] = None
+    creator_photo_url: Optional[str] = None
+    items_count: int = 0
+    saves_count: int = 0
+    average_rating: Optional[float] = None
+    covers: List[str] = []
+    accent_color: Optional[str] = None
+    banner_url: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -146,6 +146,37 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
     return bool(user.is_pro)
 
 
+def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True) -> ReadingListResponse:
+    rl_data = ReadingListResponse.model_validate(rl)
+    rl_data.can_edit = can_edit
+    items = rl.items or []
+    rl_data.items_count = len(items)
+    covers = []
+    for it in items:
+        if it.image_url and it.image_url not in covers and len(covers) < 4:
+            covers.append(it.image_url)
+    rl_data.covers = covers
+    votes = rl.votes or []
+    if votes:
+        valid_ratings = [v.rating for v in votes if v.rating is not None]
+        if valid_ratings:
+            rl_data.average_rating = round(sum(valid_ratings) / len(valid_ratings), 1)
+    rl_data.saves_count = len(rl.saved_by_users or [])
+    if rl.creator:
+        rl_data.creator_username = rl.creator.username
+        rl_data.creator_photo_url = getattr(rl.creator, 'photo_url', None) or getattr(rl.creator, 'profile_image_url', None)
+        creator_is_pro = check_user_is_pro(rl.creator)
+    else:
+        rl_data.creator_username = "Comunidad de Pathd"
+        rl_data.creator_photo_url = None
+        creator_is_pro = False
+    sec_desc = rl.section_descriptions if isinstance(rl.section_descriptions, dict) else {}
+    if creator_is_pro:
+        rl_data.accent_color = sec_desc.get("accent_color")
+        rl_data.banner_url = sec_desc.get("banner_url")
+    return rl_data
+
+
 @router.get("/me", response_model=UserDashboardResponse)
 async def get_user_dashboard(
     current_user: User = Depends(get_current_user_allow_suspended),
@@ -177,12 +208,9 @@ async def get_user_dashboard(
         ~ReadingList.id.in_(tracker_list_ids_query)
     ).order_by(ReadingList.created_at.asc()).all()
 
-    
     created_lists = []
     for idx, rl in enumerate(raw_created_lists):
-        rl_data = ReadingListResponse.model_validate(rl)
-        rl_data.can_edit = True if (is_pro or idx < 2) else False
-        created_lists.append(rl_data)
+        created_lists.append(_enrich_reading_list_response(rl, can_edit=(is_pro or idx < 2)))
     
     # Fetch lists saved/followed by the user
     saved_entries = db.query(SavedList).join(
@@ -199,13 +227,11 @@ async def get_user_dashboard(
             continue
         is_own = (rl.creator_id == current_user.id)
         if is_pro or is_own:
-            rl_data = ReadingListResponse.model_validate(rl)
-            saved_lists.append(rl_data)
+            saved_lists.append(_enrich_reading_list_response(rl, can_edit=is_own))
         else:
             # Free user: include up to 3 followed guides of other users
             if other_saved_count < 3:
-                rl_data = ReadingListResponse.model_validate(rl)
-                saved_lists.append(rl_data)
+                saved_lists.append(_enrich_reading_list_response(rl, can_edit=False))
                 other_saved_count += 1
 
     followers_count = db.query(Follow).filter(Follow.followed_id == current_user.id).count()
@@ -1171,9 +1197,7 @@ def get_any_user_profile(
 
     created_lists = []
     for idx, rl in enumerate(raw_created_lists):
-        rl_data = ReadingListResponse.model_validate(rl)
-        rl_data.can_edit = True if (is_pro or idx < 2) else False
-        created_lists.append(rl_data)
+        created_lists.append(_enrich_reading_list_response(rl, can_edit=(is_pro or idx < 2)))
     
     saved_entries = db.query(SavedList).join(
         ReadingList, SavedList.list_id == ReadingList.id
@@ -1190,12 +1214,10 @@ def get_any_user_profile(
             continue
         is_own = (rl.creator_id == user.id)
         if is_pro or is_own:
-            rl_data = ReadingListResponse.model_validate(rl)
-            saved_lists.append(rl_data)
+            saved_lists.append(_enrich_reading_list_response(rl, can_edit=is_own))
         else:
             if other_saved_count < 3:
-                rl_data = ReadingListResponse.model_validate(rl)
-                saved_lists.append(rl_data)
+                saved_lists.append(_enrich_reading_list_response(rl, can_edit=False))
                 other_saved_count += 1
 
     is_following = False

@@ -2232,7 +2232,7 @@ export const Search: React.FC = () => {
                 return (
                   <div
                     key={`${item.external_id}-${item.item_type}`}
-                    className="activity-card activity-card-portrait guide-explore-card"
+                    className="activity-card activity-card-portrait guide-explore-card search-guide-card"
                     style={{
                       width: '100%',
                       background: 'var(--bg-secondary)',
