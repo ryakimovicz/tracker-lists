@@ -3734,23 +3734,54 @@ export const Profile: React.FC = () => {
           >
             {list.title}
           </div>
-          {list.average_rating != null && (
-            <span
+          {(list.average_rating != null || (list.saves_count || 0) > 0) && (
+            <div
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                color: '#eab308',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '2px',
                 flexShrink: 0,
                 paddingTop: '1px'
               }}
             >
-              <Star size={13} fill="#eab308" color="#eab308" />
-              {list.average_rating}
-            </span>
+              {(list.saves_count || 0) > 0 && (
+                <span
+                  title={language === 'es' ? 'Seguidores de la guía' : 'Guide followers'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    color: '#ec4899',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Plus size={12} strokeWidth={2.5} />
+                  {list.saves_count >= 1000 ? `${(list.saves_count / 1000).toFixed(list.saves_count >= 10000 ? 0 : 1)}k` : list.saves_count}
+                </span>
+              )}
+              {list.average_rating != null && (
+                <span
+                  title={language === 'es' ? 'Valoración promedio' : 'Average rating'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    color: '#eab308',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Star size={12} fill="#eab308" color="#eab308" />
+                  {list.average_rating}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -3897,14 +3928,8 @@ export const Profile: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{guideItemsCount} {t('guidesWorksCount')}</span>
-              {(list.saves_count || 0) > 0 && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  <Plus size={13} strokeWidth={2.5} />
-                  {list.saves_count >= 1000 ? `${(list.saves_count / 1000).toFixed(list.saves_count >= 10000 ? 0 : 1)}k` : list.saves_count}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{guideItemsCount} {t('guidesWorksCount')}</span>
             </div>
 
             {!isSaved && isOwnProfile && (

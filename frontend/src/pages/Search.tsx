@@ -642,23 +642,54 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 >
                   {guide.title}
                 </div>
-                {guide.average_rating != null && (
-                  <span
+                {(guide.average_rating != null || guide.saves_count > 0) && (
+                  <div
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      color: '#eab308',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: '2px',
                       flexShrink: 0,
                       paddingTop: '1px'
                     }}
                   >
-                    <Star size={13} fill="#eab308" color="#eab308" />
-                    {guide.average_rating}
-                  </span>
+                    {guide.saves_count > 0 && (
+                      <span
+                        title={language === 'es' ? 'Seguidores de la guía' : 'Guide followers'}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          color: '#ec4899',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Plus size={12} strokeWidth={2.5} />
+                        {guide.saves_count >= 1000 ? `${(guide.saves_count / 1000).toFixed(guide.saves_count >= 10000 ? 0 : 1)}k` : guide.saves_count}
+                      </span>
+                    )}
+                    {guide.average_rating != null && (
+                      <span
+                        title={language === 'es' ? 'Valoración promedio' : 'Average rating'}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          color: '#eab308',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Star size={12} fill="#eab308" color="#eab308" />
+                        {guide.average_rating}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -770,14 +801,8 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 </div>
 
                 {/* Badges / Metrics */}
-                <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', minWidth: 0 }}>
-                  <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{guide.items_count} {t('guidesWorksCount')}</span>
-                  {guide.saves_count > 0 && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      <Plus size={13} strokeWidth={2.5} />
-                      {guide.saves_count >= 1000 ? `${(guide.saves_count / 1000).toFixed(guide.saves_count >= 10000 ? 0 : 1)}k` : guide.saves_count}
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: 0 }}>
+                  <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{guide.items_count} {t('guidesWorksCount')}</span>
                 </div>
               </div>
             </div>
@@ -2319,23 +2344,54 @@ export const Search: React.FC = () => {
                       >
                         {item.title}
                       </div>
-                      {avgRating != null && (
-                        <span
+                      {(avgRating != null || savesCount > 0) && (
+                        <div
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            color: '#eab308',
-                            fontSize: '0.82rem',
-                            fontWeight: 700,
-                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-end',
+                            gap: '2px',
                             flexShrink: 0,
                             paddingTop: '1px'
                           }}
                         >
-                          <Star size={13} fill="#eab308" color="#eab308" />
-                          {avgRating}
-                        </span>
+                          {savesCount > 0 && (
+                            <span
+                              title={language === 'es' ? 'Seguidores de la guía' : 'Guide followers'}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                color: '#ec4899',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                lineHeight: 1.2,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Plus size={12} strokeWidth={2.5} />
+                              {savesCount >= 1000 ? `${(savesCount / 1000).toFixed(savesCount >= 10000 ? 0 : 1)}k` : savesCount}
+                            </span>
+                          )}
+                          {avgRating != null && (
+                            <span
+                              title={language === 'es' ? 'Valoración promedio' : 'Average rating'}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                color: '#eab308',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                lineHeight: 1.2,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Star size={12} fill="#eab308" color="#eab308" />
+                              {avgRating}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -2461,14 +2517,8 @@ export const Search: React.FC = () => {
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', minWidth: 0 }}>
-                        <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{itemsCount} {t('guidesWorksCount')}</span>
-                        {savesCount > 0 && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            <Plus size={13} strokeWidth={2.5} />
-                            {savesCount >= 1000 ? `${(savesCount / 1000).toFixed(savesCount >= 10000 ? 0 : 1)}k` : savesCount}
-                          </span>
-                        )}
+                      <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: 0 }}>
+                        <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{itemsCount} {t('guidesWorksCount')}</span>
                       </div>
 
                       {user && (
