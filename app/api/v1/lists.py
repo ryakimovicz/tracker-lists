@@ -1335,9 +1335,24 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
 
 from typing import Optional
 
+def _auto_add_to_library_bg(user_id: int, item_id: int):
+    """Run auto_add_to_library in a background task with its own DB session so toggle endpoints stay fast."""
+    from app.core.database import SessionLocal
+    bg_db = SessionLocal()
+    try:
+        bg_item = bg_db.query(ListItem).filter(ListItem.id == item_id).first()
+        if bg_item:
+            auto_add_to_library(bg_db, user_id, bg_item)
+    except Exception as e:
+        logger.warning(f"Background auto_add_to_library failed for user={user_id}, item={item_id}: {e}")
+    finally:
+        bg_db.close()
+
+
 @router.post("/items/{item_id}/toggle", status_code=status.HTTP_200_OK)
 def toggle_item_progress(
     item_id: int,
+    background_tasks: BackgroundTasks,
     action: Optional[str] = None, # None=toggle, 'mark_again', 'remove'
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1473,8 +1488,6 @@ def toggle_item_progress(
 
             _ensure_global_external_progress(db, current_user.id, item, now_dt)
 
-        auto_add_to_library(db, current_user.id, item)
-        
         # Add to ConsumptionHistory
         ch = ConsumptionHistory(
             user_id=current_user.id,
@@ -1522,6 +1535,8 @@ def toggle_item_progress(
         _cleanup_orphan_from_guide_library_items(db, current_user.id)
         
     db.commit()
+    if just_marked_completed:
+        background_tasks.add_task(_auto_add_to_library_bg, current_user.id, item_id)
     return {
         "item_id": item_id,
         "is_completed": progress.is_completed

@@ -7,12 +7,13 @@ import math
 import datetime
 import logging
 import os
-import sqlite3
 import threading
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Tuple, Optional, Any
+from sqlalchemy import text
 from app.core.config import settings
+from app.core.database import engine
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
 
@@ -21,48 +22,69 @@ logger = logging.getLogger(__name__)
 USER_AGENT = settings.USER_AGENT
 BASE_URL = "https://metron.cloud/api"
 
-# Persistent SQLite cache to minimize external Metron API calls across server reloads
-_CACHE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "metron_cache.db"))
+# Persistent DB cache (Postgres in prod, SQLite locally) shared across deploys & workers
+_DB_CACHE_INITIALIZED = False
+_db_cache_init_lock = threading.Lock()
 
-def _init_sqlite_cache():
-    try:
-        with sqlite3.connect(_CACHE_DB_PATH) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS metron_cache (
-                    key TEXT PRIMARY KEY,
-                    data TEXT NOT NULL,
-                    updated_at REAL NOT NULL
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_metron_cache_updated ON metron_cache(updated_at)")
-    except Exception as e:
-        logger.warning(f"Could not initialize metron_cache.db: {e}")
+def _ensure_db_cache() -> bool:
+    global _DB_CACHE_INITIALIZED
+    if _DB_CACHE_INITIALIZED:
+        return True
+    with _db_cache_init_lock:
+        if _DB_CACHE_INITIALIZED:
+            return True
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS metron_cache (
+                        key TEXT PRIMARY KEY,
+                        data TEXT NOT NULL,
+                        updated_at DOUBLE PRECISION NOT NULL
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_metron_cache_updated ON metron_cache(updated_at)"))
+            _DB_CACHE_INITIALIZED = True
+            return True
+        except Exception as e:
+            logger.warning(f"Could not initialize metron_cache table: {e}")
+            return False
 
-_init_sqlite_cache()
+_ensure_db_cache()
 
-def _get_persistent_cache(key: str, ttl: float) -> Optional[Any]:
+def _get_persistent_cache(key: str, ttl: float, allow_stale: bool = False) -> Optional[Any]:
+    if not _ensure_db_cache():
+        return None
     now = time.time()
     try:
-        with sqlite3.connect(_CACHE_DB_PATH) as conn:
-            row = conn.execute("SELECT data, updated_at FROM metron_cache WHERE key = ?", (key,)).fetchone()
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT data, updated_at FROM metron_cache WHERE key = :key"),
+                {"key": key}
+            ).fetchone()
             if row:
-                data_json, updated_at = row
-                if now - updated_at < ttl:
+                data_json, updated_at = row[0], float(row[1])
+                if allow_stale or (now - updated_at < ttl):
                     return json.loads(data_json)
     except Exception as e:
         logger.debug(f"Cache get error for key '{key}': {e}")
     return None
 
 def _set_persistent_cache(key: str, data: Any) -> None:
+    if not _ensure_db_cache():
+        return
     now = time.time()
     try:
         data_json = json.dumps(data)
-        with sqlite3.connect(_CACHE_DB_PATH) as conn:
+        with engine.begin() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO metron_cache (key, data, updated_at) VALUES (?, ?, ?)",
-                (key, data_json, now)
+                text("""
+                    INSERT INTO metron_cache (key, data, updated_at)
+                    VALUES (:key, :data, :updated_at)
+                    ON CONFLICT (key) DO UPDATE
+                    SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
+                """),
+                {"key": key, "data": data_json, "updated_at": now}
             )
-            conn.commit()
     except Exception as e:
         logger.debug(f"Cache set error for key '{key}': {e}")
 
@@ -148,8 +170,11 @@ def _handle_429(headers: Any, url: str):
 
     logger.error(f"Metron 429 rate limit reached for '{url}'. Global circuit breaker active for {wait_s:.1f}s. Halting requests.")
 
-def _rate_limit_metron():
-    """Ensure respectful spacing and strict adherence to Metron's limits (max 16 req/min, 0.5s spacing)."""
+_MAX_SYNC_WAIT_SECONDS = 8.0
+
+def _rate_limit_metron() -> bool:
+    """Ensure respectful spacing and strict adherence to Metron's limits (max 16 req/min, 0.5s spacing).
+    Returns False without blocking if waiting would exceed _MAX_SYNC_WAIT_SECONDS so server threads are never starved."""
     global _blocked_until
     with _rate_limit_lock:
         now = time.time()
@@ -157,6 +182,9 @@ def _rate_limit_metron():
         # 1. Honor circuit breaker / proactive backoff
         if _blocked_until > now:
             wait_time = _blocked_until - now
+            if wait_time > _MAX_SYNC_WAIT_SECONDS:
+                logger.info(f"Metron rate limiter fast-failing (cooldown {wait_time:.1f}s > {_MAX_SYNC_WAIT_SECONDS}s).")
+                return False
             logger.info(f"Metron rate limiter holding requests for {wait_time:.1f}s...")
             time.sleep(wait_time)
             now = time.time()
@@ -168,6 +196,9 @@ def _rate_limit_metron():
         # 3. Controlled cap: max 16 requests per 60 seconds (Metron allows 20)
         if len(_request_timestamps) >= 16:
             sleep_needed = 60.0 - (now - _request_timestamps[0]) + 0.2
+            if sleep_needed > _MAX_SYNC_WAIT_SECONDS:
+                logger.info(f"Metron 16/min window full (need {sleep_needed:.1f}s), fast-failing to preserve threads.")
+                return False
             if sleep_needed > 0:
                 logger.info(f"Metron client rate limit pacing (16/min), waiting {sleep_needed:.1f}s...")
                 time.sleep(sleep_needed)
@@ -183,6 +214,7 @@ def _rate_limit_metron():
                 now = time.time()
 
         _request_timestamps.append(now)
+        return True
 
 def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: int = 10) -> Optional[dict]:
     global _daily_blocked_until
@@ -207,7 +239,8 @@ def _metron_request(endpoint: str, params: Optional[Dict[str, Any]] = None, time
         "Accept": "application/json"
     }
 
-    _rate_limit_metron()
+    if not _rate_limit_metron():
+        return None
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -483,6 +516,10 @@ class MetronService:
             results.sort(key=_comic_sort_key, reverse=True)
             _SEARCH_CACHE[cache_key] = (now_ts, results)
             _set_persistent_cache(cache_key, [item.model_dump() for item in results])
+        else:
+            stale_raw = _get_persistent_cache(cache_key, _CACHE_TTL_SEARCH, allow_stale=True)
+            if stale_raw:
+                return [SearchResultItem(**item) for item in stale_raw]
 
         return results
 
@@ -523,12 +560,12 @@ class MetronService:
             s_id = int(clean_id)
 
         if not s_id:
-            return None
+            return _get_persistent_cache(cache_key, _CACHE_TTL_SERIES, allow_stale=True)
 
         # Fetch series detail
         s = _metron_request(f"series/{s_id}/")
         if not s:
-            return None
+            return _get_persistent_cache(cache_key, _CACHE_TTL_SERIES, allow_stale=True)
 
         raw_vol_name = s.get("name") or s.get("series") or "Untitled Series"
         vol_name = re.sub(r'\s*\(\d{4}\)$', '', raw_vol_name).strip()
@@ -687,6 +724,10 @@ class MetronService:
         if episodes:
             _SERIES_ISSUES_CACHE[cache_key] = (now_ts, episodes)
             _set_persistent_cache(cache_key, episodes)
+        else:
+            stale_eps = _get_persistent_cache(cache_key, _CACHE_TTL_ISSUES, allow_stale=True)
+            if stale_eps:
+                return stale_eps
 
         return episodes
 
@@ -726,11 +767,11 @@ class MetronService:
             i_id = int(clean_id)
 
         if not i_id:
-            return None
+            return _get_persistent_cache(cache_key, _CACHE_TTL_ISSUES, allow_stale=True)
 
         iss = _metron_request(f"issue/{i_id}/")
         if not iss:
-            return None
+            return _get_persistent_cache(cache_key, _CACHE_TTL_ISSUES, allow_stale=True)
 
         series_data = iss.get("series") or {}
         s_id = series_data.get("id")
