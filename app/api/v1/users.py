@@ -618,31 +618,39 @@ def get_user_up_next(
     guides_up_next = []
     personal_up_next = []
     
-    # Pre-fetch completed or skipped item ids for the user
-    completed_or_skipped_item_ids = {
-        p.list_item_id for p in 
-        db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.list_item_id.isnot(None),
-            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
-        ).all()
-    }
-    completed_or_skipped_addition_ids = {
-        p.addition_item_id for p in 
-        db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.addition_item_id.isnot(None),
-            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
-        ).all()
-    }
-    completed_or_skipped_external_ids = {
-        p.external_id for p in 
-        db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.external_id.isnot(None),
-            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
-        ).all()
-    }
+    # Pre-fetch completed and skipped item ids for the user
+    all_user_progress_rows = db.query(
+        ItemProgress.list_item_id,
+        ItemProgress.addition_item_id,
+        ItemProgress.external_id,
+        ItemProgress.is_completed,
+        ItemProgress.is_skipped
+    ).filter(
+        ItemProgress.user_id == current_user.id,
+        (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
+    ).all()
+
+    completed_item_ids = set()
+    skipped_item_ids = set()
+    completed_addition_ids = set()
+    skipped_addition_ids = set()
+    completed_or_skipped_external_ids = set()
+    for lid, aid, eid, is_comp, is_skip in all_user_progress_rows:
+        if lid is not None:
+            if is_comp:
+                completed_item_ids.add(lid)
+            elif is_skip:
+                skipped_item_ids.add(lid)
+        if aid is not None:
+            if is_comp:
+                completed_addition_ids.add(aid)
+            elif is_skip:
+                skipped_addition_ids.add(aid)
+        if eid is not None:
+            completed_or_skipped_external_ids.add(eid)
+
+    completed_or_skipped_item_ids = completed_item_ids | skipped_item_ids
+    completed_or_skipped_addition_ids = completed_addition_ids | skipped_addition_ids
     
     for rlist in all_user_lists:
         addition_items = []
@@ -650,24 +658,37 @@ def get_user_up_next(
             addition_items.extend(add.items)
         addition_items.sort(key=lambda x: x.order_index)
         
-        flow = rlist.section_descriptions.get("flow", []) if rlist.section_descriptions else []
+        sec_desc = rlist.section_descriptions if isinstance(rlist.section_descriptions, dict) else {}
+        flow = sec_desc.get("flow", [])
+        flow_importance_by_id = {}
         
-        def extract_flow_item_ids(elements):
+        def extract_flow_item_ids(elements, parent_rank=None):
             ids = []
             if not elements:
                 return ids
             for el in elements:
+                if not isinstance(el, dict):
+                    continue
+                el_rank = el.get("importance_rank") if el.get("importance_rank") is not None else parent_rank
                 if el.get("type") == "section":
-                    ids.extend(extract_flow_item_ids(el.get("blocks", [])))
+                    ids.extend(extract_flow_item_ids(el.get("blocks", []), el_rank))
                 elif el.get("type") == "block":
-                    for item in el.get("items", []):
-                        if "id" in item:
-                            ids.append(item["id"])
-                    ids.extend(extract_flow_item_ids(el.get("subblocks", [])))
+                    for it in el.get("items", []):
+                        if isinstance(it, dict) and "id" in it:
+                            ids.append(it["id"])
+                            if it.get("importance_rank") is not None:
+                                flow_importance_by_id[it["id"]] = it["importance_rank"]
+                            elif el_rank is not None:
+                                flow_importance_by_id[it["id"]] = el_rank
+                    ids.extend(extract_flow_item_ids(el.get("subblocks", []), el_rank))
                 elif el.get("type") == "subblock":
-                    for item in el.get("items", []):
-                        if "id" in item:
-                            ids.append(item["id"])
+                    for it in el.get("items", []):
+                        if isinstance(it, dict) and "id" in it:
+                            ids.append(it["id"])
+                            if it.get("importance_rank") is not None:
+                                flow_importance_by_id[it["id"]] = it["importance_rank"]
+                            elif el_rank is not None:
+                                flow_importance_by_id[it["id"]] = el_rank
             return ids
             
         flow_item_ids = extract_flow_item_ids(flow)
@@ -679,7 +700,8 @@ def get_user_up_next(
                 ordered_base_items.append(base_items_dict.pop(item_id))
         
         # Append any remaining items (if flow is out of sync or for personal lists)
-        ordered_base_items.extend(sorted(base_items_dict.values(), key=lambda x: x.order_index))
+        if not flow_item_ids:
+            ordered_base_items.extend(sorted(base_items_dict.values(), key=lambda x: x.order_index))
         
         merged_items = []
         for item in ordered_base_items:
@@ -701,24 +723,47 @@ def get_user_up_next(
                 
         is_personal_tracker = rlist.id in personal_tracker_ids or (rlist.title and rlist.title.startswith("Tracker: "))
 
-        # Collect up to 10 uncompleted items in the merged list for instant optimistic advancing on the client
+        # Compute full guide progress counts & collect up to 10 uncompleted items
+        total_items_count = len(merged_items)
+        completed_items_count = 0
+        skipped_items_count = 0
         uncompleted_queue = []
         for item_id, item, is_addition, add_id, add_item_id in merged_items:
-            is_completed = False
+            is_comp = False
+            is_skip = False
             if is_addition:
-                if item_id in completed_or_skipped_addition_ids:
-                    is_completed = True
+                if item_id in completed_addition_ids:
+                    is_comp = True
+                elif item_id in skipped_addition_ids:
+                    is_skip = True
             else:
-                if item_id in completed_or_skipped_item_ids:
-                    is_completed = True
+                if item_id in completed_item_ids:
+                    is_comp = True
+                elif item_id in skipped_item_ids:
+                    is_skip = True
                     
-            if is_personal_tracker and not is_completed and item.external_id and item.external_id in completed_or_skipped_external_ids:
-                is_completed = True
-                
-            if not is_completed:
+            if is_personal_tracker and not is_comp and not is_skip and item.external_id and item.external_id in completed_or_skipped_external_ids:
+                is_comp = True
+
+            if is_comp:
+                completed_items_count += 1
+            elif is_skip:
+                skipped_items_count += 1
+            elif len(uncompleted_queue) < 10:
                 uncompleted_queue.append((item, is_addition, add_id, add_item_id))
-                if len(uncompleted_queue) >= 10:
-                    break
+
+        effective_total_count = max(0, total_items_count - skipped_items_count)
+        guide_progress_pct = round((completed_items_count / effective_total_count) * 100) if effective_total_count > 0 else 0
+        creator_is_pro = check_user_is_pro(rlist.creator) if rlist.creator else False
+        guide_accent_color = sec_desc.get("accent_color") if (creator_is_pro and not is_personal_tracker) else None
+
+        def resolve_importance(it_obj, is_add_flag):
+            raw_imp = getattr(it_obj, "importance_rank", None)
+            if raw_imp is not None:
+                return raw_imp
+            if not is_add_flag:
+                return flow_importance_by_id.get(it_obj.id)
+            return None
                 
         first_uncompleted = uncompleted_queue[0] if uncompleted_queue else None
         if first_uncompleted:
@@ -738,6 +783,7 @@ def get_user_up_next(
                     "is_addition": nxt_is_add,
                     "addition_id": nxt_add_id,
                     "addition_item_id": nxt_add_item_id,
+                    "importance_rank": resolve_importance(nxt_item, nxt_is_add),
                 }
                 for (nxt_item, nxt_is_add, nxt_add_id, nxt_add_item_id) in uncompleted_queue[1:]
             ]
@@ -777,6 +823,12 @@ def get_user_up_next(
                 is_addition=is_addition,
                 addition_id=add_id,
                 addition_item_id=add_item_id,
+                importance_rank=resolve_importance(item, is_addition),
+                accent_color=guide_accent_color,
+                completed_count=completed_items_count,
+                skipped_count=skipped_items_count,
+                total_count=total_items_count,
+                progress_percentage=float(guide_progress_pct),
                 next_items=next_items_payload
             )
             

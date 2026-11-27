@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
 import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching, getCachedSeriesMetadata, setCachedSeriesMetadata } from '../utils/seriesCache';
 import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
@@ -11,7 +13,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { PathdLoader } from '../components/PathdLoader';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles, Eye, SkipForward } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon, sortFilterTabs } from '../utils/categoryOrder';
 import { getMaxFavoritesForCategory, canUseAntiSpoiler } from '../utils/planPermissions';
@@ -493,6 +495,7 @@ const CustomCard = ({
   coverBottomText, 
   onCheck, 
   onPlay,
+  onSkip,
   onClick, 
   onTitleClick, 
   language,
@@ -500,7 +503,10 @@ const CustomCard = ({
   themeTextColor,
   actionIcon = 'check',
   shouldBlurCover = false,
-  onRevealCover
+  onRevealCover,
+  progressPercent,
+  progressLabel,
+  importanceBadge
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -513,6 +519,7 @@ const CustomCard = ({
   coverBottomText?: string;
   onCheck?: (e: React.MouseEvent) => void;
   onPlay?: (e: React.MouseEvent) => void;
+  onSkip?: (e: React.MouseEvent) => void;
   onClick?: () => void;
   onTitleClick?: (e: React.MouseEvent) => void;
   language?: string;
@@ -521,8 +528,11 @@ const CustomCard = ({
   actionIcon?: 'check' | 'play';
   shouldBlurCover?: boolean;
   onRevealCover?: () => void;
+  progressPercent?: number;
+  progressLabel?: string;
+  importanceBadge?: { label: string; color: string; bg: string } | null;
 }) => {
-  const [activeAction, setActiveAction] = useState<'check' | 'play' | null>(null);
+  const [activeAction, setActiveAction] = useState<'check' | 'play' | 'skip' | null>(null);
   const actionTimerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -531,7 +541,7 @@ const CustomCard = ({
     };
   }, []);
 
-  const handleActionClick = (e: React.MouseEvent, type: 'check' | 'play', callback?: (e: React.MouseEvent) => void) => {
+  const handleActionClick = (e: React.MouseEvent, type: 'check' | 'play' | 'skip', callback?: (e: React.MouseEvent) => void) => {
     e.stopPropagation();
     if (activeAction) return;
     try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
@@ -545,7 +555,8 @@ const CustomCard = ({
   };
 
   const showBoth = !!(onCheck && onPlay);
-  const hasAction = !!(onCheck || onPlay);
+  const showCheckAndSkip = !!(onCheck && onSkip && !onPlay);
+  const hasAction = !!(onCheck || onPlay || onSkip);
   const isSinglePlay = actionIcon === 'play' || !!onPlay;
   const singleType: 'check' | 'play' = isSinglePlay ? 'play' : 'check';
   const singleHandler = onCheck || onPlay;
@@ -678,11 +689,71 @@ const CustomCard = ({
             })()}
           </div>
         )}
+        {importanceBadge && (
+          <div
+            style={{
+              position: "absolute",
+              top: "6px",
+              left: "6px",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              color: "#ffffff",
+              background: "rgba(15, 23, 42, 0.84)",
+              border: `1px solid ${themeColor || "var(--color-guide)"}`,
+              backdropFilter: "blur(4px)",
+              zIndex: 2,
+              pointerEvents: "none"
+            }}
+          >
+            {importanceBadge.label}
+          </div>
+        )}
+        {progressLabel && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "6px",
+              right: "6px",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              color: "#ffffff",
+              background: "rgba(15, 23, 42, 0.84)",
+              border: `1px solid ${themeColor || "var(--color-guide)"}`,
+              backdropFilter: "blur(4px)",
+              zIndex: 2,
+              pointerEvents: "none"
+            }}
+          >
+            {progressLabel}
+          </div>
+        )}
       </div>
-      <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: showBoth ? "75px" : hasAction ? "40px" : "0.75rem" }}>
+      {progressPercent !== undefined && (
+        <div style={{ width: "100%", height: "3px", background: "rgba(255,255,255,0.1)", overflow: "hidden", flexShrink: 0 }}>
+          <div
+            style={{
+              width: `${Math.min(100, Math.max(0, progressPercent))}%`,
+              height: "100%",
+              background: themeColor || "var(--color-guide)",
+              transition: "width 0.25s ease"
+            }}
+          />
+        </div>
+      )}
+      <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: preSubtitle ? "0.75rem" : ((showBoth || showCheckAndSkip) ? "75px" : hasAction ? "40px" : "0.75rem") }}>
         {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
-        {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
-        {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
+        {(subtitle1 || subtitle2) ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: preSubtitle ? ((showBoth || showCheckAndSkip) ? "68px" : hasAction ? "36px" : 0) : 0, minHeight: (preSubtitle && hasAction) ? "30px" : undefined, justifyContent: "center" }}>
+            {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
+            {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
+          </div>
+        ) : (preSubtitle && hasAction) ? (
+          <div style={{ height: "28px" }} />
+        ) : null}
       </div>
       {showBoth ? (
         <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
@@ -721,6 +792,45 @@ const CustomCard = ({
             } as React.CSSProperties}
           >
             <Play size={14} style={{ marginLeft: '2px' }} />
+          </button>
+        </div>
+      ) : showCheckAndSkip ? (
+        <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
+          <button 
+            onClick={(e) => handleActionClick(e, 'skip', onSkip)}
+            className={`btn-check-seen ${activeAction === 'skip' ? 'is-checked-active' : ''}`}
+            title={language === 'es' ? 'Saltear obra' : 'Skip item'}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: activeAction === 'skip' ? "var(--text-secondary)" : "var(--bg-tertiary)",
+              border: "2px solid var(--border-color)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              color: activeAction === 'skip' ? "#ffffff" : "var(--text-secondary)",
+              "--btn-hover-bg": "var(--text-secondary)",
+              "--btn-hover-text": "#ffffff",
+              transition: "background 0.15s ease, color 0.15s ease"
+            } as React.CSSProperties}
+          >
+            <SkipForward size={13} />
+          </button>
+          <button 
+            onClick={(e) => handleActionClick(e, 'check', onCheck)}
+            className={`btn-check-seen ${activeAction === 'check' ? 'is-checked-active' : ''}`}
+            title={language === 'es' ? 'Marcar como completado' : 'Mark as completed'}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: activeAction === 'check' ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)",
+              border: `2px solid ${activeAction === 'check' ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              color: activeAction === 'check' ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
+              "--btn-hover-bg": themeColor,
+              "--btn-hover-text": themeTextColor,
+              transition: "background 0.15s ease, color 0.15s ease"
+            } as React.CSSProperties}
+          >
+            <Check size={15} />
           </button>
         </div>
       ) : hasAction ? (
@@ -2241,6 +2351,8 @@ export const Home: React.FC = () => {
   const location = useLocation();
   const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/');
   const { language, t } = useTranslation();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const { user: currentUser } = useAuth();
 
   const validHomeTabs = ["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"] as const;
@@ -2983,11 +3095,23 @@ export const Home: React.FC = () => {
       const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
       if (nextQueue.length > 0) {
         const [nextItem, ...restQueue] = nextQueue;
-        setUpNextGuides(prev => prev.map(g =>
-          g.list_id === item.list_id
-            ? { ...g, ...nextItem, list_title: g.list_title, next_items: restQueue }
-            : g
-        ));
+        setUpNextGuides(prev => prev.map(g => {
+          if (g.list_id !== item.list_id) return g;
+          const nextCompleted = (g.completed_count || 0) + 1;
+          const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
+          const nextPct = effTotal > 0 ? Math.min(100, Math.round((nextCompleted / effTotal) * 100)) : 0;
+          return {
+            ...g,
+            ...nextItem,
+            list_title: g.list_title,
+            accent_color: g.accent_color,
+            completed_count: nextCompleted,
+            skipped_count: g.skipped_count || 0,
+            total_count: g.total_count || 0,
+            progress_percentage: nextPct,
+            next_items: restQueue
+          };
+        }));
       } else {
         setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
       }
@@ -3041,11 +3165,23 @@ export const Home: React.FC = () => {
       const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
       if (nextQueue.length > 0) {
         const [nextItem, ...restQueue] = nextQueue;
-        setUpNextGuides(prev => prev.map(g =>
-          g.list_id === item.list_id
-            ? { ...g, ...nextItem, list_title: g.list_title, next_items: restQueue }
-            : g
-        ));
+        setUpNextGuides(prev => prev.map(g => {
+          if (g.list_id !== item.list_id) return g;
+          const nextCompleted = (g.completed_count || 0) + 1;
+          const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
+          const nextPct = effTotal > 0 ? Math.min(100, Math.round((nextCompleted / effTotal) * 100)) : 0;
+          return {
+            ...g,
+            ...nextItem,
+            list_title: g.list_title,
+            accent_color: g.accent_color,
+            completed_count: nextCompleted,
+            skipped_count: g.skipped_count || 0,
+            total_count: g.total_count || 0,
+            progress_percentage: nextPct,
+            next_items: restQueue
+          };
+        }));
       } else {
         setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
       }
@@ -3085,6 +3221,68 @@ export const Home: React.FC = () => {
       updateCachedShelfItem(rollbackItem);
       window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
     }
+  };
+
+  const handleSkipGuideItem = async (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    try {
+      (e.currentTarget as HTMLButtonElement)?.blur();
+    } catch {}
+    const prevGuides = [...upNextGuides];
+    const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
+    if (nextQueue.length > 0) {
+      const [nextItem, ...restQueue] = nextQueue;
+      setUpNextGuides(prev => prev.map(g => {
+        if (g.list_id !== item.list_id) return g;
+        const nextSkipped = (g.skipped_count || 0) + 1;
+        const effTotal = Math.max(0, (g.total_count || 0) - nextSkipped);
+        const nextPct = effTotal > 0 ? Math.min(100, Math.round(((g.completed_count || 0) / effTotal) * 100)) : 0;
+        return {
+          ...g,
+          ...nextItem,
+          list_title: g.list_title,
+          accent_color: g.accent_color,
+          completed_count: g.completed_count || 0,
+          skipped_count: nextSkipped,
+          total_count: g.total_count || 0,
+          progress_percentage: nextPct,
+          next_items: restQueue
+        };
+      }));
+    } else {
+      setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+    }
+    try {
+      const endpoint = item.is_addition
+        ? `/additions/items/additions/${item.addition_item_id}/toggle-skip`
+        : `/lists/items/${item.item_id}/toggle-skip`;
+      await apiClient.post(endpoint);
+      window.dispatchEvent(new Event('library-updated'));
+      if (nextQueue.length <= 1) {
+        fetchDashboard(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setUpNextGuides(prevGuides);
+    }
+  };
+
+  const getGuideImportanceBadge = (rank?: number | null) => {
+    if (!rank) return null;
+    const map: Record<number, { es: string; en: string; color: string; bg: string }> = {
+      5: { es: 'Esencial', en: 'Essential', color: '#f87171', bg: 'rgba(15, 23, 42, 0.85)' },
+      4: { es: 'Importante', en: 'Important', color: '#fb923c', bg: 'rgba(15, 23, 42, 0.85)' },
+      3: { es: 'Recomendado', en: 'Recommended', color: '#facc15', bg: 'rgba(15, 23, 42, 0.85)' },
+      2: { es: 'Opcional', en: 'Optional', color: '#60a5fa', bg: 'rgba(15, 23, 42, 0.85)' },
+      1: { es: 'Extra', en: 'Extra', color: '#94a3b8', bg: 'rgba(15, 23, 42, 0.85)' },
+    };
+    const info = map[rank];
+    if (!info) return null;
+    return {
+      label: language === 'es' ? info.es : info.en,
+      color: info.color,
+      bg: info.bg,
+    };
   };
 
   if (loading) {
@@ -3787,6 +3985,15 @@ export const Home: React.FC = () => {
                   !revealedGuides[g.item_id]
                 );
 
+                const gTheme = g.accent_color ? getProfileTheme(g.accent_color, isLight) : null;
+                const guideThemeColor = gTheme ? gTheme.accent : "var(--color-guide)";
+                const guideThemeTextColor = gTheme
+                  ? ((gTheme.cssVariables as any)['--accent-text'] || "#ffffff")
+                  : "var(--color-text-guide)";
+                const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
+                const guideProgressPct = g.progress_percentage ?? (effTotal > 0 ? Math.round(((g.completed_count || 0) / effTotal) * 100) : 0);
+                const guideProgressLabel = effTotal > 0 ? `${g.completed_count || 0}/${effTotal} · ${Math.round(guideProgressPct)}%` : undefined;
+
                 return (
                   <CustomCard 
                     key={g.list_id}
@@ -3794,12 +4001,16 @@ export const Home: React.FC = () => {
                     coverUrl={g.image_url}
                     itemType="guide"
                     preSubtitle={insideTop}
-                    themeColor="var(--color-guide)"
-                    themeTextColor="var(--color-text-guide)"
+                    themeColor={guideThemeColor}
+                    themeTextColor={guideThemeTextColor}
                     coverBottomText={undefined}
                     subtitle1={bottomText1}
                     subtitle2={bottomText2}
+                    progressPercent={effTotal > 0 ? guideProgressPct : undefined}
+                    progressLabel={guideProgressLabel}
+                    importanceBadge={getGuideImportanceBadge(g.importance_rank)}
                     onCheck={(e) => handleMarkCompleted(e, g)}
+                    onSkip={(e) => handleSkipGuideItem(e, g)}
                     onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                     onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                     language={language}
@@ -3858,6 +4069,15 @@ export const Home: React.FC = () => {
                     !revealedGuides[g.item_id]
                   );
 
+                  const gTheme = g.accent_color ? getProfileTheme(g.accent_color, isLight) : null;
+                  const guideThemeColor = gTheme ? gTheme.accent : "var(--color-guide)";
+                  const guideThemeTextColor = gTheme
+                    ? ((gTheme.cssVariables as any)['--accent-text'] || "#ffffff")
+                    : "var(--color-text-guide)";
+                  const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
+                  const guideProgressPct = g.progress_percentage ?? (effTotal > 0 ? Math.round(((g.completed_count || 0) / effTotal) * 100) : 0);
+                  const guideProgressLabel = effTotal > 0 ? `${g.completed_count || 0}/${effTotal} · ${Math.round(guideProgressPct)}%` : undefined;
+
                   return (
                     <CustomCard 
                       key={g.list_id}
@@ -3865,12 +4085,16 @@ export const Home: React.FC = () => {
                       coverUrl={g.image_url}
                       itemType="guide"
                       preSubtitle={insideTop}
-                      themeColor="var(--color-guide)"
-                      themeTextColor="var(--color-text-guide)"
+                      themeColor={guideThemeColor}
+                      themeTextColor={guideThemeTextColor}
                       coverBottomText={undefined}
                       subtitle1={bottomText1}
                       subtitle2={bottomText2}
+                      progressPercent={effTotal > 0 ? guideProgressPct : undefined}
+                      progressLabel={guideProgressLabel}
+                      importanceBadge={getGuideImportanceBadge(g.importance_rank)}
                       onCheck={(e) => handleMarkCompleted(e, g)}
+                      onSkip={(e) => handleSkipGuideItem(e, g)}
                       onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                       onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                       language={language}

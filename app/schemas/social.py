@@ -126,6 +126,12 @@ class UpNextItemResponse(BaseModel):
     is_addition: bool = False
     addition_id: Optional[int] = None
     addition_item_id: Optional[int] = None
+    importance_rank: Optional[int] = None
+    accent_color: Optional[str] = None
+    completed_count: int = 0
+    skipped_count: int = 0
+    total_count: int = 0
+    progress_percentage: float = 0.0
     next_items: List[dict] = []
 
     class Config:
