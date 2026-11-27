@@ -650,7 +650,8 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 6px 22px var(--card-hover-glow, color-mix(in srgb, var(--color-guide) 30%, transparent)) !important;
 }
 
-.search-guide-card:hover {
+.search-guide-card:hover,
+.profile-guide-card:hover {
   box-shadow: none !important;
 }
 
