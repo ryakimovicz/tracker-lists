@@ -146,7 +146,12 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
     return bool(user.is_pro)
 
 
-def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True, user_progress_pct: Optional[float] = None) -> ReadingListResponse:
+def _enrich_reading_list_response(
+    rl: ReadingList,
+    can_edit: bool = True,
+    user_progress_pct: Optional[float] = None,
+    avg_rating_override: Optional[float] = None
+) -> ReadingListResponse:
     from app.api.v1.lists import _get_guide_visible_items
     rl_data = ReadingListResponse.model_validate(rl)
     rl_data.can_edit = can_edit
@@ -163,11 +168,14 @@ def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True, user_p
             media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
     rl_data.covers = covers
     rl_data.media_type_counts = media_type_counts
-    votes = rl.votes or []
-    if votes:
-        valid_ratings = [v.rating for v in votes if v.rating is not None]
-        if valid_ratings:
-            rl_data.average_rating = round(sum(valid_ratings) / len(valid_ratings), 1)
+    if avg_rating_override is not None:
+        rl_data.average_rating = avg_rating_override
+    else:
+        votes = rl.votes or []
+        if votes:
+            valid_ratings = [v.rating for v in votes if v.rating is not None]
+            if valid_ratings:
+                rl_data.average_rating = round(sum(valid_ratings) / len(valid_ratings), 1)
     rl_data.saves_count = len(rl.saved_by_users or [])
     if rl.creator:
         rl_data.creator_username = rl.creator.username
@@ -222,16 +230,18 @@ async def get_user_dashboard(
         SavedList.user_id == current_user.id
     ).order_by(SavedList.saved_at.asc()).all()
 
-    from app.api.v1.lists import _compute_user_guide_progress_map
+    from app.api.v1.lists import _compute_user_guide_progress_map, _compute_guide_ratings_map
     all_dashboard_rls = list(raw_created_lists) + [se.reading_list for se in saved_entries if se.reading_list]
     user_progress_map = _compute_user_guide_progress_map(db, current_user.id, all_dashboard_rls)
+    ratings_map = _compute_guide_ratings_map(db, all_dashboard_rls)
 
     created_lists = []
     for idx, rl in enumerate(raw_created_lists):
         created_lists.append(_enrich_reading_list_response(
             rl,
             can_edit=(is_pro or idx < 2),
-            user_progress_pct=user_progress_map.get(rl.id)
+            user_progress_pct=user_progress_map.get(rl.id),
+            avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
         ))
 
     saved_lists = []
@@ -245,7 +255,8 @@ async def get_user_dashboard(
             saved_lists.append(_enrich_reading_list_response(
                 rl,
                 can_edit=is_own,
-                user_progress_pct=user_progress_map.get(rl.id)
+                user_progress_pct=user_progress_map.get(rl.id),
+                avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
             ))
         else:
             # Free user: include up to 3 followed guides of other users
@@ -253,7 +264,8 @@ async def get_user_dashboard(
                 saved_lists.append(_enrich_reading_list_response(
                     rl,
                     can_edit=False,
-                    user_progress_pct=user_progress_map.get(rl.id)
+                    user_progress_pct=user_progress_map.get(rl.id),
+                    avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
                 ))
                 other_saved_count += 1
 
@@ -1225,17 +1237,19 @@ def get_any_user_profile(
         ReadingList.visibility == VisibilityEnum.PUBLIC
     ).order_by(SavedList.saved_at.asc()).all()
 
-    from app.api.v1.lists import _compute_user_guide_progress_map
+    from app.api.v1.lists import _compute_user_guide_progress_map, _compute_guide_ratings_map
     viewer_id = current_user.id if current_user else None
     all_profile_rls = list(raw_created_lists) + [se.reading_list for se in saved_entries if se.reading_list]
     viewer_progress_map = _compute_user_guide_progress_map(db, viewer_id, all_profile_rls)
+    ratings_map = _compute_guide_ratings_map(db, all_profile_rls)
 
     created_lists = []
     for idx, rl in enumerate(raw_created_lists):
         created_lists.append(_enrich_reading_list_response(
             rl,
             can_edit=(is_pro or idx < 2),
-            user_progress_pct=viewer_progress_map.get(rl.id)
+            user_progress_pct=viewer_progress_map.get(rl.id),
+            avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
         ))
 
     saved_lists = []
@@ -1249,14 +1263,16 @@ def get_any_user_profile(
             saved_lists.append(_enrich_reading_list_response(
                 rl,
                 can_edit=is_own,
-                user_progress_pct=viewer_progress_map.get(rl.id)
+                user_progress_pct=viewer_progress_map.get(rl.id),
+                avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
             ))
         else:
             if other_saved_count < 3:
                 saved_lists.append(_enrich_reading_list_response(
                     rl,
                     can_edit=False,
-                    user_progress_pct=viewer_progress_map.get(rl.id)
+                    user_progress_pct=viewer_progress_map.get(rl.id),
+                    avg_rating_override=ratings_map.get(rl.id, (None, 0))[0]
                 ))
                 other_saved_count += 1
 

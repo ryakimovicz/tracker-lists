@@ -133,6 +133,50 @@ def _compute_user_guide_progress_map(db: Session, user_id: Optional[int], readin
     return result
 
 
+def _compute_guide_ratings_map(db: Session, reading_lists: list) -> dict:
+    """Return {list_id: (average_rating, ratings_count)} from MediaReview (item_type='guide'),
+    falling back to legacy ListVote rows when no MediaReview ratings exist."""
+    if not reading_lists:
+        return {}
+    from app.models.review import MediaReview
+    list_ids = [rl.id for rl in reading_lists if rl and rl.id is not None]
+    if not list_ids:
+        return {}
+    ext_ids = [str(lid) for lid in list_ids]
+
+    rows = db.query(MediaReview.external_id, MediaReview.rating).filter(
+        MediaReview.item_type == "guide",
+        MediaReview.external_id.in_(ext_ids),
+        MediaReview.parent_id.is_(None),
+        MediaReview.rating.isnot(None),
+        MediaReview.is_deleted == False
+    ).all()
+
+    by_list = {}
+    for ext_id, rating in rows:
+        try:
+            lid = int(ext_id)
+        except (TypeError, ValueError):
+            continue
+        if rating is not None and float(rating) > 0:
+            by_list.setdefault(lid, []).append(float(rating))
+
+    result = {}
+    for rl in reading_lists:
+        if not rl or rl.id is None:
+            continue
+        ratings = by_list.get(rl.id)
+        if ratings:
+            result[rl.id] = (round(sum(ratings) / len(ratings), 1), len(ratings))
+        else:
+            legacy = [float(v.rating) for v in (rl.votes or []) if v.rating is not None and float(v.rating) > 0]
+            if legacy:
+                result[rl.id] = (round(sum(legacy) / len(legacy), 1), len(legacy))
+            else:
+                result[rl.id] = (None, 0)
+    return result
+
+
 # 0. Explore Guides: Populares, Mejor Valoradas, Más Guardadas, Nuevas
 @router.get("/explore", response_model=ExploreGuidesResponse)
 def get_explore_guides(
@@ -147,6 +191,7 @@ def get_explore_guides(
     user_progress_map = _compute_user_guide_progress_map(
         db, current_user.id if current_user else None, lists
     )
+    ratings_map = _compute_guide_ratings_map(db, lists)
 
     guide_items = []
     for l in lists:
@@ -165,17 +210,12 @@ def get_explore_guides(
                 media_types.add(m_type)
                 media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
 
-        votes = l.votes or []
         saves = l.saved_by_users or []
         comments = l.comments or []
 
-        votes_count = len(votes)
+        avg_rating, votes_count = ratings_map.get(l.id, (None, 0))
         saves_count = len(saves)
         comments_count = len(comments)
-
-        avg_rating = None
-        if votes_count > 0:
-            avg_rating = round(sum(v.rating for v in votes if v.rating is not None) / votes_count, 1)
 
         pop_score = (saves_count * 3) + (votes_count * 2) + (comments_count * 2)
 

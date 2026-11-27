@@ -612,22 +612,54 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
               }}
               onClick={() => navigate(`/guide/${guide.id}`)}
             >
-              {/* Desktop Title / Card Title */}
-              <div 
-                className="card-item-title"
-                style={{ 
-                  padding: '0.5rem 0.75rem', 
-                  fontSize: '0.85rem', 
-                  fontWeight: 600, 
-                  borderBottom: '1px solid var(--border-color)', 
-                  whiteSpace: 'nowrap', 
-                  overflow: 'hidden', 
-                  textOverflow: 'ellipsis',
-                  transition: 'color 0.2s ease'
+              {/* Desktop Title / Card Title + Rating */}
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderBottom: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem'
                 }}
-                title={guide.title}
               >
-                {guide.title}
+                <div
+                  className="card-item-title"
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    lineHeight: 1.3,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flex: 1,
+                    minWidth: 0,
+                    transition: 'color 0.2s ease'
+                  }}
+                  title={guide.title}
+                >
+                  {guide.title}
+                </div>
+                {guide.average_rating != null && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      color: '#eab308',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      paddingTop: '1px'
+                    }}
+                  >
+                    <Star size={13} fill="#eab308" color="#eab308" />
+                    {guide.average_rating}
+                  </span>
+                )}
               </div>
 
               {/* Cover Collage or Banner */}
@@ -738,18 +770,12 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 </div>
 
                 {/* Badges / Metrics */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  <span>{guide.items_count} {t('guidesWorksCount')}</span>
-                  {guide.average_rating != null && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
-                      <Star size={11} fill="#eab308" color="#eab308" />
-                      {guide.average_rating}
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', minWidth: 0 }}>
+                  <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{guide.items_count} {t('guidesWorksCount')}</span>
                   {guide.saves_count > 0 && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
-                      <Plus size={11} strokeWidth={2.5} />
-                      {guide.saves_count}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <Plus size={13} strokeWidth={2.5} />
+                      {guide.saves_count >= 1000 ? `${(guide.saves_count / 1000).toFixed(guide.saves_count >= 10000 ? 0 : 1)}k` : guide.saves_count}
                     </span>
                   )}
                 </div>
@@ -2263,22 +2289,54 @@ export const Search: React.FC = () => {
                     }}
                     onClick={() => navigate(`/guide/${item.external_id}`)}
                   >
-                    {/* Card Title */}
+                    {/* Card Title + Rating */}
                     <div
-                      className="card-item-title"
                       style={{
                         padding: '0.6rem 0.85rem',
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
                         borderBottom: '1px solid var(--border-color)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        transition: 'color 0.2s ease'
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem'
                       }}
-                      title={item.title}
                     >
-                      {item.title}
+                      <div
+                        className="card-item-title"
+                        style={{
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          lineHeight: 1.3,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          flex: 1,
+                          minWidth: 0,
+                          transition: 'color 0.2s ease'
+                        }}
+                        title={item.title}
+                      >
+                        {item.title}
+                      </div>
+                      {avgRating != null && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            color: '#eab308',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            paddingTop: '1px'
+                          }}
+                        >
+                          <Star size={13} fill="#eab308" color="#eab308" />
+                          {avgRating}
+                        </span>
+                      )}
                     </div>
 
                     {/* Cover Banner or Collage */}
@@ -2403,18 +2461,12 @@ export const Search: React.FC = () => {
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.74rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                        <span>{itemsCount} {t('guidesWorksCount')}</span>
-                        {avgRating != null && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
-                            <Star size={11} fill="#eab308" color="#eab308" />
-                            {avgRating}
-                          </span>
-                        )}
+                      <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', minWidth: 0 }}>
+                        <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{itemsCount} {t('guidesWorksCount')}</span>
                         {savesCount > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
-                            <Plus size={11} strokeWidth={2.5} />
-                            {savesCount}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            <Plus size={13} strokeWidth={2.5} />
+                            {savesCount >= 1000 ? `${(savesCount / 1000).toFixed(savesCount >= 10000 ? 0 : 1)}k` : savesCount}
                           </span>
                         )}
                       </div>

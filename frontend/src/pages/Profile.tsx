@@ -3706,20 +3706,52 @@ export const Profile: React.FC = () => {
         onClick={() => handleOpenGuide(list.id)}
       >
         <div
-          className="card-item-title"
           style={{
             padding: '0.5rem 0.75rem',
-            fontSize: '0.85rem',
-            fontWeight: 600,
             borderBottom: '1px solid var(--border-color)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            transition: 'color 0.2s ease'
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '0.5rem'
           }}
-          title={list.title}
         >
-          {list.title}
+          <div
+            className="card-item-title"
+            style={{
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              lineHeight: 1.3,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: 1,
+              minWidth: 0,
+              transition: 'color 0.2s ease'
+            }}
+            title={list.title}
+          >
+            {list.title}
+          </div>
+          {list.average_rating != null && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                color: '#eab308',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                paddingTop: '1px'
+              }}
+            >
+              <Star size={13} fill="#eab308" color="#eab308" />
+              {list.average_rating}
+            </span>
+          )}
         </div>
 
         <div
@@ -3865,18 +3897,12 @@ export const Profile: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap', minWidth: 0 }}>
-              <span>{guideItemsCount} {t('guidesWorksCount')}</span>
-              {list.average_rating != null && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
-                  <Star size={11} fill="#eab308" color="#eab308" />
-                  {list.average_rating}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', columnGap: '0.55rem', rowGap: '0.2rem', fontSize: '0.82rem', color: 'var(--text-secondary)', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{guideItemsCount} {t('guidesWorksCount')}</span>
               {(list.saves_count || 0) > 0 && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
-                  <Plus size={11} strokeWidth={2.5} />
-                  {list.saves_count}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  <Plus size={13} strokeWidth={2.5} />
+                  {list.saves_count >= 1000 ? `${(list.saves_count / 1000).toFixed(list.saves_count >= 10000 ? 0 : 1)}k` : list.saves_count}
                 </span>
               )}
             </div>

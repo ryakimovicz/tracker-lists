@@ -454,10 +454,11 @@ def search_all_media(
                         popularity=0.0
                     ))
             
-        from app.api.v1.lists import _get_guide_visible_items, _compute_user_guide_progress_map
+        from app.api.v1.lists import _get_guide_visible_items, _compute_user_guide_progress_map, _compute_guide_ratings_map
         guide_progress_map = _compute_user_guide_progress_map(
             db, current_user.id if current_user else None, db_guides
         )
+        guide_ratings_map = _compute_guide_ratings_map(db, db_guides)
         for g in db_guides:
             if g.id not in seen_guides:
                 seen_guides.add(g.id)
@@ -480,9 +481,7 @@ def search_all_media(
                         if it.item_type:
                             m_type = (it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)).lower()
                             media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
-                    votes = g.votes or []
-                    votes_count = len(votes)
-                    avg_rating = round(sum(v.rating for v in votes if v.rating is not None) / votes_count, 1) if votes_count > 0 else None
+                    avg_rating = guide_ratings_map.get(g.id, (None, 0))[0]
                     saves_count = len(g.saved_by_users or [])
                     combined.append(SearchResultItem(
                         external_id=ext_id,
