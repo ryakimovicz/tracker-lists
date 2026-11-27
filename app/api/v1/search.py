@@ -454,6 +454,10 @@ def search_all_media(
                         popularity=0.0
                     ))
             
+        from app.api.v1.lists import _get_guide_visible_items, _compute_user_guide_progress_map
+        guide_progress_map = _compute_user_guide_progress_map(
+            db, current_user.id if current_user else None, db_guides
+        )
         for g in db_guides:
             if g.id not in seen_guides:
                 seen_guides.add(g.id)
@@ -467,7 +471,6 @@ def search_all_media(
                     sec_desc = g.section_descriptions if isinstance(g.section_descriptions, dict) else {}
                     guide_accent = sec_desc.get("accent_color") if creator_is_pro else None
                     guide_banner = sec_desc.get("banner_url") if creator_is_pro else None
-                    from app.api.v1.lists import _get_guide_visible_items
                     visible_items = _get_guide_visible_items(g)
                     covers = []
                     media_type_counts = {}
@@ -496,7 +499,8 @@ def search_all_media(
                         banner_url=guide_banner,
                         items_count=len(visible_items),
                         saves_count=saves_count,
-                        average_rating=avg_rating
+                        average_rating=avg_rating,
+                        user_progress_percentage=guide_progress_map.get(g.id)
                     ))
 
     user_category_order = None

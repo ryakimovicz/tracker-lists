@@ -73,6 +73,7 @@ class ReadingListResponse(ReadingListBase):
     media_type_counts: Dict[str, int] = {}
     accent_color: Optional[str] = None
     banner_url: Optional[str] = None
+    user_progress_percentage: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -152,6 +153,7 @@ class ExploreGuideItem(BaseModel):
     media_type_counts: Dict[str, int] = {}
     accent_color: Optional[str] = None
     banner_url: Optional[str] = None
+    user_progress_percentage: Optional[float] = None
 
 class ExploreGuidesResponse(BaseModel):
     populares: List[ExploreGuideItem] = []

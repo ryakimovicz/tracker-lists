@@ -146,10 +146,11 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
     return bool(user.is_pro)
 
 
-def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True) -> ReadingListResponse:
+def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True, user_progress_pct: Optional[float] = None) -> ReadingListResponse:
     from app.api.v1.lists import _get_guide_visible_items
     rl_data = ReadingListResponse.model_validate(rl)
     rl_data.can_edit = can_edit
+    rl_data.user_progress_percentage = user_progress_pct
     items = _get_guide_visible_items(rl)
     rl_data.items_count = len(items)
     covers = []
@@ -214,16 +215,24 @@ async def get_user_dashboard(
         ~ReadingList.id.in_(tracker_list_ids_query)
     ).order_by(ReadingList.created_at.asc()).all()
 
-    created_lists = []
-    for idx, rl in enumerate(raw_created_lists):
-        created_lists.append(_enrich_reading_list_response(rl, can_edit=(is_pro or idx < 2)))
-    
     # Fetch lists saved/followed by the user
     saved_entries = db.query(SavedList).join(
         ReadingList, SavedList.list_id == ReadingList.id
     ).filter(
         SavedList.user_id == current_user.id
     ).order_by(SavedList.saved_at.asc()).all()
+
+    from app.api.v1.lists import _compute_user_guide_progress_map
+    all_dashboard_rls = list(raw_created_lists) + [se.reading_list for se in saved_entries if se.reading_list]
+    user_progress_map = _compute_user_guide_progress_map(db, current_user.id, all_dashboard_rls)
+
+    created_lists = []
+    for idx, rl in enumerate(raw_created_lists):
+        created_lists.append(_enrich_reading_list_response(
+            rl,
+            can_edit=(is_pro or idx < 2),
+            user_progress_pct=user_progress_map.get(rl.id)
+        ))
 
     saved_lists = []
     other_saved_count = 0
@@ -233,11 +242,19 @@ async def get_user_dashboard(
             continue
         is_own = (rl.creator_id == current_user.id)
         if is_pro or is_own:
-            saved_lists.append(_enrich_reading_list_response(rl, can_edit=is_own))
+            saved_lists.append(_enrich_reading_list_response(
+                rl,
+                can_edit=is_own,
+                user_progress_pct=user_progress_map.get(rl.id)
+            ))
         else:
             # Free user: include up to 3 followed guides of other users
             if other_saved_count < 3:
-                saved_lists.append(_enrich_reading_list_response(rl, can_edit=False))
+                saved_lists.append(_enrich_reading_list_response(
+                    rl,
+                    can_edit=False,
+                    user_progress_pct=user_progress_map.get(rl.id)
+                ))
                 other_saved_count += 1
 
     followers_count = db.query(Follow).filter(Follow.followed_id == current_user.id).count()
@@ -1201,16 +1218,25 @@ def get_any_user_profile(
         ~ReadingList.id.in_(tracker_list_ids_query)
     ).order_by(ReadingList.created_at.asc()).all()
 
-    created_lists = []
-    for idx, rl in enumerate(raw_created_lists):
-        created_lists.append(_enrich_reading_list_response(rl, can_edit=(is_pro or idx < 2)))
-    
     saved_entries = db.query(SavedList).join(
         ReadingList, SavedList.list_id == ReadingList.id
     ).filter(
         SavedList.user_id == user.id,
         ReadingList.visibility == VisibilityEnum.PUBLIC
     ).order_by(SavedList.saved_at.asc()).all()
+
+    from app.api.v1.lists import _compute_user_guide_progress_map
+    viewer_id = current_user.id if current_user else None
+    all_profile_rls = list(raw_created_lists) + [se.reading_list for se in saved_entries if se.reading_list]
+    viewer_progress_map = _compute_user_guide_progress_map(db, viewer_id, all_profile_rls)
+
+    created_lists = []
+    for idx, rl in enumerate(raw_created_lists):
+        created_lists.append(_enrich_reading_list_response(
+            rl,
+            can_edit=(is_pro or idx < 2),
+            user_progress_pct=viewer_progress_map.get(rl.id)
+        ))
 
     saved_lists = []
     other_saved_count = 0
@@ -1220,10 +1246,18 @@ def get_any_user_profile(
             continue
         is_own = (rl.creator_id == user.id)
         if is_pro or is_own:
-            saved_lists.append(_enrich_reading_list_response(rl, can_edit=is_own))
+            saved_lists.append(_enrich_reading_list_response(
+                rl,
+                can_edit=is_own,
+                user_progress_pct=viewer_progress_map.get(rl.id)
+            ))
         else:
             if other_saved_count < 3:
-                saved_lists.append(_enrich_reading_list_response(rl, can_edit=False))
+                saved_lists.append(_enrich_reading_list_response(
+                    rl,
+                    can_edit=False,
+                    user_progress_pct=viewer_progress_map.get(rl.id)
+                ))
                 other_saved_count += 1
 
     is_following = False

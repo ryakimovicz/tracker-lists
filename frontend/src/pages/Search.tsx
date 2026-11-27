@@ -44,6 +44,7 @@ interface SearchResultItem {
   saves_count?: number;
   average_rating?: number | null;
   creator_photo_url?: string | null;
+  user_progress_percentage?: number | null;
   creator?: string;
 }
 
@@ -675,6 +676,34 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
                     <BookOpen size={28} color="var(--guide-accent, var(--color-guide))" />
                   </div>
+                )}
+
+                {guide.user_progress_percentage != null && (
+                  <span
+                    title={language === 'es'
+                      ? `Tu progreso: ${Math.round(guide.user_progress_percentage)}%`
+                      : `Your progress: ${Math.round(guide.user_progress_percentage)}%`}
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      background: Math.round(guide.user_progress_percentage) >= 100
+                        ? (gTheme ? gTheme.accent : 'var(--color-guide)')
+                        : 'rgba(15, 23, 42, 0.84)',
+                      color: Math.round(guide.user_progress_percentage) >= 100
+                        ? (gTheme ? ((gTheme.cssVariables as any)['--accent-text'] || '#fff') : '#fff')
+                        : '#ffffff',
+                      border: `1px solid ${gTheme ? gTheme.accent : 'var(--color-guide)'}`,
+                      backdropFilter: 'blur(4px)',
+                      zIndex: 2
+                    }}
+                  >
+                    {Math.round(guide.user_progress_percentage)}%
+                  </span>
                 )}
               </div>
 
@@ -2299,6 +2328,34 @@ export const Search: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
                           <BookOpen size={32} color={guideAccent} />
                         </div>
+                      )}
+
+                      {isSaved && item.user_progress_percentage != null && (
+                        <span
+                          title={language === 'es'
+                            ? `Tu progreso: ${Math.round(item.user_progress_percentage)}%`
+                            : `Your progress: ${Math.round(item.user_progress_percentage)}%`}
+                          style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            right: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            background: Math.round(item.user_progress_percentage) >= 100
+                              ? guideAccent
+                              : 'rgba(15, 23, 42, 0.84)',
+                            color: Math.round(item.user_progress_percentage) >= 100
+                              ? guideAccentText
+                              : '#ffffff',
+                            border: `1px solid ${guideAccent}`,
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 2
+                          }}
+                        >
+                          {Math.round(item.user_progress_percentage)}%
+                        </span>
                       )}
                     </div>
 

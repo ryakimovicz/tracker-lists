@@ -3790,6 +3790,34 @@ export const Profile: React.FC = () => {
               {visibilityLabel}
             </span>
           )}
+
+          {list.user_progress_percentage != null && (
+            <span
+              title={language === 'es'
+                ? `Tu progreso: ${Math.round(list.user_progress_percentage)}%`
+                : `Your progress: ${Math.round(list.user_progress_percentage)}%`}
+              style={{
+                position: 'absolute',
+                bottom: '6px',
+                right: '6px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: '6px',
+                background: Math.round(list.user_progress_percentage) >= 100
+                  ? guideAccent
+                  : 'rgba(15, 23, 42, 0.84)',
+                color: Math.round(list.user_progress_percentage) >= 100
+                  ? guideAccentText
+                  : '#ffffff',
+                border: `1px solid ${guideAccent}`,
+                backdropFilter: 'blur(4px)',
+                zIndex: 2
+              }}
+            >
+              {Math.round(list.user_progress_percentage)}%
+            </span>
+          )}
         </div>
 
         <GuideMediaTypeBar mediaTypeCounts={list.media_type_counts} language={language} />

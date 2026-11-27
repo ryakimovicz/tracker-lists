@@ -30,4 +30,5 @@ class SearchResultItem(BaseModel):
     saves_count: Optional[int] = None
     average_rating: Optional[float] = None
     creator_photo_url: Optional[str] = None
+    user_progress_percentage: Optional[float] = None
 

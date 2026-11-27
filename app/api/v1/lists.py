@@ -79,13 +79,74 @@ def _get_guide_visible_items(rl: ReadingList) -> list:
     return all_items
 
 
+def _compute_user_guide_progress_map(db: Session, user_id: Optional[int], reading_lists: list) -> dict:
+    """Return {list_id: progress_percentage} only for guides the user follows (SavedList)."""
+    if not user_id or not reading_lists:
+        return {}
+    list_ids = [rl.id for rl in reading_lists if rl and rl.id is not None]
+    if not list_ids:
+        return {}
+    saved_ids = {
+        row[0]
+        for row in db.query(SavedList.list_id).filter(
+            SavedList.user_id == user_id,
+            SavedList.list_id.in_(list_ids)
+        ).all()
+    }
+    if not saved_ids:
+        return {}
+
+    visible_by_list = {}
+    all_item_ids = []
+    for rl in reading_lists:
+        if rl and rl.id in saved_ids and rl.id not in visible_by_list:
+            vis = _get_guide_visible_items(rl)
+            visible_by_list[rl.id] = vis
+            all_item_ids.extend(it.id for it in vis)
+
+    prog_map = {}
+    if all_item_ids:
+        progs = db.query(
+            ItemProgress.list_item_id,
+            ItemProgress.is_completed,
+            ItemProgress.is_skipped
+        ).filter(
+            ItemProgress.user_id == user_id,
+            ItemProgress.list_item_id.in_(all_item_ids)
+        ).all()
+        for lid, is_comp, is_skip in progs:
+            prog_map[lid] = (bool(is_comp), bool(is_skip))
+
+    result = {}
+    for lid, vis in visible_by_list.items():
+        completed = 0
+        skipped = 0
+        for it in vis:
+            is_comp, is_skip = prog_map.get(it.id, (False, False))
+            if is_comp:
+                completed += 1
+            elif is_skip:
+                skipped += 1
+        effective_total = len(vis) - skipped
+        pct = round((completed / effective_total) * 100) if effective_total > 0 else 0
+        result[lid] = float(pct)
+    return result
+
+
 # 0. Explore Guides: Populares, Mejor Valoradas, Más Guardadas, Nuevas
 @router.get("/explore", response_model=ExploreGuidesResponse)
-def get_explore_guides(db: Session = Depends(get_db)):
+def get_explore_guides(
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     # Query all public reading lists
     lists = db.query(ReadingList).filter(
         ReadingList.visibility == VisibilityEnum.PUBLIC
     ).all()
+
+    user_progress_map = _compute_user_guide_progress_map(
+        db, current_user.id if current_user else None, lists
+    )
 
     guide_items = []
     for l in lists:
@@ -141,7 +202,8 @@ def get_explore_guides(db: Session = Depends(get_db)):
             media_types=sorted(list(media_types)),
             media_type_counts=media_type_counts,
             accent_color=guide_accent,
-            banner_url=guide_banner
+            banner_url=guide_banner,
+            user_progress_percentage=user_progress_map.get(l.id)
         )
         guide_items.append((guide_item, pop_score, avg_rating or 0, saves_count, l.created_at))
 
