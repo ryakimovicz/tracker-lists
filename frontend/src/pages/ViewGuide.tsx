@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { getUserPlanTier } from '../utils/planPermissions';
 import { getProfileTheme } from '../utils/profileThemes';
+import { getGuideImportanceStyle } from '../utils/guideImportance';
 import { shouldShowTranslateButton } from '../utils/languageDetect';
 import {
   ChevronDown,
@@ -117,6 +118,29 @@ export const ViewGuide: React.FC = () => {
     isOpen: false,
     guideToReplaceTitle: ''
   });
+
+  const renderImportanceTag = (rank: number | null | undefined, fontSize = '0.72rem') => {
+    const st = getGuideImportanceStyle(rank, language, isLight);
+    if (!st) return null;
+    return (
+      <span
+        style={{
+          fontSize,
+          fontWeight: 700,
+          color: st.color,
+          background: st.bg,
+          border: `1px solid ${st.border}`,
+          boxShadow: st.glow || 'none',
+          padding: '0.08rem 0.45rem',
+          borderRadius: '999px',
+          lineHeight: 1.35,
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {st.label}
+      </span>
+    );
+  };
 
   const getPriorityLabel = (rank: number | null, lang: string) => {
     if (!rank) return '';
@@ -1273,21 +1297,27 @@ export const ViewGuide: React.FC = () => {
               { value: 1, label: language === 'es' ? 'Extra' : 'Extra' }
             ].map(opt => {
               const active = minImportanceFilter === opt.value;
+              const impStyle = opt.value ? getGuideImportanceStyle(opt.value, language, isLight) : null;
+              const tabColor = impStyle ? impStyle.color : 'var(--accent-primary)';
+              const tabText = opt.value === null
+                ? 'var(--accent-text, #ffffff)'
+                : (!isLight && (opt.value === 1 || opt.value === 2 || opt.value === 4 || opt.value === 5) ? '#0f172a' : '#ffffff');
               return (
                 <button
                   key={String(opt.value)}
                   type="button"
                   onClick={() => setMinImportanceFilter(opt.value)}
+                  className={`profile-category-tab ${active ? 'selected' : ''}`}
                   style={{
-                    padding: '0.28rem 0.7rem',
+                    padding: '0.28rem 0.75rem',
                     borderRadius: '999px',
                     fontSize: '0.78rem',
-                    fontWeight: active ? 600 : 400,
-                    cursor: 'pointer',
-                    border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                    background: active ? 'var(--accent-primary)' : 'transparent',
-                    color: active ? '#fff' : 'var(--text-secondary)'
-                  }}
+                    fontWeight: active ? 600 : 500,
+                    background: active ? tabColor : 'transparent',
+                    '--tab-color': tabColor,
+                    '--tab-text': tabText,
+                    boxShadow: active && impStyle?.glow ? impStyle.glow : undefined
+                  } as React.CSSProperties}
                 >
                   {opt.label}
                 </button>
@@ -1409,8 +1439,9 @@ export const ViewGuide: React.FC = () => {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.25rem',
-                              color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
-                              borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                              color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
+                              borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
                             }}
                           >
                             <SkipForward size={12} />
@@ -1541,7 +1572,7 @@ export const ViewGuide: React.FC = () => {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{tGuide(el.title) || (language === 'es' ? 'Bloque sin título' : 'Untitled Block')}</h4>
-                          {priorityLabel && <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({priorityLabel})</span>}
+                          {priorityLabel && renderImportanceTag(el.importance_rank, '0.75rem')}
                         </div>
                         {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{tGuide(el.description)}</p>}
                       </div>
@@ -1603,7 +1634,7 @@ export const ViewGuide: React.FC = () => {
                                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
                                               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
-                                              {itemPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                              {itemPriorityLabel && renderImportanceTag(itemImportance, '0.72rem')}
                                             </div>
                                             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
                                             {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
@@ -1613,7 +1644,7 @@ export const ViewGuide: React.FC = () => {
                                       return (
                                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
                                           <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>
-                                          {itemPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                          {itemPriorityLabel && renderImportanceTag(itemImportance, '0.72rem')}
                                         </div>
                                       );
                                     })()}
@@ -1629,8 +1660,9 @@ export const ViewGuide: React.FC = () => {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '0.25rem',
-                                      color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
-                                      borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                                      color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                      background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
+                                      borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
                                     }}
                                   >
                                     <SkipForward size={12} />
@@ -1704,7 +1736,7 @@ export const ViewGuide: React.FC = () => {
                                 <div style={{ flex: 1 }}>
                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
                                     <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{tGuide(sub.title) || (language === 'es' ? 'Subbloque sin título' : 'Untitled Subblock')}</h5>
-                                    {subPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({subPriorityLabel})</span>}
+                                    {subPriorityLabel && renderImportanceTag(sub.importance_rank, '0.72rem')}
                                   </div>
                                   {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{tGuide(sub.description)}</p>}
                                 </div>
@@ -1765,7 +1797,7 @@ export const ViewGuide: React.FC = () => {
                                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
                                                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
-                                                      {itemPriorityLabel && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                                      {itemPriorityLabel && renderImportanceTag(itemImportance, '0.7rem')}
                                                     </div>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
                                                     {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
@@ -1775,7 +1807,7 @@ export const ViewGuide: React.FC = () => {
                                               return (
                                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
                                                   <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>
-                                                  {itemPriorityLabel && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                                  {itemPriorityLabel && renderImportanceTag(itemImportance, '0.7rem')}
                                                 </div>
                                               );
                                             })()}
@@ -1791,8 +1823,9 @@ export const ViewGuide: React.FC = () => {
                                               display: 'inline-flex',
                                               alignItems: 'center',
                                               gap: '0.25rem',
-                                              color: item.is_skipped ? '#f59e0b' : 'var(--text-secondary)',
-                                              borderColor: item.is_skipped ? 'rgba(245, 158, 11, 0.5)' : undefined
+                                              color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                              background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
+                                              borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
                                             }}
                                           >
                                             <SkipForward size={11} />

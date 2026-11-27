@@ -4,6 +4,7 @@ import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
+import { getGuideImportanceStyle, type ImportanceBadgeStyle } from '../utils/guideImportance';
 import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching, getCachedSeriesMetadata, setCachedSeriesMetadata } from '../utils/seriesCache';
 import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
@@ -530,7 +531,7 @@ const CustomCard = ({
   onRevealCover?: () => void;
   progressPercent?: number;
   progressLabel?: string;
-  importanceBadge?: { label: string; color: string; bg: string } | null;
+  importanceBadge?: ImportanceBadgeStyle | null;
 }) => {
   const [activeAction, setActiveAction] = useState<'check' | 'play' | 'skip' | null>(null);
   const actionTimerRef = useRef<any>(null);
@@ -699,9 +700,10 @@ const CustomCard = ({
               borderRadius: "6px",
               fontSize: "0.68rem",
               fontWeight: 700,
-              color: "#ffffff",
-              background: "rgba(15, 23, 42, 0.84)",
-              border: `1px solid ${themeColor || "var(--color-guide)"}`,
+              color: importanceBadge.color,
+              background: importanceBadge.overlayBg,
+              border: `1px solid ${importanceBadge.border}`,
+              boxShadow: importanceBadge.glow || "none",
               backdropFilter: "blur(4px)",
               zIndex: 2,
               pointerEvents: "none"
@@ -3267,23 +3269,7 @@ export const Home: React.FC = () => {
     }
   };
 
-  const getGuideImportanceBadge = (rank?: number | null) => {
-    if (!rank) return null;
-    const map: Record<number, { es: string; en: string; color: string; bg: string }> = {
-      5: { es: 'Esencial', en: 'Essential', color: '#f87171', bg: 'rgba(15, 23, 42, 0.85)' },
-      4: { es: 'Importante', en: 'Important', color: '#fb923c', bg: 'rgba(15, 23, 42, 0.85)' },
-      3: { es: 'Recomendado', en: 'Recommended', color: '#facc15', bg: 'rgba(15, 23, 42, 0.85)' },
-      2: { es: 'Opcional', en: 'Optional', color: '#60a5fa', bg: 'rgba(15, 23, 42, 0.85)' },
-      1: { es: 'Extra', en: 'Extra', color: '#94a3b8', bg: 'rgba(15, 23, 42, 0.85)' },
-    };
-    const info = map[rank];
-    if (!info) return null;
-    return {
-      label: language === 'es' ? info.es : info.en,
-      color: info.color,
-      bg: info.bg,
-    };
-  };
+  const getGuideImportanceBadge = (rank?: number | null) => getGuideImportanceStyle(rank, language, isLight);
 
   if (loading) {
     return (
