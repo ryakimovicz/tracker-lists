@@ -674,25 +674,6 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                     <BookOpen size={28} color="var(--guide-accent, var(--color-guide))" />
                   </div>
                 )}
-
-                {/* Items count overlay */}
-                <div 
-                  className="guide-items-badge"
-                  style={{
-                    position: 'absolute',
-                    bottom: '6px',
-                    right: '6px',
-                    background: 'rgba(0,0,0,0.75)',
-                    backdropFilter: 'blur(4px)',
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    color: '#fff'
-                  }}
-                >
-                  {guide.items_count} {t('guidesWorksCount')}
-                </div>
               </div>
 
               {/* Body Content */}
@@ -2313,26 +2294,6 @@ export const Search: React.FC = () => {
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
                           <BookOpen size={32} color={guideAccent} />
-                        </div>
-                      )}
-
-                      {itemsCount > 0 && (
-                        <div
-                          className="guide-items-badge"
-                          style={{
-                            position: 'absolute',
-                            bottom: '6px',
-                            right: '6px',
-                            background: 'rgba(0,0,0,0.75)',
-                            backdropFilter: 'blur(4px)',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            color: '#fff'
-                          }}
-                        >
-                          {itemsCount} {t('guidesWorksCount')}
                         </div>
                       )}
                     </div>

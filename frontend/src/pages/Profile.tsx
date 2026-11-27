@@ -3789,25 +3789,6 @@ export const Profile: React.FC = () => {
               {visibilityLabel}
             </span>
           )}
-
-          <div
-            className="guide-items-badge"
-            style={{
-              position: 'absolute',
-              bottom: '6px',
-              right: '6px',
-              background: 'rgba(0,0,0,0.75)',
-              backdropFilter: 'blur(4px)',
-              padding: '2px 7px',
-              borderRadius: '4px',
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              color: '#fff',
-              zIndex: 2
-            }}
-          >
-            {guideItemsCount} {t('guidesWorksCount')}
-          </div>
         </div>
 
         <div
@@ -3852,73 +3833,82 @@ export const Profile: React.FC = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-            <span>{guideItemsCount} {t('guidesWorksCount')}</span>
-            {list.average_rating != null && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
-                <Star size={11} fill="#eab308" color="#eab308" />
-                {list.average_rating}
-              </span>
-            )}
-            {(list.saves_count || 0) > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
-                <Plus size={11} strokeWidth={2.5} />
-                {list.saves_count}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)', flexWrap: 'wrap', minWidth: 0 }}>
+              <span>{guideItemsCount} {t('guidesWorksCount')}</span>
+              {list.average_rating != null && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
+                  <Star size={11} fill="#eab308" color="#eab308" />
+                  {list.average_rating}
+                </span>
+              )}
+              {(list.saves_count || 0) > 0 && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
+                  <Plus size={11} strokeWidth={2.5} />
+                  {list.saves_count}
+                </span>
+              )}
+            </div>
+
+            {!isSaved && isOwnProfile && (
+              <div
+                className="card-actions-wrap profile-guide-actions"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'flex',
+                  gap: '0.3rem',
+                  alignItems: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (list.can_edit !== false) {
+                      navigate(`/create?edit=${list.id}`);
+                    } else {
+                      setShowProModal(true);
+                    }
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    padding: 0,
+                    borderRadius: '8px',
+                    color: list.can_edit === false ? '#f59e0b' : 'var(--text-secondary)',
+                    borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+                  }}
+                  title={language === 'es' ? 'Editar' : 'Edit'}
+                >
+                  {list.can_edit === false ? <Lock size={15} /> : <Pencil size={15} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteGuide(list.id)}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    padding: 0,
+                    borderRadius: '8px',
+                    color: '#ef4444',
+                    borderColor: 'rgba(239, 68, 68, 0.25)'
+                  }}
+                  title={language === 'es' ? 'Eliminar' : 'Delete'}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             )}
           </div>
         </div>
-
-        {!isSaved && isOwnProfile ? (
-          <div
-            className="card-actions-wrap profile-guide-actions"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              display: 'flex',
-              gap: '0.4rem',
-              alignItems: 'center',
-              padding: '0.5rem 0.75rem',
-              borderTop: '1px solid var(--border-color)',
-              background: 'rgba(0,0,0,0.15)'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                if (list.can_edit !== false) {
-                  navigate(`/create?edit=${list.id}`);
-                } else {
-                  setShowProModal(true);
-                }
-              }}
-              className="btn-secondary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.35rem',
-                fontSize: '0.78rem',
-                padding: '0.28rem 0.55rem',
-                flex: 1,
-                color: list.can_edit === false ? '#f59e0b' : 'inherit',
-                borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
-              }}
-              title={language === 'es' ? 'Editar' : 'Edit'}
-            >
-              {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
-              <span>{language === 'es' ? 'Editar' : 'Edit'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteGuide(list.id)}
-              className="btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.78rem', padding: '0.28rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-              title={language === 'es' ? 'Eliminar' : 'Delete'}
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ) : null}
       </div>
     );
   };
