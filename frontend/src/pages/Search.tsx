@@ -2213,7 +2213,7 @@ export const Search: React.FC = () => {
               }
 
               const shelfItem = findInShelfMap(shelfMap, item.item_type, item.external_id) || (item.cv_id ? findInShelfMap(shelfMap, item.item_type, item.cv_id) : undefined);
-              const onShelf = Boolean(shelfItem);
+              const onShelf = Boolean(shelfItem && shelfItem.custom_badge !== 'from_guide');
               const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
 
@@ -2295,7 +2295,7 @@ export const Search: React.FC = () => {
                             type="button"
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (shelfItem) {
+                              if (shelfItem && shelfItem.custom_badge !== 'from_guide') {
                                 const hasProgress = shelfItem.status !== 'plan_to_watch' && 
                                                     shelfItem.status !== 'plan_to_play' && 
                                                     shelfItem.status !== 'plan_to_read' && 

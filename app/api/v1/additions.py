@@ -310,42 +310,27 @@ def toggle_addition_item_progress(
             detail="You must own or adopt this addition to check its item progress"
         )
         
-    if item.external_id:
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.item_type == item.item_type,
-            ItemProgress.external_id == item.external_id
-        ).first()
-    else:
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.addition_item_id == addition_item_id
-        ).first()
+    progress = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.addition_item_id == addition_item_id
+    ).first()
     
     if progress:
+        if progress.external_id is not None:
+            progress.external_id = None
+            progress.item_type = None
         progress.is_completed = not progress.is_completed
         if progress.is_completed:
             progress.is_skipped = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
     else:
-        if item.external_id:
-            progress = ItemProgress(
-                user_id=current_user.id,
-                item_type=item.item_type,
-                external_id=item.external_id,
-                addition_item_id=addition_item_id,
-                is_completed=True,
-                is_skipped=False,
-                completed_at=datetime.now(timezone.utc)
-            )
-        else:
-            progress = ItemProgress(
-                user_id=current_user.id,
-                addition_item_id=addition_item_id,
-                is_completed=True,
-                is_skipped=False,
-                completed_at=datetime.now(timezone.utc)
-            )
+        progress = ItemProgress(
+            user_id=current_user.id,
+            addition_item_id=addition_item_id,
+            is_completed=True,
+            is_skipped=False,
+            completed_at=datetime.now(timezone.utc)
+        )
         db.add(progress)
         
     db.commit()
@@ -378,42 +363,27 @@ def toggle_addition_item_skip(
             detail="You must own or adopt this addition to check its item progress"
         )
         
-    if item.external_id:
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.item_type == item.item_type,
-            ItemProgress.external_id == item.external_id
-        ).first()
-    else:
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.addition_item_id == addition_item_id
-        ).first()
+    progress = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.addition_item_id == addition_item_id
+    ).first()
     
     if progress:
+        if progress.external_id is not None:
+            progress.external_id = None
+            progress.item_type = None
         progress.is_skipped = not progress.is_skipped
         if progress.is_skipped:
             progress.is_completed = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_skipped else None
     else:
-        if item.external_id:
-            progress = ItemProgress(
-                user_id=current_user.id,
-                item_type=item.item_type,
-                external_id=item.external_id,
-                addition_item_id=addition_item_id,
-                is_completed=False,
-                is_skipped=True,
-                completed_at=datetime.now(timezone.utc)
-            )
-        else:
-            progress = ItemProgress(
-                user_id=current_user.id,
-                addition_item_id=addition_item_id,
-                is_completed=False,
-                is_skipped=True,
-                completed_at=datetime.now(timezone.utc)
-            )
+        progress = ItemProgress(
+            user_id=current_user.id,
+            addition_item_id=addition_item_id,
+            is_completed=False,
+            is_skipped=True,
+            completed_at=datetime.now(timezone.utc)
+        )
         db.add(progress)
         
     db.commit()

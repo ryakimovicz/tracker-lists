@@ -215,6 +215,115 @@ def create_list(
 
     return new_list
 
+def _is_tracker_list(db: Session, reading_list: Optional[ReadingList]) -> bool:
+    if not reading_list:
+        return False
+    if reading_list.title and reading_list.title.startswith("Tracker: "):
+        return True
+    return db.query(UserLibraryItem.id).filter(
+        UserLibraryItem.tracking_list_id == reading_list.id
+    ).first() is not None
+
+
+def _get_user_consumed_external_ids(db: Session, user_id: int, candidate_external_ids: list) -> set:
+    if not candidate_external_ids:
+        return set()
+    unique_ids = list({eid for eid in candidate_external_ids if eid})
+    if not unique_ids:
+        return set()
+
+    from app.models.consumption import ConsumptionHistory
+    consumed = set()
+
+    prog_rows = db.query(ItemProgress.external_id).filter(
+        ItemProgress.user_id == user_id,
+        ItemProgress.external_id.in_(unique_ids),
+        ItemProgress.is_completed == True
+    ).all()
+    for (eid,) in prog_rows:
+        if eid:
+            consumed.add(eid)
+
+    ch_rows = db.query(ConsumptionHistory.external_id).filter(
+        ConsumptionHistory.user_id == user_id,
+        ConsumptionHistory.external_id.in_(unique_ids)
+    ).all()
+    for (eid,) in ch_rows:
+        if eid:
+            consumed.add(eid)
+
+    lib_rows = db.query(UserLibraryItem.external_id).filter(
+        UserLibraryItem.user_id == user_id,
+        UserLibraryItem.external_id.in_(unique_ids),
+        UserLibraryItem.status.in_([UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ])
+    ).all()
+    for (eid,) in lib_rows:
+        if eid:
+            consumed.add(eid)
+
+    return consumed
+
+
+def _detach_legacy_guide_progress(db: Session, user_id: int, progress: ItemProgress) -> None:
+    """If a guide ItemProgress row still holds a global external_id, split it cleanly so
+    guide-local toggles/skips never mutate global library/tracker progress."""
+    if not progress or not progress.external_id:
+        return
+    old_ext_id = progress.external_id
+    old_item_type = progress.item_type
+    old_was_completed = bool(progress.is_completed)
+    old_completed_at = progress.completed_at
+
+    progress.external_id = None
+    progress.item_type = None
+    db.flush()
+
+    if old_was_completed:
+        existing_global = db.query(ItemProgress).filter(
+            ItemProgress.user_id == user_id,
+            ItemProgress.item_type == old_item_type,
+            ItemProgress.external_id == old_ext_id
+        ).first()
+        if not existing_global:
+            db.add(ItemProgress(
+                user_id=user_id,
+                item_type=old_item_type,
+                external_id=old_ext_id,
+                list_item_id=None,
+                is_completed=True,
+                is_skipped=False,
+                completed_at=old_completed_at or datetime.now(timezone.utc)
+            ))
+            db.flush()
+
+
+def _ensure_global_external_progress(db: Session, user_id: int, item: ListItem, now_dt: datetime) -> None:
+    """Ensure a global ItemProgress record exists for (user_id, item_type, external_id) so
+    library/episode/issue trackers and /users/me/progress/batch reflect manual completions."""
+    if not item.external_id:
+        return
+    t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
+    existing_global = db.query(ItemProgress).filter(
+        ItemProgress.user_id == user_id,
+        ItemProgress.item_type == t_str,
+        ItemProgress.external_id == item.external_id
+    ).first()
+    if existing_global:
+        existing_global.is_completed = True
+        existing_global.is_skipped = False
+        existing_global.completed_at = now_dt
+    else:
+        db.add(ItemProgress(
+            user_id=user_id,
+            item_type=t_str,
+            external_id=item.external_id,
+            list_item_id=None,
+            is_completed=True,
+            is_skipped=False,
+            completed_at=now_dt
+        ))
+
+
 # 3. Get list details (with progress calculated if logged in)
 @router.get("/{list_id}", response_model=ReadingListDetailsResponse)
 def get_list_details(
@@ -294,9 +403,13 @@ def get_list_details(
     # Fetch list items and their progress
     items = reading_list.items
     total_count = len(items)
+    is_tracker = _is_tracker_list(db, reading_list)
     external_progress_map = {}
     custom_progress_map = {}
+    list_item_progress_map = {}
     addition_progress_map = {}
+    consumption_counts_map = {}
+    consumed_ext_ids = set()
     
     if current_user:
         progress_records = db.query(ItemProgress).filter(ItemProgress.user_id == current_user.id).all()
@@ -312,20 +425,21 @@ def get_list_details(
                     p_type = "anime"
                 external_progress_map[(p_type, p.external_id)] = (p.is_completed, p.is_skipped)
                 external_progress_map[("", p.external_id)] = (p.is_completed, p.is_skipped)
+            if p.list_item_id:
+                list_item_progress_map[p.list_item_id] = (p.is_completed, p.is_skipped)
         custom_progress_map = {
             p.list_item_id: (p.is_completed, p.is_skipped)
             for p in progress_records if p.list_item_id and not p.external_id
         }
         addition_progress_map = {
             p.addition_item_id: (p.is_completed, p.is_skipped)
-            for p in progress_records if p.addition_item_id and not p.external_id
+            for p in progress_records if p.addition_item_id
         }
 
         # Query consumption history counts for this user and items in this list
         from app.models.consumption import ConsumptionHistory
         from sqlalchemy import func
         all_ext_ids = [it.external_id for it in items if it.external_id]
-        consumption_counts_map = {}
         if all_ext_ids:
             c_counts = db.query(
                 ConsumptionHistory.external_id,
@@ -336,6 +450,8 @@ def get_list_details(
             ).group_by(ConsumptionHistory.external_id).all()
             for eid, cnt in c_counts:
                 consumption_counts_map[eid] = cnt
+            if not is_tracker:
+                consumed_ext_ids = _get_user_consumed_external_ids(db, current_user.id, all_ext_ids)
 
     # Fetch active additions for the current user
     addition_items = []
@@ -402,22 +518,26 @@ def get_list_details(
             pass
 
     for item in items:
-        # Check progress
-        if item.external_id:
-            i_type = str(item.item_type.value if hasattr(item.item_type, 'value') else item.item_type).lower() if item.item_type else ""
-            if "comic" in i_type:
-                i_type = "comic"
-            elif "series" in i_type:
-                i_type = "series"
-            elif "anime" in i_type:
-                i_type = "anime"
-            key = (i_type, item.external_id)
-            is_comp, is_skip = external_progress_map.get(key, external_progress_map.get(("", item.external_id), (False, False)))
+        # Check progress: trackers sync globally by external_id; guides track progress independently per list_item_id
+        if is_tracker:
+            if item.external_id:
+                i_type = str(item.item_type.value if hasattr(item.item_type, 'value') else item.item_type).lower() if item.item_type else ""
+                if "comic" in i_type:
+                    i_type = "comic"
+                elif "series" in i_type:
+                    i_type = "series"
+                elif "anime" in i_type:
+                    i_type = "anime"
+                key = (i_type, item.external_id)
+                is_comp, is_skip = external_progress_map.get(key, external_progress_map.get(("", item.external_id), (False, False)))
+            else:
+                is_comp, is_skip = custom_progress_map.get(item.id, (False, False))
         else:
-            is_comp, is_skip = custom_progress_map.get(item.id, (False, False))
+            is_comp, is_skip = list_item_progress_map.get(item.id, (False, False))
 
+        is_already_consumed = bool(item.external_id and item.external_id in consumed_ext_ids)
         c_cnt = consumption_counts_map.get(item.external_id, 0) if item.external_id else 0
-        if is_comp and c_cnt == 0:
+        if (is_comp or is_already_consumed) and c_cnt == 0:
             c_cnt = 1
 
         display_item_title = item.title
@@ -441,7 +561,8 @@ def get_list_details(
                 is_completed=is_comp,
                 is_skipped=is_skip,
                 is_addition=False,
-                consumption_count=c_cnt
+                consumption_count=c_cnt,
+                already_consumed=is_already_consumed
             )
         )
 
@@ -484,6 +605,9 @@ def get_list_details(
     effective_total = merged_total - skipped_count
     progress_percentage = (completed_count / effective_total * 100) if effective_total > 0 else 0
     skipped_percentage = (skipped_count / merged_total * 100) if merged_total > 0 else 0
+    already_consumed_unmarked_count = sum(
+        1 for i in merged_items if getattr(i, "already_consumed", False) and not i.is_completed
+    )
 
     all_votes = db.query(ListVote).filter(ListVote.list_id == list_id).all()
     total_ratings = len(all_votes)
@@ -516,6 +640,7 @@ def get_list_details(
         user_rating=user_rating,
         average_rating=round(avg_rating, 1) if avg_rating is not None else None,
         total_ratings=total_ratings,
+        already_consumed_unmarked_count=already_consumed_unmarked_count,
         section_descriptions=reading_list.section_descriptions,
         section_importances=reading_list.section_importances,
         items=merged_items
@@ -1074,13 +1199,20 @@ def toggle_item_progress(
             detail="Item belongs to a private list you don't access"
         )
         
-    if item.external_id:
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.item_type == (item.item_type.value if hasattr(item.item_type, 'value') else item.item_type),
-            ItemProgress.external_id == item.external_id
-        ).first()
-        if not progress:
+    is_tracker = _is_tracker_list(db, reading_list)
+    if is_tracker:
+        if item.external_id:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.item_type == (item.item_type.value if hasattr(item.item_type, 'value') else item.item_type),
+                ItemProgress.external_id == item.external_id
+            ).first()
+            if not progress:
+                progress = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.list_item_id == item_id
+                ).first()
+        else:
             progress = db.query(ItemProgress).filter(
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.list_item_id == item_id
@@ -1090,6 +1222,8 @@ def toggle_item_progress(
             ItemProgress.user_id == current_user.id,
             ItemProgress.list_item_id == item_id
         ).first()
+        if progress and progress.external_id:
+            _detach_legacy_guide_progress(db, current_user.id, progress)
     
     # Needs to be imported inside or at the top
     from app.models.consumption import ConsumptionHistory
@@ -1106,8 +1240,8 @@ def toggle_item_progress(
             progress.is_completed = False
             progress.completed_at = None
             
-            # Also try to remove from user library if it's an episode that was added automatically
-            if item.external_id and item.external_id.startswith("tvm-ep-"):
+            # Also try to remove from user library if it's an episode in a tracker that was added automatically
+            if is_tracker and item.external_id and item.external_id.startswith("tvm-ep-"):
                 db.query(UserLibraryItem).filter(
                     UserLibraryItem.user_id == current_user.id,
                     UserLibraryItem.external_id == item.external_id
@@ -1124,7 +1258,7 @@ def toggle_item_progress(
         if action == "remove":
             return {"item_id": item_id, "is_completed": False}
             
-        if item.external_id:
+        if is_tracker and item.external_id:
             progress = ItemProgress(
                 user_id=current_user.id,
                 item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
@@ -1146,12 +1280,49 @@ def toggle_item_progress(
         just_marked_completed = True
         
     if just_marked_completed:
+        t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
+
+        # If this item was already consumed before (e.g. in UserLibraryItem or global ItemProgress)
+        # but has no ConsumptionHistory rows yet, backfill the original completion so this guide
+        # completion counts as a re-consumption (incrementing the counter).
+        if not is_tracker and item.external_id:
+            existing_ch_count = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == item.external_id
+            ).count()
+            if existing_ch_count == 0:
+                prev_completed_at = None
+                prev_lib = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.external_id == item.external_id,
+                    UserLibraryItem.status.in_([UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ])
+                ).first()
+                if prev_lib:
+                    prev_completed_at = prev_lib.completed_at or prev_lib.updated_at or now_dt
+                else:
+                    prev_global = db.query(ItemProgress).filter(
+                        ItemProgress.user_id == current_user.id,
+                        ItemProgress.external_id == item.external_id,
+                        ItemProgress.is_completed == True
+                    ).first()
+                    if prev_global:
+                        prev_completed_at = prev_global.completed_at or now_dt
+                if prev_completed_at is not None:
+                    db.add(ConsumptionHistory(
+                        user_id=current_user.id,
+                        item_type=t_str,
+                        external_id=item.external_id,
+                        consumed_at=prev_completed_at
+                    ))
+
+            _ensure_global_external_progress(db, current_user.id, item, now_dt)
+
         auto_add_to_library(db, current_user.id, item)
         
         # Add to ConsumptionHistory
         ch = ConsumptionHistory(
             user_id=current_user.id,
-            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            item_type=t_str,
             external_id=item.external_id,
             list_item_id=item_id,
             consumed_at=now_dt
@@ -1160,7 +1331,6 @@ def toggle_item_progress(
         
         # Record activity log with progress metadata
         from app.services.activity_service import ActivityService
-        t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
         show_name = (
             item.title.split(" - ")[0].strip()
             if item.title and " - " in item.title
@@ -1194,6 +1364,31 @@ def toggle_item_progress(
 class UnmarkProgressRequest(BaseModel):
     external_id: str
 
+def _expand_external_id_variants(ext_id: str) -> list:
+    raw = (ext_id or "").strip()
+    if not raw:
+        return []
+    clean = (
+        raw.replace("cv_issue_metron_issue_", "")
+           .replace("cv_issue_cv_issue_", "")
+           .replace("metron_issue_", "")
+           .replace("cv_issue_", "")
+           .replace("tvm-ep-", "")
+           .replace("cv_", "")
+    )
+    variants = {raw}
+    if clean and clean != raw:
+        variants.add(clean)
+        if "tvm-ep-" in raw:
+            variants.add(f"tvm-ep-{clean}")
+        else:
+            variants.add(f"metron_issue_{clean}")
+            variants.add(f"cv_issue_{clean}")
+            variants.add(f"cv_issue_metron_issue_{clean}")
+            variants.add(f"cv_{clean}")
+    return list(variants)
+
+
 @router.post("/progress/unmark", status_code=status.HTTP_200_OK)
 def unmark_item_progress_by_external_id(
     req: UnmarkProgressRequest,
@@ -1202,9 +1397,10 @@ def unmark_item_progress_by_external_id(
 ):
     from app.models.consumption import ConsumptionHistory
     ext_id = req.external_id.strip()
+    variants = _expand_external_id_variants(ext_id)
     latest_ch = db.query(ConsumptionHistory).filter(
         ConsumptionHistory.user_id == current_user.id,
-        ConsumptionHistory.external_id == ext_id
+        ConsumptionHistory.external_id.in_(variants)
     ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).first()
 
     if latest_ch:
@@ -1213,7 +1409,7 @@ def unmark_item_progress_by_external_id(
 
     remaining = db.query(ConsumptionHistory).filter(
         ConsumptionHistory.user_id == current_user.id,
-        ConsumptionHistory.external_id == ext_id
+        ConsumptionHistory.external_id.in_(variants)
     ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).all()
 
     still_completed = len(remaining) > 0
@@ -1221,7 +1417,7 @@ def unmark_item_progress_by_external_id(
 
     progs = db.query(ItemProgress).filter(
         ItemProgress.user_id == current_user.id,
-        ItemProgress.external_id == ext_id
+        ItemProgress.external_id.in_(variants)
     ).all()
     for p in progs:
         p.is_completed = still_completed
@@ -1244,12 +1440,16 @@ def bulk_toggle_items_progress(
     db: Session = Depends(get_db)
 ):
     from app.services.activity_service import ActivityService
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    is_tracker = _is_tracker_list(db, reading_list)
+    now_dt = datetime.now(timezone.utc)
+
     for item_id in req_body.item_ids:
         item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
         if not item:
             continue
         
-        if item.external_id:
+        if is_tracker and item.external_id:
             progress = db.query(ItemProgress).filter(
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.item_type == item.item_type,
@@ -1260,14 +1460,16 @@ def bulk_toggle_items_progress(
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.list_item_id == item_id
             ).first()
+            if not is_tracker and progress and progress.external_id:
+                _detach_legacy_guide_progress(db, current_user.id, progress)
             
         if progress:
             progress.is_completed = req_body.completed
             if req_body.completed:
                 progress.is_skipped = False
-            progress.completed_at = datetime.now(timezone.utc) if req_body.completed else None
+            progress.completed_at = now_dt if req_body.completed else None
         else:
-            if item.external_id:
+            if is_tracker and item.external_id:
                 progress = ItemProgress(
                     user_id=current_user.id,
                     item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
@@ -1275,7 +1477,7 @@ def bulk_toggle_items_progress(
                     list_item_id=item_id,
                     is_completed=req_body.completed,
                     is_skipped=False,
-                    completed_at=datetime.now(timezone.utc) if req_body.completed else None
+                    completed_at=now_dt if req_body.completed else None
                 )
             else:
                 progress = ItemProgress(
@@ -1283,11 +1485,13 @@ def bulk_toggle_items_progress(
                     list_item_id=item_id,
                     is_completed=req_body.completed,
                     is_skipped=False,
-                    completed_at=datetime.now(timezone.utc) if req_body.completed else None
+                    completed_at=now_dt if req_body.completed else None
                 )
             db.add(progress)
             
         if req_body.completed:
+            if not is_tracker:
+                _ensure_global_external_progress(db, current_user.id, item, now_dt)
             auto_add_to_library(db, current_user.id, item)
             
             # Record activity log with progress metadata
@@ -1312,6 +1516,73 @@ def bulk_toggle_items_progress(
             
     db.commit()
     return {"status": "success"}
+
+
+@router.post("/{list_id}/mark-consumed", status_code=status.HTTP_200_OK)
+def mark_already_consumed_in_guide(
+    list_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Mark all items in a guide that the user has already consumed elsewhere.
+    Only ticks the guide-local ItemProgress rows — does NOT increment ConsumptionHistory
+    or record new activity logs."""
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+
+    if reading_list.visibility == VisibilityEnum.PRIVATE and reading_list.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this list"
+        )
+
+    items = reading_list.items
+    candidate_ext_ids = [it.external_id for it in items if it.external_id]
+    consumed_ext_ids = _get_user_consumed_external_ids(db, current_user.id, candidate_ext_ids)
+
+    if not consumed_ext_ids:
+        return {"marked_item_ids": [], "marked_count": 0}
+
+    item_ids = [it.id for it in items]
+    existing_progs = {
+        p.list_item_id: p
+        for p in db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.list_item_id.in_(item_ids)
+        ).all()
+    } if item_ids else {}
+
+    now_dt = datetime.now(timezone.utc)
+    marked_item_ids = []
+
+    for item in items:
+        if not item.external_id or item.external_id not in consumed_ext_ids:
+            continue
+        prog = existing_progs.get(item.id)
+        if prog:
+            if prog.external_id:
+                _detach_legacy_guide_progress(db, current_user.id, prog)
+            if prog.is_completed:
+                continue
+            prog.is_completed = True
+            prog.is_skipped = False
+            prog.completed_at = now_dt
+        else:
+            db.add(ItemProgress(
+                user_id=current_user.id,
+                list_item_id=item.id,
+                is_completed=True,
+                is_skipped=False,
+                completed_at=now_dt
+            ))
+        marked_item_ids.append(item.id)
+
+    db.commit()
+    return {
+        "marked_item_ids": marked_item_ids,
+        "marked_count": len(marked_item_ids)
+    }
 
 # 11. Reverse Lookup: See which lists contain this item
 @router.get("/items/lookup", response_model=List[ReadingListResponse])
@@ -1545,7 +1816,8 @@ def toggle_item_skip(
             detail="Item belongs to a private list you don't access"
         )
         
-    if item.external_id:
+    is_tracker = _is_tracker_list(db, reading_list)
+    if is_tracker and item.external_id:
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
             ItemProgress.item_type == item.item_type,
@@ -1556,6 +1828,8 @@ def toggle_item_skip(
             ItemProgress.user_id == current_user.id,
             ItemProgress.list_item_id == item_id
         ).first()
+        if not is_tracker and progress and progress.external_id:
+            _detach_legacy_guide_progress(db, current_user.id, progress)
     
     if progress:
         progress.is_skipped = not progress.is_skipped
@@ -1563,7 +1837,7 @@ def toggle_item_skip(
             progress.is_completed = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_skipped else None
     else:
-        if item.external_id:
+        if is_tracker and item.external_id:
             progress = ItemProgress(
                 user_id=current_user.id,
                 item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
@@ -1623,20 +1897,27 @@ def bulk_section_action(
     item_ids = [i.id for i in items]
     
     # Load all user progress records first to avoid N+1 queries
+    is_tracker = _is_tracker_list(db, reading_list)
     all_user_progress = db.query(ItemProgress).filter(ItemProgress.user_id == current_user.id).all()
     
     # Maps
     external_progress = {(p.item_type.lower() if p.item_type else "", p.external_id): p for p in all_user_progress if p.external_id}
     custom_progress = {p.list_item_id: p for p in all_user_progress if p.list_item_id and not p.external_id}
+    guide_progress = {p.list_item_id: p for p in all_user_progress if p.list_item_id}
     
     action = action_req.action.lower()
     
     for item in items:
         # Find record
-        if item.external_id:
-            rec = external_progress.get((item.item_type.lower(), item.external_id))
+        if is_tracker:
+            if item.external_id:
+                rec = external_progress.get((item.item_type.lower(), item.external_id))
+            else:
+                rec = custom_progress.get(item.id)
         else:
-            rec = custom_progress.get(item.id)
+            rec = guide_progress.get(item.id)
+            if rec and rec.external_id:
+                _detach_legacy_guide_progress(db, current_user.id, rec)
             
         if action == "skip":
             if rec:
@@ -1644,7 +1925,7 @@ def bulk_section_action(
                 rec.is_completed = False
                 rec.completed_at = datetime.now(timezone.utc)
             else:
-                if item.external_id:
+                if is_tracker and item.external_id:
                     new_rec = ItemProgress(
                         user_id=current_user.id,
                         item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
@@ -1673,7 +1954,7 @@ def bulk_section_action(
                 rec.is_skipped = False
                 rec.completed_at = datetime.now(timezone.utc)
             else:
-                if item.external_id:
+                if is_tracker and item.external_id:
                     new_rec = ItemProgress(
                         user_id=current_user.id,
                         item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
@@ -1854,6 +2135,7 @@ def toggle_series_episode(
     raw_ep_str = str(ep_req.episode_id)
     is_comic = (
         (tracking_lib_item and tracking_lib_item.item_type == "comic") or
+        raw_ep_str.startswith("metron_") or
         raw_ep_str.startswith("cv_") or
         raw_ep_str.startswith("cv-") or
         raw_ep_str.startswith("4000-") or
@@ -1861,13 +2143,17 @@ def toggle_series_episode(
     )
 
     if is_comic:
-        ext_id = raw_ep_str if raw_ep_str.startswith("cv_issue_") else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
+        if raw_ep_str.startswith("metron_issue_") or raw_ep_str.startswith("cv_issue_"):
+            ext_id = raw_ep_str
+        else:
+            ext_id = f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
         media_item_type = ItemTypeEnum.COMIC
         sec_name = "Volumen"
     else:
-        ext_id = f"tvm-ep-{raw_ep_str}"
+        ext_id = raw_ep_str if raw_ep_str.startswith("tvm-ep-") else f"tvm-ep-{raw_ep_str}"
         media_item_type = ItemTypeEnum.SERIES
         sec_name = f"Season {ep_req.season_number}"
+    ext_variants = _expand_external_id_variants(ext_id)
     
     # Check if ListItem already exists
     item = db.query(ListItem).filter(
@@ -1896,7 +2182,7 @@ def toggle_series_episode(
     # Toggle progress
     progress = db.query(ItemProgress).filter(
         ItemProgress.user_id == current_user.id,
-        ItemProgress.external_id == ext_id
+        ItemProgress.external_id.in_(ext_variants)
     ).first()
     
     from app.models.consumption import ConsumptionHistory
@@ -1931,8 +2217,8 @@ def toggle_series_episode(
             # Check if there is consumption history to remove latest
             history = db.query(ConsumptionHistory).filter(
                 ConsumptionHistory.user_id == current_user.id,
-                ConsumptionHistory.external_id == ext_id
-            ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+                ConsumptionHistory.external_id.in_(ext_variants)
+            ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).all()
             
             if history:
                 db.delete(history[0])

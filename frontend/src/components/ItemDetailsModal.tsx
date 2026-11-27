@@ -2009,7 +2009,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleAddToShelf = async () => {
     if (!selectedItem) return;
-    if (selectedItem.id) {
+    if (selectedItem.id && selectedItem.custom_badge !== 'from_guide') {
       // Already in shelf, show menu
       setShowShelfMenu(!showShelfMenu);
     } else {
@@ -3661,6 +3661,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 ...prev,
                 id: myMatch.id,
                 status: myMatch.status,
+                custom_badge: myMatch.custom_badge,
                 completed_at: myMatch.completed_at,
                 pages_read: myMatch.pages_read,
                 total_pages: myMatch.total_pages || incomingItem.total_pages,
@@ -5124,7 +5125,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const ensureTrackedPromiseRef = React.useRef<Promise<any | null> | null>(null);
 
   const ensureTracked = async (status: string, isHundredPercent: boolean = false) => {
-    if (selectedItem.id) return selectedItem;
+    if (selectedItem.id && selectedItem.custom_badge !== 'from_guide') return selectedItem;
     if (ensureTrackedPromiseRef.current) {
       return await ensureTrackedPromiseRef.current;
     }
@@ -5138,7 +5139,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           description: selectedItem.description,
           item_type: selectedItem.item_type,
           release_date: selectedItem.release_date,
-          custom_badge: selectedItem.badge || selectedItem.custom_badge || null,
+          custom_badge: selectedItem.badge || (selectedItem.custom_badge === 'from_guide' ? null : selectedItem.custom_badge) || null,
           total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
           pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
           status: status,
@@ -5674,7 +5675,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       .replace('cv_', '');
     const extId = rawExtId.startsWith('cv_') || rawExtId.startsWith('metron_') ? rawExtId : `metron_issue_${cleanId}`;
     const issueNum = selectedItem.episode_number ?? selectedItem.issue_number ?? (cleanId.match(/\d+$/)?.[0] ? parseInt(cleanId.match(/\d+$/)![0]) : 1);
-    const effectiveListId = selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
+    const effectiveListId = selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
 
     if (!bypassPrompt) {
       // 1. If currently 'reading' and clicks 'reading' -> confirm unmark
@@ -5988,7 +5989,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('tvm-ep-', '');
     const extId = `tvm-ep-${cleanId}`;
-    const effectiveListId = selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
+    const effectiveListId = selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
 
     const epData = {
       id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(cleanId) : selectedItem.id),
@@ -6962,12 +6963,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   })()}
 
                   {/* Button + (Add to Shelf / Follow) */}
-                  {user && !isEpisode && (
+                  {user && !isEpisode && (() => {
+                    const isExplicitlyAdded = Boolean(selectedItem?.id && selectedItem?.custom_badge !== 'from_guide');
+                    return (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
                         onClick={async () => {
-                          if (selectedItem?.id) {
+                          if (isExplicitlyAdded) {
                             const hasProgress = selectedItem.status !== 'plan_to_watch' && 
                                                 selectedItem.status !== 'plan_to_play' && 
                                                 selectedItem.status !== 'plan_to_read' && 
@@ -6983,7 +6986,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }
                         }}
                         className="btn-circle-action"
-                        title={selectedItem?.id 
+                        title={isExplicitlyAdded 
                           ? (language === 'es' ? 'Quitar' : 'Remove')
                           : (language === 'es' ? 'Agregar' : 'Add')
                         }
@@ -6999,9 +7002,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           justifyContent: 'center',
                           flexShrink: 0,
                           border: '1px solid',
-                          background: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                          borderColor: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
-                          color: selectedItem?.id ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                          background: isExplicitlyAdded ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                          borderColor: isExplicitlyAdded ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
+                          color: isExplicitlyAdded ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease'
                         }}
@@ -7009,7 +7012,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <Plus size={18} />
                       </button>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -10468,7 +10472,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 <span>{rootNode.vote_count || 0}</span>
                               </button>
 
-                              {user && !rootNode.is_deleted && rootNode.content && (!rootNode.is_spoiler || revealedSpoilers[rootNode.id]) && (translatedItemReviews[rootNode.id]?.show || shouldShowTranslateButton(rootNode.content, language)) && (
+                              {user && !rootNode.is_deleted && rootNode.content && (!rootNode.is_spoiler || user.id === rootNode.user_id || isItemConsumed || revealedReviewSpoilers[rootNode.id]) && (translatedItemReviews[rootNode.id]?.show || shouldShowTranslateButton(rootNode.content, language)) && (
                                 <button
                                   type="button"
                                   disabled={translatedItemReviews[rootNode.id]?.loading}

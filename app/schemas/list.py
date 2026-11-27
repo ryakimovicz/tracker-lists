@@ -39,6 +39,7 @@ class ListItemProgressResponse(ListItemResponse):
     addition_item_id: Optional[int] = None
     inherited_importance_rank: Optional[int] = None
     consumption_count: Optional[int] = 0
+    already_consumed: bool = False
 
 # Reading List schemas
 class ReadingListBase(BaseModel):
@@ -80,6 +81,7 @@ class ReadingListDetailsResponse(ReadingListResponse):
     user_rating: Optional[int] = None
     average_rating: Optional[float] = None
     total_ratings: int = 0
+    already_consumed_unmarked_count: int = 0
     items: List[ListItemProgressResponse] = []
 
 

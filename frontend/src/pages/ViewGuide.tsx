@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Check,
+  CheckCheck,
   Share2,
   ArrowDownCircle,
   SkipForward,
@@ -62,6 +63,7 @@ export const ViewGuide: React.FC = () => {
   const [guide, setGuide] = useState<any | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isTogglingSave, setIsTogglingSave] = useState(false);
+  const [isMarkingConsumed, setIsMarkingConsumed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -657,7 +659,12 @@ export const ViewGuide: React.FC = () => {
       if (!prev) return null;
       const updatedItems = (prev.items || []).map((item: any) =>
         item.id === itemId
-          ? { ...item, is_completed: !item.is_completed, is_skipped: !item.is_completed ? false : item.is_skipped }
+          ? {
+              ...item,
+              is_completed: !item.is_completed,
+              is_skipped: !item.is_completed ? false : item.is_skipped,
+              already_consumed: !item.is_completed ? true : item.already_consumed
+            }
           : item
       );
       return {
@@ -705,6 +712,35 @@ export const ViewGuide: React.FC = () => {
     } catch (err: any) {
       setGuide(prevGuide);
       setErrorMsg(language === 'es' ? 'Error al saltear la obra.' : 'Failed to toggle skip.');
+    }
+  };
+
+  const handleMarkAlreadyConsumed = async () => {
+    if (!guide || isMarkingConsumed) return;
+    setIsMarkingConsumed(true);
+    try {
+      const res = await apiClient.post(`/lists/${guide.id}/mark-consumed`);
+      const markedIds = new Set<number>(res.data?.marked_item_ids || []);
+      if (markedIds.size > 0) {
+        setGuide((prev: any) => {
+          if (!prev) return null;
+          const updatedItems = (prev.items || []).map((item: any) =>
+            markedIds.has(item.id)
+              ? { ...item, is_completed: true, is_skipped: false }
+              : item
+          );
+          return {
+            ...prev,
+            items: updatedItems,
+            ...computeGuideCounts(updatedItems)
+          };
+        });
+        window.dispatchEvent(new Event('library-updated'));
+      }
+    } catch {
+      setErrorMsg(language === 'es' ? 'Error al marcar las obras ya consumidas.' : 'Failed to mark already consumed items.');
+    } finally {
+      setIsMarkingConsumed(false);
     }
   };
 
@@ -1089,6 +1125,45 @@ export const ViewGuide: React.FC = () => {
                 {guide.skipped_count} {guide.skipped_count === 1 ? (language === 'es' ? 'salteado' : 'skipped') : (language === 'es' ? 'salteados' : 'skipped')}
               </span>
             )}
+            {currentUser && (() => {
+              const unmarkedConsumedCount = itemsList.filter((i: any) => i.already_consumed && !i.is_completed).length;
+              if (unmarkedConsumedCount <= 0) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={handleMarkAlreadyConsumed}
+                  disabled={isMarkingConsumed}
+                  title={
+                    language === 'es'
+                      ? 'Tilda en esta guía las obras que ya consumiste antes sin sumar al contador'
+                      : 'Check items you have already consumed without incrementing your consumption count'
+                  }
+                  style={{
+                    marginTop: '0.65rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.35rem 0.7rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    cursor: isMarkingConsumed ? 'wait' : 'pointer',
+                    opacity: isMarkingConsumed ? 0.65 : 1,
+                    transition: 'border-color 0.2s ease, background 0.2s ease'
+                  }}
+                >
+                  <CheckCheck size={15} color="var(--accent-primary)" />
+                  {isMarkingConsumed
+                    ? (language === 'es' ? 'Marcando...' : 'Marking...')
+                    : (language === 'es'
+                        ? `Marcar ya consumidos (${unmarkedConsumedCount})`
+                        : `Mark already consumed (${unmarkedConsumedCount})`)}
+                </button>
+              );
+            })()}
           </div>
           <div>
             {/* Interactive Half-Star Rating & Review Box (matches media items) */}

@@ -638,6 +638,8 @@ def get_user_up_next(
             if not inserted:
                 merged_items.append((ai.id, ai, True, ai.addition_id, ai.id))
                 
+        is_personal_tracker = rlist.id in personal_tracker_ids or (rlist.title and rlist.title.startswith("Tracker: "))
+
         # Collect up to 10 uncompleted items in the merged list for instant optimistic advancing on the client
         uncompleted_queue = []
         for item_id, item, is_addition, add_id, add_item_id in merged_items:
@@ -649,7 +651,7 @@ def get_user_up_next(
                 if item_id in completed_or_skipped_item_ids:
                     is_completed = True
                     
-            if not is_completed and item.external_id and item.external_id in completed_or_skipped_external_ids:
+            if is_personal_tracker and not is_completed and item.external_id and item.external_id in completed_or_skipped_external_ids:
                 is_completed = True
                 
             if not is_completed:
