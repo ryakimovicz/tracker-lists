@@ -123,6 +123,9 @@ class UpNextItemResponse(BaseModel):
     image_url: Optional[str] = None
     custom_notes: Optional[str] = None
     section: Optional[str] = None
+    section_title: Optional[str] = None
+    block_title: Optional[str] = None
+    subblock_title: Optional[str] = None
     is_addition: bool = False
     addition_id: Optional[int] = None
     addition_item_id: Optional[int] = None

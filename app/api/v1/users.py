@@ -661,30 +661,46 @@ def get_user_up_next(
         sec_desc = rlist.section_descriptions if isinstance(rlist.section_descriptions, dict) else {}
         flow = sec_desc.get("flow", [])
         flow_importance_by_id = {}
+        flow_location_by_id = {}
         
-        def extract_flow_item_ids(elements, parent_rank=None):
+        def _clean_title(val):
+            if isinstance(val, str):
+                cleaned = val.strip()
+                return cleaned or None
+            return None
+
+        def extract_flow_item_ids(elements, parent_rank=None, inherited_section=None, inherited_block=None):
             ids = []
             if not elements:
                 return ids
+            current_section = inherited_section
             for el in elements:
                 if not isinstance(el, dict):
                     continue
                 el_rank = el.get("importance_rank") if el.get("importance_rank") is not None else parent_rank
-                if el.get("type") == "section":
-                    ids.extend(extract_flow_item_ids(el.get("blocks", []), el_rank))
-                elif el.get("type") == "block":
+                el_type = el.get("type")
+                if el_type == "section":
+                    sec_title = _clean_title(el.get("title"))
+                    current_section = sec_title
+                    if el.get("blocks"):
+                        ids.extend(extract_flow_item_ids(el.get("blocks", []), el_rank, inherited_section=sec_title))
+                elif el_type == "block":
+                    blk_title = _clean_title(el.get("title"))
                     for it in el.get("items", []):
                         if isinstance(it, dict) and "id" in it:
                             ids.append(it["id"])
+                            flow_location_by_id[it["id"]] = (current_section, blk_title, None)
                             if it.get("importance_rank") is not None:
                                 flow_importance_by_id[it["id"]] = it["importance_rank"]
                             elif el_rank is not None:
                                 flow_importance_by_id[it["id"]] = el_rank
-                    ids.extend(extract_flow_item_ids(el.get("subblocks", []), el_rank))
-                elif el.get("type") == "subblock":
+                    ids.extend(extract_flow_item_ids(el.get("subblocks", []), el_rank, inherited_section=current_section, inherited_block=blk_title))
+                elif el_type == "subblock":
+                    sub_title = _clean_title(el.get("title"))
                     for it in el.get("items", []):
                         if isinstance(it, dict) and "id" in it:
                             ids.append(it["id"])
+                            flow_location_by_id[it["id"]] = (current_section, inherited_block, sub_title)
                             if it.get("importance_rank") is not None:
                                 flow_importance_by_id[it["id"]] = it["importance_rank"]
                             elif el_rank is not None:
@@ -764,12 +780,26 @@ def get_user_up_next(
             if not is_add_flag:
                 return flow_importance_by_id.get(it_obj.id)
             return None
+
+        def resolve_location(it_obj, is_add_flag):
+            if not is_add_flag:
+                loc = flow_location_by_id.get(it_obj.id)
+                if loc:
+                    return loc
+            else:
+                after_id = getattr(it_obj, "after_item_id", None)
+                if after_id and after_id in flow_location_by_id:
+                    return flow_location_by_id[after_id]
+            fallback_sec = _clean_title(getattr(it_obj, "section", None))
+            return (fallback_sec, None, None)
                 
         first_uncompleted = uncompleted_queue[0] if uncompleted_queue else None
         if first_uncompleted:
             item, is_addition, add_id, add_item_id = first_uncompleted
-            next_items_payload = [
-                {
+            next_items_payload = []
+            for (nxt_item, nxt_is_add, nxt_add_id, nxt_add_item_id) in uncompleted_queue[1:]:
+                nxt_sec_title, nxt_blk_title, nxt_sub_title = resolve_location(nxt_item, nxt_is_add)
+                next_items_payload.append({
                     "item_id": nxt_item.id,
                     "list_id": rlist.id,
                     "list_title": rlist.title,
@@ -780,13 +810,14 @@ def get_user_up_next(
                     "image_url": nxt_item.image_url,
                     "custom_notes": getattr(nxt_item, "custom_notes", None),
                     "section": getattr(nxt_item, "section", None),
+                    "section_title": nxt_sec_title,
+                    "block_title": nxt_blk_title,
+                    "subblock_title": nxt_sub_title,
                     "is_addition": nxt_is_add,
                     "addition_id": nxt_add_id,
                     "addition_item_id": nxt_add_item_id,
                     "importance_rank": resolve_importance(nxt_item, nxt_is_add),
-                }
-                for (nxt_item, nxt_is_add, nxt_add_id, nxt_add_item_id) in uncompleted_queue[1:]
-            ]
+                })
             item_title_val = item.title
             list_title_val = rlist.title
             
@@ -809,6 +840,7 @@ def get_user_up_next(
                 if item.item_type == 'series' and item_title_val:
                     list_title_val = f"Tracker: {item_title_val}"
 
+            item_sec_title, item_blk_title, item_sub_title = resolve_location(item, is_addition)
             up_next_item = UpNextItemResponse(
                 item_id=item.id,
                 list_id=rlist.id,
@@ -820,6 +852,9 @@ def get_user_up_next(
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
                 section=item.section,
+                section_title=item_sec_title,
+                block_title=item_blk_title,
+                subblock_title=item_sub_title,
                 is_addition=is_addition,
                 addition_id=add_id,
                 addition_item_id=add_item_id,

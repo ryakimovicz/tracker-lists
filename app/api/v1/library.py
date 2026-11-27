@@ -367,6 +367,23 @@ def remove_latest_consumption(
                 item.status = UserLibraryStatusEnum.PLAN_TO_PLAY
             else:
                 item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            # Completely unconsumed (0 remaining): also unmark in all guides
+            if item.external_id:
+                from app.models.item_progress import ItemProgress
+                guide_item_ids = [
+                    r[0] for r in db.query(ListItem.id).filter(
+                        ListItem.external_id == item.external_id
+                    ).all()
+                ]
+                db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.external_id == item.external_id
+                ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+                if guide_item_ids:
+                    db.query(ItemProgress).filter(
+                        ItemProgress.user_id == current_user.id,
+                        ItemProgress.list_item_id.in_(guide_item_ids)
+                    ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
     else:
         # No history entries -> uncomplete
         item.completed_at = None
@@ -377,6 +394,22 @@ def remove_latest_consumption(
             item.status = UserLibraryStatusEnum.PLAN_TO_PLAY
         else:
             item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+        if item.external_id:
+            from app.models.item_progress import ItemProgress
+            guide_item_ids = [
+                r[0] for r in db.query(ListItem.id).filter(
+                    ListItem.external_id == item.external_id
+                ).all()
+            ]
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.external_id == item.external_id
+            ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+            if guide_item_ids:
+                db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.list_item_id.in_(guide_item_ids)
+                ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
             
     db.commit()
     db.refresh(item)
@@ -1466,15 +1499,16 @@ def delete_from_library(
 
         if ext_id:
             ext_ids_to_wipe.add(ext_id)
-            clean_ext = str(ext_id).replace("cv_vol_", "").replace("cv_issue_", "").replace("tvm-ep-", "").replace("tvm_", "").replace("4050-", "").replace("4000-", "")
+            clean_ext = str(ext_id).replace("metron_series_", "").replace("metron_issue_", "").replace("cv_vol_", "").replace("cv_issue_", "").replace("tvm-ep-", "").replace("tvm_", "").replace("4050-", "").replace("4000-", "")
             if clean_ext:
                 ext_ids_to_wipe.add(clean_ext)
+                ext_ids_to_wipe.add(f"metron_series_{clean_ext}")
                 ext_ids_to_wipe.add(f"cv_vol_{clean_ext}")
                 ext_ids_to_wipe.add(f"4050-{clean_ext}")
                 ext_ids_to_wipe.add(f"tvm_{clean_ext}")
 
         # If it was a comic volume, fetch all issues to wipe their history & progress
-        if item_type == "comic" or (ext_id and ("cv_vol_" in str(ext_id) or "4050-" in str(ext_id))):
+        if item_type == "comic" or (ext_id and ("cv_vol_" in str(ext_id) or "metron_series_" in str(ext_id) or "4050-" in str(ext_id))):
             try:
                 from app.services.metron import MetronService
                 cv_issues = MetronService.get_comic_volume_issues(ext_id)
@@ -1482,8 +1516,10 @@ def delete_from_library(
                     for iss in cv_issues:
                         i_id = iss.get("id")
                         if i_id:
-                            str_id = str(i_id).replace("cv_issue_", "").replace("4000-", "")
+                            str_id = str(i_id).replace("cv_issue_", "").replace("metron_issue_", "").replace("4000-", "")
+                            ext_ids_to_wipe.add(f"metron_issue_{str_id}")
                             ext_ids_to_wipe.add(f"cv_issue_{str_id}")
+                            ext_ids_to_wipe.add(f"cv_issue_metron_issue_{str_id}")
                             ext_ids_to_wipe.add(f"4000-{str_id}")
                             ext_ids_to_wipe.add(str_id)
                         if iss.get("external_id"):
@@ -1525,6 +1561,23 @@ def delete_from_library(
         # Wipe ItemProgress, ConsumptionHistory, and MediaReview
         if ext_ids_to_wipe:
             ext_list = list(ext_ids_to_wipe)
+            # Also find any guide ListItem rows matching these external_ids so per-guide progress is unmarked too
+            matching_guide_item_ids = [
+                r[0] for r in db.query(ListItem.id).filter(
+                    ListItem.external_id.in_(ext_list)
+                ).all()
+            ]
+            item_ids_to_wipe.update(matching_guide_item_ids)
+            if item_type == "comic" and lib_item.title:
+                title_clean = lib_item.title.strip()
+                if title_clean:
+                    title_guide_ids = [
+                        r[0] for r in db.query(ListItem.id).filter(
+                            ListItem.item_type == ItemTypeEnum.COMIC,
+                            ListItem.title.ilike(f"{title_clean}%")
+                        ).all()
+                    ]
+                    item_ids_to_wipe.update(title_guide_ids)
             db.query(ItemProgress).filter(
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.external_id.in_(ext_list)
@@ -1573,6 +1626,16 @@ def delete_from_library(
         private_list = db.query(ReadingList).filter(ReadingList.id == tracking_list_id).first()
         if private_list:
             db.delete(private_list)
+
+    # Also remove any duplicate/alias shadow 'from_guide' library row for the same title & type
+    if lib_item.title:
+        db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.item_type == item_type,
+            UserLibraryItem.custom_badge == "from_guide",
+            UserLibraryItem.id != lib_item.id,
+            func.lower(UserLibraryItem.title) == lib_item.title.strip().lower()
+        ).delete(synchronize_session=False)
             
     db.delete(lib_item)
     db.commit()

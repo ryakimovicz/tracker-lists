@@ -10,7 +10,7 @@ elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+")
 
 connect_args = {}
 if db_url.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+    connect_args = {"check_same_thread": False, "timeout": 30}
 
 engine_kwargs = {
     "connect_args": connect_args,
@@ -32,12 +32,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Enforce foreign key constraints for SQLite
+# Enforce foreign key constraints and busy timeout for SQLite
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     if db_url.startswith("sqlite"):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=15000")
         cursor.close()
 
 def get_db():

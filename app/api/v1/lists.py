@@ -1510,6 +1510,16 @@ def toggle_item_progress(
                 "is_single_episode": bool(item.external_id and item.external_id.startswith("tvm-ep-"))
             }
         )
+    else:
+        # Unmarking a guide/tracker item: undo the latest ConsumptionHistory tied to this list_item_id
+        latest_ch = db.query(ConsumptionHistory).filter(
+            ConsumptionHistory.user_id == current_user.id,
+            ConsumptionHistory.list_item_id == item_id
+        ).order_by(ConsumptionHistory.consumed_at.desc(), ConsumptionHistory.id.desc()).first()
+        if latest_ch:
+            db.delete(latest_ch)
+            db.flush()
+        _cleanup_orphan_from_guide_library_items(db, current_user.id)
         
     db.commit()
     return {
@@ -1545,6 +1555,88 @@ def _expand_external_id_variants(ext_id: str) -> list:
     return list(variants)
 
 
+def _cleanup_orphan_from_guide_library_items(db: Session, user_id: int):
+    """Remove shadow 'from_guide' UserLibraryItem rows that no longer have any consumed/completed items."""
+    from app.models.consumption import ConsumptionHistory
+    from sqlalchemy import or_
+
+    from_guide_items = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == user_id,
+        UserLibraryItem.custom_badge == "from_guide"
+    ).all()
+    if not from_guide_items:
+        return
+
+    for lib_item in from_guide_items:
+        has_any = False
+        # 1. Direct external_id match (e.g. movie/book/game/standalone)
+        direct_variants = _expand_external_id_variants(lib_item.external_id or "")
+        if direct_variants:
+            ch_direct = db.query(ConsumptionHistory.id).filter(
+                ConsumptionHistory.user_id == user_id,
+                ConsumptionHistory.external_id.in_(direct_variants)
+            ).first()
+            if ch_direct:
+                has_any = True
+            else:
+                ip_direct = db.query(ItemProgress.id).filter(
+                    ItemProgress.user_id == user_id,
+                    ItemProgress.is_completed == True,
+                    ItemProgress.external_id.in_(direct_variants)
+                ).first()
+                if ip_direct:
+                    has_any = True
+
+        # 2. Parent volume / series match via child ListItems
+        if not has_any and lib_item.title:
+            title_clean = lib_item.title.strip()
+            if title_clean:
+                child_items = db.query(ListItem.id, ListItem.external_id).filter(
+                    ListItem.title.ilike(f"{title_clean}%")
+                ).all()
+                child_ids = [r[0] for r in child_items]
+                child_eids = set()
+                for _, ceid in child_items:
+                    if ceid:
+                        child_eids.update(_expand_external_id_variants(ceid))
+                conds_ch = []
+                conds_ip = []
+                if child_ids:
+                    conds_ch.append(ConsumptionHistory.list_item_id.in_(child_ids))
+                    conds_ip.append(ItemProgress.list_item_id.in_(child_ids))
+                if child_eids:
+                    conds_ch.append(ConsumptionHistory.external_id.in_(list(child_eids)))
+                    conds_ip.append(ItemProgress.external_id.in_(list(child_eids)))
+                if conds_ch:
+                    if db.query(ConsumptionHistory.id).filter(
+                        ConsumptionHistory.user_id == user_id,
+                        or_(*conds_ch)
+                    ).first():
+                        has_any = True
+                if not has_any and conds_ip:
+                    if db.query(ItemProgress.id).filter(
+                        ItemProgress.user_id == user_id,
+                        ItemProgress.is_completed == True,
+                        or_(*conds_ip)
+                    ).first():
+                        has_any = True
+
+        if not has_any:
+            db.delete(lib_item)
+        elif lib_item.title:
+            # Keep last_seen_episode accurate if the previously shown issue/episode was unmarked
+            title_clean = lib_item.title.strip()
+            latest_rem_ip = db.query(ItemProgress, ListItem).join(
+                ListItem, ItemProgress.list_item_id == ListItem.id
+            ).filter(
+                ItemProgress.user_id == user_id,
+                ItemProgress.is_completed == True,
+                ListItem.title.ilike(f"{title_clean}%")
+            ).order_by(ItemProgress.completed_at.desc(), ItemProgress.id.desc()).first()
+            if latest_rem_ip and latest_rem_ip[1].title:
+                lib_item.last_seen_episode = latest_rem_ip[1].title
+
+
 @router.post("/progress/unmark", status_code=status.HTTP_200_OK)
 def unmark_item_progress_by_external_id(
     req: UnmarkProgressRequest,
@@ -1578,6 +1670,21 @@ def unmark_item_progress_by_external_id(
     for p in progs:
         p.is_completed = still_completed
         p.completed_at = new_completed_at
+
+    if not still_completed:
+        # 0 consumptions left: also unmark per-guide ItemProgress rows matching these external_ids
+        matching_guide_lids = [
+            r[0] for r in db.query(ListItem.id).filter(
+                ListItem.external_id.in_(variants)
+            ).all()
+        ]
+        if matching_guide_lids:
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.list_item_id.in_(matching_guide_lids)
+            ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+        db.flush()
+        _cleanup_orphan_from_guide_library_items(db, current_user.id)
 
     db.commit()
     return {
@@ -1669,6 +1776,16 @@ def bulk_toggle_items_progress(
                     "is_single_episode": bool(item.external_id and item.external_id.startswith("tvm-ep-"))
                 }
             )
+
+    if not req_body.completed:
+        from app.models.consumption import ConsumptionHistory
+        if req_body.item_ids:
+            db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.list_item_id.in_(req_body.item_ids)
+            ).delete(synchronize_session=False)
+            db.flush()
+        _cleanup_orphan_from_guide_library_items(db, current_user.id)
             
     db.commit()
     return {"status": "success"}

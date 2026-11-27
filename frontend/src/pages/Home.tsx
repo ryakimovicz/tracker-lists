@@ -507,7 +507,8 @@ const CustomCard = ({
   onRevealCover,
   progressPercent,
   progressLabel,
-  importanceBadge
+  importanceBadge,
+  guideLocationParts
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -532,6 +533,7 @@ const CustomCard = ({
   progressPercent?: number;
   progressLabel?: string;
   importanceBadge?: ImportanceBadgeStyle | null;
+  guideLocationParts?: string[];
 }) => {
   const [activeAction, setActiveAction] = useState<'check' | 'play' | 'skip' | null>(null);
   const actionTimerRef = useRef<any>(null);
@@ -576,7 +578,7 @@ const CustomCard = ({
         boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
         "--title-hover-color": themeColor
       } as React.CSSProperties}
-      className="activity-card activity-card-portrait"
+      className={`activity-card activity-card-portrait${itemType === 'guide' ? ' activity-card-guide' : ''}`}
     >
       <div 
         onClick={onTitleClick ? (e) => { e.stopPropagation(); onTitleClick(e); } : undefined}
@@ -678,14 +680,15 @@ const CustomCard = ({
           </div>
         )}
         {coverBottomText && (
-          <div className={getTagClass(coverBottomText.toLowerCase())} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
+          <div className={getTagClass(coverBottomText.toLowerCase())} style={{ position: "absolute", bottom: "6px", left: "6px", padding: "2px 6px", borderRadius: "6px", fontSize: "0.68rem", fontWeight: 700, opacity: 0.92, backdropFilter: 'blur(4px)', zIndex: 2, pointerEvents: "none" }}>
             {(() => {
+              const key = coverBottomText.toLowerCase();
               if (language === 'es') {
-                const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Juego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
-                return map[coverBottomText.toLowerCase()] || coverBottomText;
+                const map: any = { "movie": "Película", "series": "Serie", "episode": "Serie", "anime": "Anime", "game": "Juego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+                return map[key] || coverBottomText;
               } else {
-                const map: any = { "movie": "Movie", "series": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
-                return map[coverBottomText.toLowerCase()] || coverBottomText;
+                const map: any = { "movie": "Movie", "series": "Series", "episode": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
+                return map[key] || coverBottomText;
               }
             })()}
           </div>
@@ -735,7 +738,7 @@ const CustomCard = ({
         )}
       </div>
       {progressPercent !== undefined && (
-        <div style={{ width: "100%", height: "3px", background: "rgba(255,255,255,0.1)", overflow: "hidden", flexShrink: 0 }}>
+        <div className="card-progress-bar" style={{ width: "100%", height: "3px", background: "rgba(255,255,255,0.1)", overflow: "hidden", flexShrink: 0 }}>
           <div
             style={{
               width: `${Math.min(100, Math.max(0, progressPercent))}%`,
@@ -747,15 +750,89 @@ const CustomCard = ({
         </div>
       )}
       <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: preSubtitle ? "0.75rem" : ((showBoth || showCheckAndSkip) ? "75px" : hasAction ? "40px" : "0.75rem") }}>
-        {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
-        {(subtitle1 || subtitle2) ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: preSubtitle ? ((showBoth || showCheckAndSkip) ? "68px" : hasAction ? "36px" : 0) : 0, minHeight: (preSubtitle && hasAction) ? "30px" : undefined, justifyContent: "center" }}>
-            {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
-            {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
+        {guideLocationParts && guideLocationParts.length > 0 && (
+          <div
+            className="card-guide-location"
+            title={guideLocationParts.join(' › ')}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.08rem",
+              marginBottom: "0.1rem",
+              minWidth: 0
+            }}
+          >
+            {guideLocationParts.map((part, idx) => (
+              <div
+                key={idx}
+                style={{
+                  fontSize: idx === 0 ? "0.68rem" : "0.71rem",
+                  color: idx === 0 ? "var(--text-muted, var(--text-secondary))" : "var(--text-secondary)",
+                  fontWeight: idx === 0 ? 700 : 600,
+                  lineHeight: 1.2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  paddingLeft: idx > 0 ? `${Math.min(idx, 2) * 0.35}rem` : 0
+                }}
+              >
+                {idx > 0 ? `› ${part}` : part}
+              </div>
+            ))}
           </div>
-        ) : (preSubtitle && hasAction) ? (
-          <div style={{ height: "28px" }} />
-        ) : null}
+        )}
+        {preSubtitle && <div className="card-pre-subtitle" style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
+        {(() => {
+          const mobileTypeBadge = itemType === 'guide' && coverBottomText ? (
+            <span
+              className={`card-mobile-type-badge ${getTagClass(coverBottomText.toLowerCase())}`}
+              style={{
+                display: "none",
+                padding: "1px 6px",
+                borderRadius: "4px",
+                fontSize: "0.64rem",
+                fontWeight: 700,
+                lineHeight: 1.25,
+                flexShrink: 0
+              }}
+            >
+              {(() => {
+                const key = coverBottomText.toLowerCase();
+                if (language === 'es') {
+                  const map: any = { "movie": "Película", "series": "Serie", "episode": "Serie", "anime": "Anime", "game": "Juego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+                  return map[key] || coverBottomText;
+                }
+                const map: any = { "movie": "Movie", "series": "Series", "episode": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
+                return map[key] || coverBottomText;
+              })()}
+            </span>
+          ) : null;
+
+          if (subtitle1 || subtitle2) {
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", paddingRight: preSubtitle ? ((showBoth || showCheckAndSkip) ? "68px" : hasAction ? "36px" : 0) : 0, minHeight: (preSubtitle && hasAction) ? "30px" : undefined, justifyContent: "center" }}>
+                {(subtitle1 || mobileTypeBadge) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                    {subtitle1 && <span style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</span>}
+                    {mobileTypeBadge}
+                  </div>
+                )}
+                {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
+              </div>
+            );
+          }
+          if (mobileTypeBadge) {
+            return (
+              <div style={{ display: "flex", alignItems: "center", marginTop: "0.1rem", minHeight: (preSubtitle && hasAction) ? "28px" : undefined }}>
+                {mobileTypeBadge}
+              </div>
+            );
+          }
+          if (preSubtitle && hasAction) {
+            return <div style={{ height: "28px" }} />;
+          }
+          return null;
+        })()}
       </div>
       {showBoth ? (
         <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
@@ -1074,6 +1151,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       // Run queries in parallel for high speed
       const listPromise = item.tracking_list_id
         ? apiClient.get(`/lists/${item.tracking_list_id}`).then(res => res.data.items || []).catch(err => {
+            if (err?.response?.status === 404) {
+              return [];
+            }
             console.error("Failed to load tracking list for Home card", err);
             return getCachedSeries(`list_${item.tracking_list_id}`) || [];
           })
@@ -2800,7 +2880,41 @@ export const Home: React.FC = () => {
   });
   const [showProModal, setShowProModal] = useState(false);
 
+  const pendingGuideOpsRef = useRef<number>(0);
+  const guideOpQueueRef = useRef<Map<number, Promise<void>>>(new Map());
+  const guideQueueNeedsRefetchRef = useRef<boolean>(false);
+
+  const enqueueGuideItemOp = (listId: number, endpoint: string, needsRefetchAfter: boolean) => {
+    pendingGuideOpsRef.current += 1;
+    if (needsRefetchAfter) {
+      guideQueueNeedsRefetchRef.current = true;
+    }
+    const prevChain = guideOpQueueRef.current.get(listId) || Promise.resolve();
+    const nextChain = prevChain
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await apiClient.post(endpoint);
+        } catch (err) {
+          console.error(err);
+          guideQueueNeedsRefetchRef.current = true;
+        } finally {
+          pendingGuideOpsRef.current = Math.max(0, pendingGuideOpsRef.current - 1);
+          if (pendingGuideOpsRef.current === 0) {
+            const shouldRefetch = guideQueueNeedsRefetchRef.current;
+            guideQueueNeedsRefetchRef.current = false;
+            window.dispatchEvent(new CustomEvent('library-updated', { detail: { skipHomeDashboardRefetch: true } }));
+            if (shouldRefetch) {
+              fetchDashboard(true);
+            }
+          }
+        }
+      });
+    guideOpQueueRef.current.set(listId, nextChain);
+  };
+
   const fetchDashboard = async (silent = false) => {
+    const guideOpsAtStart = pendingGuideOpsRef.current;
     try {
       // If we already have items rendered from cache, keep loading false
       if (!silent && libraryItems.length === 0) setLoading(true);
@@ -2821,7 +2935,12 @@ export const Home: React.FC = () => {
         sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
       } catch (e) {}
 
-      if (upNextRes.status === 'fulfilled' && upNextRes.value.data?.guides) {
+      if (
+        upNextRes.status === 'fulfilled' &&
+        upNextRes.value.data?.guides &&
+        guideOpsAtStart === 0 &&
+        pendingGuideOpsRef.current === 0
+      ) {
         setUpNextGuides(upNextRes.value.data.guides);
         try {
           localStorage.setItem('pathd_upnext_cache', JSON.stringify(upNextRes.value.data));
@@ -3033,6 +3152,9 @@ export const Home: React.FC = () => {
     fetchDashboard(libraryItems.length > 0);
 
     const handleLibraryUpdate = (e?: any) => {
+      if ((e as CustomEvent)?.detail?.skipHomeDashboardRefetch) {
+        return;
+      }
       const updatedItem = (e as CustomEvent)?.detail?.item;
       if (updatedItem) {
         setLibraryItems(prev => {
@@ -3093,7 +3215,6 @@ export const Home: React.FC = () => {
   const handleStartConsuming = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
     if (item.item_id || item.is_addition) {
-      const prevGuides = [...upNextGuides];
       const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
       if (nextQueue.length > 0) {
         const [nextItem, ...restQueue] = nextQueue;
@@ -3117,19 +3238,10 @@ export const Home: React.FC = () => {
       } else {
         setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
       }
-      try {
-        const endpoint = item.is_addition
-          ? `/additions/items/additions/${item.addition_item_id}/toggle`
-          : `/lists/items/${item.item_id}/toggle`;
-        await apiClient.post(endpoint);
-        window.dispatchEvent(new Event('library-updated'));
-        if (nextQueue.length <= 1) {
-          fetchDashboard(true);
-        }
-      } catch (err) {
-        console.error(err);
-        setUpNextGuides(prevGuides);
-      }
+      const endpoint = item.is_addition
+        ? `/additions/items/additions/${item.addition_item_id}/toggle`
+        : `/lists/items/${item.item_id}/toggle`;
+      enqueueGuideItemOp(item.list_id, endpoint, nextQueue.length <= 1);
       return;
     }
 
@@ -3163,7 +3275,6 @@ export const Home: React.FC = () => {
       (e.currentTarget as HTMLButtonElement)?.blur();
     } catch {}
     if (item.item_id || item.is_addition) {
-      const prevGuides = [...upNextGuides];
       const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
       if (nextQueue.length > 0) {
         const [nextItem, ...restQueue] = nextQueue;
@@ -3187,19 +3298,10 @@ export const Home: React.FC = () => {
       } else {
         setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
       }
-      try {
-        const endpoint = item.is_addition
-          ? `/additions/items/additions/${item.addition_item_id}/toggle`
-          : `/lists/items/${item.item_id}/toggle`;
-        await apiClient.post(endpoint);
-        window.dispatchEvent(new Event('library-updated'));
-        if (nextQueue.length <= 1) {
-          fetchDashboard(true);
-        }
-      } catch (err) {
-        console.error(err);
-        setUpNextGuides(prevGuides);
-      }
+      const endpoint = item.is_addition
+        ? `/additions/items/additions/${item.addition_item_id}/toggle`
+        : `/lists/items/${item.item_id}/toggle`;
+      enqueueGuideItemOp(item.list_id, endpoint, nextQueue.length <= 1);
       return;
     }
 
@@ -3230,7 +3332,6 @@ export const Home: React.FC = () => {
     try {
       (e.currentTarget as HTMLButtonElement)?.blur();
     } catch {}
-    const prevGuides = [...upNextGuides];
     const nextQueue = Array.isArray(item.next_items) ? item.next_items : [];
     if (nextQueue.length > 0) {
       const [nextItem, ...restQueue] = nextQueue;
@@ -3254,19 +3355,10 @@ export const Home: React.FC = () => {
     } else {
       setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
     }
-    try {
-      const endpoint = item.is_addition
-        ? `/additions/items/additions/${item.addition_item_id}/toggle-skip`
-        : `/lists/items/${item.item_id}/toggle-skip`;
-      await apiClient.post(endpoint);
-      window.dispatchEvent(new Event('library-updated'));
-      if (nextQueue.length <= 1) {
-        fetchDashboard(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setUpNextGuides(prevGuides);
-    }
+    const endpoint = item.is_addition
+      ? `/additions/items/additions/${item.addition_item_id}/toggle-skip`
+      : `/lists/items/${item.item_id}/toggle-skip`;
+    enqueueGuideItemOp(item.list_id, endpoint, nextQueue.length <= 1);
   };
 
   const getGuideImportanceBadge = (rank?: number | null) => getGuideImportanceStyle(rank, language, isLight);
@@ -3292,7 +3384,7 @@ export const Home: React.FC = () => {
     : gameFilter;
 
   const getItemsForTab = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
-    const activeLib = libraryItems;
+    const activeLib = libraryItems.filter(i => i.custom_badge !== 'from_guide');
     if (targetTab === "watching") {
       return activeLib.filter(i => {
       if (i.item_type === "custom") return false;
@@ -3370,7 +3462,7 @@ export const Home: React.FC = () => {
       return true;
     });
   } else if (targetTab === "plan_to_watch") {
-    return libraryItems.filter(i => {
+    return activeLib.filter(i => {
       if (!["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status)) return false;
       if (i.item_type === "custom") return false;
       if (i.badge === "dlc" || i.custom_badge === "dlc" || i.badge === "expansion" || i.custom_badge === "expansion") return false;
@@ -3979,6 +4071,10 @@ export const Home: React.FC = () => {
                 const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
                 const guideProgressPct = g.progress_percentage ?? (effTotal > 0 ? Math.round(((g.completed_count || 0) / effTotal) * 100) : 0);
                 const guideProgressLabel = effTotal > 0 ? `${g.completed_count || 0}/${effTotal} · ${Math.round(guideProgressPct)}%` : undefined;
+                const guideLocationParts = [g.section_title, g.block_title, g.subblock_title]
+                  .map((part: any) => (typeof part === 'string' ? part.trim() : ''))
+                  .filter(Boolean);
+                const guideWorkType = g.item_type === 'episode' ? 'series' : (g.item_type || undefined);
 
                 return (
                   <CustomCard 
@@ -3986,10 +4082,11 @@ export const Home: React.FC = () => {
                     title={g.list_title}
                     coverUrl={g.image_url}
                     itemType="guide"
+                    guideLocationParts={guideLocationParts}
                     preSubtitle={insideTop}
                     themeColor={guideThemeColor}
                     themeTextColor={guideThemeTextColor}
-                    coverBottomText={undefined}
+                    coverBottomText={guideWorkType}
                     subtitle1={bottomText1}
                     subtitle2={bottomText2}
                     progressPercent={effTotal > 0 ? guideProgressPct : undefined}
@@ -4063,6 +4160,10 @@ export const Home: React.FC = () => {
                   const effTotal = Math.max(0, (g.total_count || 0) - (g.skipped_count || 0));
                   const guideProgressPct = g.progress_percentage ?? (effTotal > 0 ? Math.round(((g.completed_count || 0) / effTotal) * 100) : 0);
                   const guideProgressLabel = effTotal > 0 ? `${g.completed_count || 0}/${effTotal} · ${Math.round(guideProgressPct)}%` : undefined;
+                  const guideLocationParts = [g.section_title, g.block_title, g.subblock_title]
+                    .map((part: any) => (typeof part === 'string' ? part.trim() : ''))
+                    .filter(Boolean);
+                  const guideWorkType = g.item_type === 'episode' ? 'series' : (g.item_type || undefined);
 
                   return (
                     <CustomCard 
@@ -4070,10 +4171,11 @@ export const Home: React.FC = () => {
                       title={g.list_title}
                       coverUrl={g.image_url}
                       itemType="guide"
+                      guideLocationParts={guideLocationParts}
                       preSubtitle={insideTop}
                       themeColor={guideThemeColor}
                       themeTextColor={guideThemeTextColor}
-                      coverBottomText={undefined}
+                      coverBottomText={guideWorkType}
                       subtitle1={bottomText1}
                       subtitle2={bottomText2}
                       progressPercent={effTotal > 0 ? guideProgressPct : undefined}
