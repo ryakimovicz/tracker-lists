@@ -570,9 +570,6 @@ export const ViewGuide: React.FC = () => {
       .then(response => {
         setGuide(response.data);
         setIsSaved(!!response.data.is_saved_by_me);
-        setUserRating(response.data.user_rating ?? null);
-        setAverageRating(response.data.average_rating ?? null);
-        setTotalRatings(response.data.total_ratings ?? 0);
         const cachedCollapse = localStorage.getItem(`guide_collapsed_${id}`);
         if (cachedCollapse) {
           try {
