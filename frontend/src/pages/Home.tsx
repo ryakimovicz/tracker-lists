@@ -2252,8 +2252,34 @@ export const Home: React.FC = () => {
     : "watching";
 
   const [activeHomeTab, setActiveHomeTab] = useState<HomeTab>(activeTab);
+  const desktopTabIndicatorRef = useRef<HTMLDivElement | null>(null);
   const isGuidesTabRef = useRef(activeHomeTab === 'guides');
   isGuidesTabRef.current = activeHomeTab === 'guides';
+
+  const moveDesktopTabIndicator = useCallback((targetIdx: number, instant = false) => {
+    const indicator = desktopTabIndicatorRef.current;
+    const el = tabItemRefs.current[targetIdx];
+    if (!indicator || !el) return;
+    if (instant) {
+      indicator.style.transition = 'none';
+    }
+    indicator.style.transform = `translate3d(${el.offsetLeft}px, 0, 0)`;
+    indicator.style.width = `${el.offsetWidth}px`;
+    indicator.style.opacity = '1';
+    if (instant) {
+      void indicator.offsetWidth;
+      indicator.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease';
+    }
+  }, []);
+
+  useEffect(() => {
+    const activeIdx = validHomeTabs.indexOf(activeHomeTab);
+    const idx = activeIdx >= 0 ? activeIdx : 0;
+    moveDesktopTabIndicator(idx, false);
+    const handleResize = () => moveDesktopTabIndicator(idx, true);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeHomeTab, language, moveDesktopTabIndicator]);
 
   useEffect(() => {
     if (!effectiveSearchParams) return;
@@ -4280,6 +4306,10 @@ export const Home: React.FC = () => {
         <div 
           ref={homeTabsContainerRef}
           className="home-tabs-container"
+          onMouseLeave={() => {
+            const activeIdx = validHomeTabs.indexOf(activeHomeTab);
+            moveDesktopTabIndicator(activeIdx >= 0 ? activeIdx : 0);
+          }}
           style={{ 
             display: "flex", 
             gap: "1.75rem", 
@@ -4311,6 +4341,7 @@ export const Home: React.FC = () => {
                 key={tab}
                 ref={el => { tabItemRefs.current[idx] = el; }}
                 onClick={() => handleTabChange(tab as any)}
+                onMouseEnter={() => moveDesktopTabIndicator(idx)}
                 className={`home-tab-item ${isActive ? 'active' : ''}`}
                 data-tab={tab}
                 title={labels[tab]}
@@ -4323,10 +4354,27 @@ export const Home: React.FC = () => {
               >
                 <span className="home-tab-icon">{icons[tab]}</span>
                 <span className="home-tab-label">{labels[tab]}</span>
-                {isActive && <div className="home-tab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
               </div>
             );
           })}
+
+          {/* Sliding Hover & Active Indicator for Desktop Tabs */}
+          <div
+            ref={desktopTabIndicatorRef}
+            className="home-tab-indicator home-desktop-only"
+            style={{
+              position: "absolute",
+              bottom: "-1px",
+              left: 0,
+              width: 0,
+              height: "2px",
+              background: "var(--accent-primary)",
+              opacity: 0,
+              transition: "transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease",
+              pointerEvents: "none",
+              willChange: "transform, width"
+            }}
+          />
 
           {/* Sliding Continuous Indicator for Mobile Tabs */}
           <div className="home-tabs-sliding-indicator home-mobile-only" />

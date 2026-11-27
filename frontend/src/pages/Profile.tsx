@@ -1201,6 +1201,35 @@ export const Profile: React.FC = () => {
     return tabs;
   }, [language, hasMusic]);
 
+  const desktopProfileIndicatorRef = useRef<HTMLDivElement | null>(null);
+
+  const moveDesktopProfileIndicator = useCallback((targetIdx: number, instant = false) => {
+    const indicator = desktopProfileIndicatorRef.current;
+    const el = profileTabBtnRefs.current[targetIdx];
+    const tab = mainTabs[targetIdx];
+    if (!indicator || !el || !tab) return;
+    if (instant) {
+      indicator.style.transition = 'none';
+    }
+    indicator.style.transform = `translate3d(${el.offsetLeft}px, 0, 0)`;
+    indicator.style.width = `${el.offsetWidth}px`;
+    indicator.style.background = tab.color;
+    indicator.style.opacity = '1';
+    if (instant) {
+      void indicator.offsetWidth;
+      indicator.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), background-color 0.16s ease, opacity 0.12s ease';
+    }
+  }, [mainTabs]);
+
+  useEffect(() => {
+    const activeIdx = mainTabs.findIndex(t => t.id === activeProfileTab);
+    const idx = activeIdx >= 0 ? activeIdx : 0;
+    moveDesktopProfileIndicator(idx, false);
+    const handleResize = () => moveDesktopProfileIndicator(idx, true);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeProfileTab, mainTabs, profile, moveDesktopProfileIndicator]);
+
   const isCarouselFilter = (currentProfileStep === 0 && mediaFilter === 'all') ||
     ((hasMusic ? currentProfileStep === 6 : currentProfileStep === 3) && favoritesMediaFilter === 'all');
 
@@ -5470,6 +5499,10 @@ export const Profile: React.FC = () => {
           <div
             ref={profileTabsNavRef}
             className="profile-tabs-nav"
+            onMouseLeave={() => {
+              const activeIdx = mainTabs.findIndex(t => t.id === activeProfileTab);
+              moveDesktopProfileIndicator(activeIdx >= 0 ? activeIdx : 0);
+            }}
             style={{
               display: 'flex',
               borderBottom: '1px solid var(--border-color)',
@@ -5492,6 +5525,7 @@ export const Profile: React.FC = () => {
                   key={tab.id}
                   ref={el => { profileTabBtnRefs.current[idx] = el; }}
                   onClick={() => goToProfileStep(tab.step)}
+                  onMouseEnter={() => moveDesktopProfileIndicator(idx)}
                   className={`profile-tab-btn ${isActive ? 'active' : ''}`}
                   title={tab.label}
                   style={{
@@ -5548,6 +5582,24 @@ export const Profile: React.FC = () => {
                 </button>
               );
             })}
+
+            {/* Sliding Hover & Active Indicator for Desktop Profile Tabs */}
+            <div
+              ref={desktopProfileIndicatorRef}
+              className="profile-tab-desktop-indicator home-desktop-only"
+              style={{
+                position: 'absolute',
+                bottom: '-1px',
+                left: 0,
+                width: 0,
+                height: '2px',
+                background: 'var(--accent-primary)',
+                opacity: 0,
+                transition: 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), background-color 0.16s ease, opacity 0.12s ease',
+                pointerEvents: 'none',
+                willChange: 'transform, width'
+              }}
+            />
 
             {/* Single Continuous Sliding Indicator for Profile Tabs */}
             <div className="profile-tabs-sliding-indicator home-mobile-only" />

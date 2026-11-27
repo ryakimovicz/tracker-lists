@@ -987,6 +987,33 @@ export const Search: React.FC = () => {
 
   const exploreSubtabsContainerRef = useRef<HTMLDivElement>(null);
   const subtabItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const desktopExploreIndicatorRef = useRef<HTMLDivElement | null>(null);
+
+  const moveDesktopExploreIndicator = React.useCallback((targetIdx: number, instant = false) => {
+    const indicator = desktopExploreIndicatorRef.current;
+    const el = subtabItemRefs.current[targetIdx];
+    if (!indicator || !el) return;
+    const color = targetIdx === 1 ? '#f97316' : targetIdx === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
+    if (instant) {
+      indicator.style.transition = 'none';
+    }
+    indicator.style.transform = `translate3d(${el.offsetLeft}px, 0, 0)`;
+    indicator.style.width = `${el.offsetWidth}px`;
+    indicator.style.background = color;
+    indicator.style.opacity = '1';
+    if (instant) {
+      void indicator.offsetWidth;
+      indicator.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), background-color 0.16s ease, opacity 0.12s ease';
+    }
+  }, []);
+
+  useEffect(() => {
+    if (submittedQuery !== '') return;
+    moveDesktopExploreIndicator(currentExploreStep, false);
+    const handleResize = () => moveDesktopExploreIndicator(currentExploreStep, true);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentExploreStep, submittedQuery, language, moveDesktopExploreIndicator]);
 
   const handleScrollProgress = React.useCallback((progress: number) => {
     const clamped = Math.min(2, Math.max(0, progress));
@@ -2023,6 +2050,7 @@ export const Search: React.FC = () => {
           <div 
             ref={exploreSubtabsContainerRef}
             className="explore-subtabs-container"
+            onMouseLeave={() => moveDesktopExploreIndicator(currentExploreStep)}
             style={{ 
               display: "flex", 
               alignItems: "center", 
@@ -2044,6 +2072,7 @@ export const Search: React.FC = () => {
                 ref={el => { subtabItemRefs.current[0] = el; }}
                 className={`explore-subtab-item explore-tab-new ${activeExploreSubTab === 'new' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(0)}
+                onMouseEnter={() => moveDesktopExploreIndicator(0)}
                 title={t('exploreNew')}
                 style={{
                   fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'new' ? 600 : 500,
@@ -2063,9 +2092,6 @@ export const Search: React.FC = () => {
                   <Rocket size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreNew')}</span>
-                {activeExploreSubTab === 'new' && (
-                  <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
-                )}
               </button>
 
               <button 
@@ -2073,6 +2099,7 @@ export const Search: React.FC = () => {
                 ref={el => { subtabItemRefs.current[1] = el; }}
                 className={`explore-subtab-item explore-tab-trending ${activeExploreSubTab === 'trending' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(1)}
+                onMouseEnter={() => moveDesktopExploreIndicator(1)}
                 title={t('exploreTrending')}
                 style={{
                   fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'trending' ? 600 : 500,
@@ -2092,9 +2119,6 @@ export const Search: React.FC = () => {
                   <Flame size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreTrending')}</span>
-                {activeExploreSubTab === 'trending' && (
-                  <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
-                )}
               </button>
 
               <button 
@@ -2102,6 +2126,7 @@ export const Search: React.FC = () => {
                 ref={el => { subtabItemRefs.current[2] = el; }}
                 className={`explore-subtab-item explore-tab-guides ${activeExploreSubTab === 'guides' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(2)}
+                onMouseEnter={() => moveDesktopExploreIndicator(2)}
                 title={t('exploreGuides')}
                 style={{
                   fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'guides' ? 600 : 500,
@@ -2121,10 +2146,25 @@ export const Search: React.FC = () => {
                   <BookOpen size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreGuides')}</span>
-                {activeExploreSubTab === 'guides' && (
-                  <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
-                )}
               </button>
+
+              {/* Sliding Hover & Active Indicator for Desktop Explore Subtabs */}
+              <div
+                ref={desktopExploreIndicatorRef}
+                className="explore-subtab-indicator home-desktop-only"
+                style={{
+                  position: "absolute",
+                  bottom: "-1px",
+                  left: 0,
+                  width: 0,
+                  height: "2px",
+                  background: "var(--accent-primary)",
+                  opacity: 0,
+                  transition: "transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), background-color 0.16s ease, opacity 0.12s ease",
+                  pointerEvents: "none",
+                  willChange: "transform, width"
+                }}
+              />
 
               {/* Sliding Continuous Indicator for Explore Mobile Subtabs */}
               <div className="explore-subtabs-sliding-indicator home-mobile-only" />

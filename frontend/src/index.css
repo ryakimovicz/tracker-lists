@@ -1047,7 +1047,6 @@ h1, h2, h3, h4, h5, h6 {
 
   .profile-tab-btn.active {
     color: var(--tab-color, var(--accent-primary)) !important;
-    border-bottom-color: var(--tab-color, var(--accent-primary)) !important;
     font-weight: 600;
     background: transparent !important;
   }

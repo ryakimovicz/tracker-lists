@@ -39,6 +39,32 @@ export const Social: React.FC = () => {
     : 'following';
 
   const [activeSocialTab, setActiveSocialTab] = useState<SocialTab>(activeTab);
+  const desktopTabIndicatorRef = useRef<HTMLDivElement | null>(null);
+
+  const moveDesktopTabIndicator = useCallback((targetIdx: number, instant = false) => {
+    const indicator = desktopTabIndicatorRef.current;
+    const el = tabItemRefs.current[targetIdx];
+    if (!indicator || !el) return;
+    if (instant) {
+      indicator.style.transition = 'none';
+    }
+    indicator.style.transform = `translate3d(${el.offsetLeft}px, 0, 0)`;
+    indicator.style.width = `${el.offsetWidth}px`;
+    indicator.style.opacity = '1';
+    if (instant) {
+      void indicator.offsetWidth;
+      indicator.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease';
+    }
+  }, []);
+
+  useEffect(() => {
+    const activeIdx = validTabs.indexOf(activeSocialTab);
+    const idx = activeIdx >= 0 ? activeIdx : 0;
+    moveDesktopTabIndicator(idx, false);
+    const handleResize = () => moveDesktopTabIndicator(idx, true);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeSocialTab, language, moveDesktopTabIndicator]);
 
   useEffect(() => {
     if (!effectiveSearchParams) return;
@@ -596,6 +622,10 @@ export const Social: React.FC = () => {
       <div
         ref={socialTabsContainerRef}
         className="social-tabs-container"
+        onMouseLeave={() => {
+          const activeIdx = validTabs.indexOf(activeSocialTab);
+          moveDesktopTabIndicator(activeIdx >= 0 ? activeIdx : 0);
+        }}
         style={{
           display: 'flex',
           gap: '1.75rem',
@@ -608,7 +638,6 @@ export const Social: React.FC = () => {
           background: 'var(--bg-primary)',
           marginTop: '-2rem',
           paddingTop: '1.35rem',
-          overflowX: 'auto',
           '--tab-progress': String(currentSocialStep)
         } as React.CSSProperties}
       >
@@ -620,11 +649,13 @@ export const Social: React.FC = () => {
               key={tab.id}
               ref={el => { tabItemRefs.current[idx] = el; }}
               onClick={() => goToSocialStep(idx)}
+              onMouseEnter={() => moveDesktopTabIndicator(idx)}
               className={`social-tab-item ${isActive ? 'active' : ''}`}
               title={tab.label}
               style={{
                 fontSize: '1.05rem',
                 fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: '0.25rem 0',
                 position: 'relative',
@@ -632,6 +663,7 @@ export const Social: React.FC = () => {
                 alignItems: 'center',
                 gap: '0.5rem',
                 whiteSpace: 'nowrap',
+                transition: 'color 0.15s ease',
                 '--tab-act': isActive ? '1' : '0'
               } as React.CSSProperties}
             >
@@ -639,22 +671,27 @@ export const Social: React.FC = () => {
                 <Icon size={18} />
               </span>
               <span className="social-tab-label">{tab.label}</span>
-              {isActive && (
-                <div
-                  className="social-tab-indicator home-desktop-only"
-                  style={{
-                    position: 'absolute',
-                    bottom: '-0.75rem',
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: 'var(--accent-primary)'
-                  }}
-                />
-              )}
             </div>
           );
         })}
+
+        {/* Sliding Hover & Active Indicator for Desktop Social Tabs */}
+        <div
+          ref={desktopTabIndicatorRef}
+          className="social-tab-indicator home-desktop-only"
+          style={{
+            position: 'absolute',
+            bottom: '-1px',
+            left: 0,
+            width: 0,
+            height: '2px',
+            background: 'var(--accent-primary)',
+            opacity: 0,
+            transition: 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease',
+            pointerEvents: 'none',
+            willChange: 'transform, width'
+          }}
+        />
 
         {/* Sliding Continuous Indicator for Mobile Social Tabs */}
         <div className="social-tabs-sliding-indicator home-mobile-only" />
