@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
@@ -78,6 +78,31 @@ export const ViewGuide: React.FC = () => {
   // Ratings & Reviews state
   const [guideReviews, setGuideReviews] = useState<any[]>([]);
   const [communityTab, setCommunityTab] = useState<'guide' | 'reviews' | 'comments'>('guide');
+  const communityTabRefs = useRef<Record<'guide' | 'reviews' | 'comments', HTMLButtonElement | null>>({
+    guide: null,
+    reviews: null,
+    comments: null,
+  });
+  const communityTabIndicatorRef = useRef<HTMLDivElement | null>(null);
+  const communityTabIndicatorReadyRef = useRef(false);
+
+  const moveCommunityTabIndicator = useCallback((tab: 'guide' | 'reviews' | 'comments', immediate = false) => {
+    const btn = communityTabRefs.current[tab];
+    const ind = communityTabIndicatorRef.current;
+    if (!btn || !ind) return;
+    if (immediate) {
+      ind.style.transition = 'none';
+    } else {
+      ind.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease';
+    }
+    ind.style.transform = `translate3d(${btn.offsetLeft}px, 0, 0)`;
+    ind.style.width = `${btn.offsetWidth}px`;
+    ind.style.opacity = '1';
+    if (immediate) {
+      void ind.offsetWidth;
+      ind.style.transition = 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease';
+    }
+  }, []);
   const [hasAcceptedCommentsSpoiler, setHasAcceptedCommentsSpoiler] = useState(false);
   const [revealedReviewSpoilers, setRevealedReviewSpoilers] = useState<Record<number, boolean>>({});
   const [translatedGuideMap, setTranslatedGuideMap] = useState<Record<string, string>>({});
@@ -95,6 +120,21 @@ export const ViewGuide: React.FC = () => {
 
   // Comments state
   const [comments, setComments] = useState<CommentItem[]>([]);
+
+  useEffect(() => {
+    if (loading || !guide) return;
+    const immediate = !communityTabIndicatorReadyRef.current;
+    const rafId = window.requestAnimationFrame(() => {
+      moveCommunityTabIndicator(communityTab, immediate);
+      communityTabIndicatorReadyRef.current = true;
+    });
+    const onResize = () => moveCommunityTabIndicator(communityTab, true);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [communityTab, loading, guide, language, guideReviews.length, comments.length, moveCommunityTabIndicator]);
   const [newCommentText, setNewCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState<{
     rootCommentId: number;
@@ -1320,67 +1360,91 @@ export const ViewGuide: React.FC = () => {
         </div>
 
         {/* Main Guide / Reviews / Comments Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid var(--border-color)', marginTop: '0.25rem' }}>
+        <div
+          onMouseLeave={() => moveCommunityTabIndicator(communityTab)}
+          style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '1.5rem', borderBottom: '1px solid var(--border-color)', marginTop: '0.25rem' }}
+        >
           <button
+            ref={(el) => { communityTabRefs.current.guide = el; }}
             type="button"
             onClick={() => setCommunityTab('guide')}
+            onMouseEnter={() => moveCommunityTabIndicator('guide')}
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: communityTab === 'guide' ? '2px solid var(--accent-primary)' : '2px solid transparent',
               padding: '0 0 0.75rem 0',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.45rem',
               cursor: 'pointer',
-              color: communityTab === 'guide' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: communityTab === 'guide' ? 'var(--accent-primary)' : 'var(--text-secondary)',
               fontSize: '1.05rem',
-              fontWeight: 700
+              fontWeight: 700,
+              transition: 'color 0.15s ease'
             }}
           >
             <BookOpen size={17} color={communityTab === 'guide' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
             {language === 'es' ? 'Guía' : 'Guide'}
           </button>
           <button
+            ref={(el) => { communityTabRefs.current.reviews = el; }}
             type="button"
             onClick={() => setCommunityTab('reviews')}
+            onMouseEnter={() => moveCommunityTabIndicator('reviews')}
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: communityTab === 'reviews' ? '2px solid var(--accent-primary)' : '2px solid transparent',
               padding: '0 0 0.75rem 0',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.45rem',
               cursor: 'pointer',
-              color: communityTab === 'reviews' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: communityTab === 'reviews' ? 'var(--accent-primary)' : 'var(--text-secondary)',
               fontSize: '1.05rem',
-              fontWeight: 700
+              fontWeight: 700,
+              transition: 'color 0.15s ease'
             }}
           >
-            <Star size={17} color={communityTab === 'reviews' ? '#f59e0b' : 'var(--text-secondary)'} fill={communityTab === 'reviews' ? '#f59e0b' : 'none'} />
+            <Star size={17} color={communityTab === 'reviews' ? 'var(--accent-primary)' : 'var(--text-secondary)'} fill={communityTab === 'reviews' ? 'var(--accent-primary)' : 'none'} />
             {language === 'es' ? 'Reseñas' : 'Reviews'} ({guideReviews.length})
           </button>
           <button
+            ref={(el) => { communityTabRefs.current.comments = el; }}
             type="button"
             onClick={() => setCommunityTab('comments')}
+            onMouseEnter={() => moveCommunityTabIndicator('comments')}
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: communityTab === 'comments' ? '2px solid var(--accent-primary)' : '2px solid transparent',
               padding: '0 0 0.75rem 0',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.45rem',
               cursor: 'pointer',
-              color: communityTab === 'comments' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: communityTab === 'comments' ? 'var(--accent-primary)' : 'var(--text-secondary)',
               fontSize: '1.05rem',
-              fontWeight: 700
+              fontWeight: 700,
+              transition: 'color 0.15s ease'
             }}
           >
             <MessageSquare size={17} color={communityTab === 'comments' ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
             {language === 'es' ? 'Comentarios' : 'Comments'} ({comments.length})
           </button>
+          <div
+            ref={communityTabIndicatorRef}
+            style={{
+              position: 'absolute',
+              bottom: '-1px',
+              left: 0,
+              width: 0,
+              height: '2px',
+              background: 'var(--accent-primary)',
+              opacity: 0,
+              transition: 'transform 0.16s cubic-bezier(0.2, 0, 0, 1), width 0.16s cubic-bezier(0.2, 0, 0, 1), opacity 0.12s ease',
+              pointerEvents: 'none',
+              willChange: 'transform, width'
+            }}
+          />
         </div>
 
         {communityTab === 'guide' ? (
