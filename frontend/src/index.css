@@ -1017,10 +1017,6 @@ h1, h2, h3, h4, h5, h6 {
   transition: color 0.15s ease;
 }
 
-.explore-subtab-item:hover {
-  color: var(--tab-color, var(--accent-primary));
-}
-
 .explore-subtab-item.active,
 .explore-subtab-item.active .explore-subtab-icon,
 .explore-subtab-item.active svg {
@@ -1041,7 +1037,6 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .profile-tab-btn:hover {
-    color: var(--tab-color, var(--accent-primary)) !important;
     background: transparent !important;
   }
 
