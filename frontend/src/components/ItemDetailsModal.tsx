@@ -4,7 +4,8 @@ import { canUseAntiSpoiler, canUseReconsumptionHistory } from '../utils/planPerm
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { shouldShowTranslateButton } from '../utils/languageDetect';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff, ArrowLeft, Languages } from 'lucide-react';
 
 
 
@@ -1521,6 +1522,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(true);
+  const [translatedItemReviews, setTranslatedItemReviews] = useState<Record<number, { text: string; show: boolean; loading?: boolean }>>({});
   const mouseDownOnBackdropRef = useRef(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>(() => {
@@ -1948,6 +1950,32 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    setTranslatedDesc(null);
+    setShowOriginalDesc(true);
+    setTranslatedItemReviews({});
+  }, [language]);
+
+  const handleTranslateItemReview = async (reviewId: number, content: string) => {
+    if (!content?.trim()) return;
+    const existing = translatedItemReviews[reviewId];
+    if (existing?.loading) return;
+    if (existing?.text) {
+      setTranslatedItemReviews(prev => ({ ...prev, [reviewId]: { ...existing, show: !existing.show } }));
+      return;
+    }
+    setTranslatedItemReviews(prev => ({ ...prev, [reviewId]: { text: '', show: false, loading: true } }));
+    try {
+      const res = await apiClient.post('/translate/', { text: content, target_language: language });
+      setTranslatedItemReviews(prev => ({
+        ...prev,
+        [reviewId]: { text: res.data?.translated_text || content, show: true, loading: false }
+      }));
+    } catch {
+      setTranslatedItemReviews(prev => ({ ...prev, [reviewId]: { text: '', show: false, loading: false } }));
+    }
+  };
+
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
     if (translatedDesc) {
@@ -1956,7 +1984,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
     try {
       setIsTranslating(true);
-      const res = await apiClient.post('/translate/', { text: textToTranslate, target_language: 'es' });
+      const res = await apiClient.post('/translate/', { text: textToTranslate, target_language: language });
       if (res.data && res.data.translated_text) {
         setTranslatedDesc(res.data.translated_text);
         setShowOriginalDesc(false);
@@ -7141,8 +7169,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }
 
                     const notes = parseNotes(selectedItem.custom_notes || '');
-                    let cleanText = stripHtml(notes.description || selectedItem.description || initialItem.description || '');
-                    const isTranslatedView = language === 'es' && !showOriginalDesc && translatedDesc;
+                    const rawOriginalDesc = stripHtml(notes.description || selectedItem.description || initialItem.description || '');
+                    let cleanText = rawOriginalDesc;
+                    const isTranslatedView = !showOriginalDesc && translatedDesc;
                     if (isTranslatedView) {
                       cleanText = stripHtml(translatedDesc);
                     }
@@ -7181,8 +7210,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               )}
                             </p>
                             
-                            {language === 'es' && (
+                            {user && (!showOriginalDesc || shouldShowTranslateButton(rawOriginalDesc, language)) && (
                               <button
+                                type="button"
                                 onClick={() => {
                                   if (showOriginalDesc) {
                                     handleTranslateDescription(notes.description || selectedItem.description || initialItem.description || '');
@@ -7193,23 +7223,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 disabled={isTranslating}
                                 style={{
                                   background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--text-muted)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '4px',
+                                  color: !showOriginalDesc ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                   cursor: isTranslating ? 'wait' : 'pointer',
                                   fontWeight: 500,
-                                  fontSize: '0.8rem',
-                                  marginTop: '0.35rem',
-                                  padding: 0,
-                                  display: 'flex',
+                                  fontSize: '0.75rem',
+                                  marginTop: '0.45rem',
+                                  padding: '0.2rem 0.5rem',
+                                  display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.25rem',
+                                  gap: '0.3rem',
                                   opacity: isTranslating ? 0.7 : 1
                                 }}
                               >
-                                <Globe size={13} style={{ display: 'inline', marginRight: '4px' }} />
-                                {isTranslating 
-                                  ? 'Traduciendo...' 
-                                  : (showOriginalDesc ? 'Ver traducción' : 'Mostrar texto original')
+                                <Languages size={12} />
+                                {isTranslating
+                                  ? (language === 'es' ? 'Traduciendo...' : 'Translating...')
+                                  : (showOriginalDesc
+                                      ? (language === 'es' ? 'Traducir' : 'Translate')
+                                      : (language === 'es' ? 'Ver original' : 'Show original'))
                                 }
                               </button>
                             )}
@@ -10405,7 +10438,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                     return (
                                       <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                                        {renderReviewContent(rootNode.content)}
+                                        {renderReviewContent(translatedItemReviews[rootNode.id]?.show ? translatedItemReviews[rootNode.id].text : rootNode.content)}
                                       </p>
                                     );
                                   })()}
@@ -10434,6 +10467,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 <ThumbsUp size={12} fill={rootNode.is_voted_by_me ? '#3b82f6' : 'none'} />
                                 <span>{rootNode.vote_count || 0}</span>
                               </button>
+
+                              {user && !rootNode.is_deleted && rootNode.content && (!rootNode.is_spoiler || revealedSpoilers[rootNode.id]) && (translatedItemReviews[rootNode.id]?.show || shouldShowTranslateButton(rootNode.content, language)) && (
+                                <button
+                                  type="button"
+                                  disabled={translatedItemReviews[rootNode.id]?.loading}
+                                  onClick={() => handleTranslateItemReview(rootNode.id, rootNode.content)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px solid var(--border-color)',
+                                    color: translatedItemReviews[rootNode.id]?.show ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                    borderRadius: '4px',
+                                    padding: '0.2rem 0.5rem',
+                                    fontSize: '0.75rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <Languages size={12} />
+                                  <span>
+                                    {translatedItemReviews[rootNode.id]?.loading
+                                      ? '...'
+                                      : translatedItemReviews[rootNode.id]?.show
+                                        ? (language === 'es' ? 'Ver original' : 'Show original')
+                                        : (language === 'es' ? 'Traducir' : 'Translate')}
+                                  </span>
+                                </button>
+                              )}
 
                               {user && activeBottomTab === 'comments' && (
                                 <button
@@ -10701,7 +10763,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         <>
                                           {reply.content && (
                                             <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                              {renderReviewContent(reply.content)}
+                                              {renderReviewContent(translatedItemReviews[reply.id]?.show ? translatedItemReviews[reply.id].text : reply.content)}
                                             </p>
                                           )}
                                           {renderMediaAttachment(reply.media_url, reply.media_type)}
@@ -10728,6 +10790,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
                                             <span>{reply.vote_count || 0}</span>
                                           </button>
+
+                                          {user && !reply.is_deleted && reply.content && (translatedItemReviews[reply.id]?.show || shouldShowTranslateButton(reply.content, language)) && (
+                                            <button
+                                              type="button"
+                                              disabled={translatedItemReviews[reply.id]?.loading}
+                                              onClick={() => handleTranslateItemReview(reply.id, reply.content)}
+                                              style={{
+                                                background: 'transparent',
+                                                border: '1px solid var(--border-color)',
+                                                color: translatedItemReviews[reply.id]?.show ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                borderRadius: '4px',
+                                                padding: '0.15rem 0.45rem',
+                                                fontSize: '0.73rem',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              <Languages size={11} />
+                                              <span>
+                                                {translatedItemReviews[reply.id]?.loading
+                                                  ? '...'
+                                                  : translatedItemReviews[reply.id]?.show
+                                                    ? (language === 'es' ? 'Ver original' : 'Show original')
+                                                    : (language === 'es' ? 'Traducir' : 'Translate')}
+                                              </span>
+                                            </button>
+                                          )}
 
                                           {user && (
                                             <button

@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { getUserPlanTier } from '../utils/planPermissions';
+import { shouldShowTranslateButton } from '../utils/languageDetect';
 import {
   ChevronDown,
   ChevronRight,
@@ -848,7 +849,18 @@ export const ViewGuide: React.FC = () => {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{tGuide(guide.title)}</h1>
-            {currentUser && (
+            {currentUser && (() => {
+              const sampleText = [
+                guide.title,
+                guide.description,
+                ...(guide.section_descriptions?.flow || []).flatMap((el: any) => [
+                  el.title,
+                  el.description,
+                  ...(el.subblocks || []).flatMap((s: any) => [s.title, s.description])
+                ])
+              ].filter(Boolean).join(' ');
+              return isGuideTranslated || shouldShowTranslateButton(sampleText, language);
+            })() && (
               <button
                 type="button"
                 onClick={handleTranslateGuide}
@@ -1826,7 +1838,7 @@ export const ViewGuide: React.FC = () => {
                         <ThumbsUp size={12} fill={rev.user_has_voted ? '#3b82f6' : 'none'} />
                         <span>{rev.votes_count || 0}</span>
                       </button>
-                      {currentUser && rev.content && !isSpoilerHidden && (
+                      {currentUser && rev.content && !isSpoilerHidden && (translatedReviews[rev.id]?.show || shouldShowTranslateButton(rev.content, language)) && (
                         <button
                           type="button"
                           disabled={translatedReviews[rev.id]?.loading}
@@ -2198,7 +2210,7 @@ export const ViewGuide: React.FC = () => {
                             <span>{node.vote_count}</span>
                           </button>
                         )}
-                        {currentUser && !node.is_deleted && node.content && (
+                        {currentUser && !node.is_deleted && node.content && (translatedComments[node.id]?.show || shouldShowTranslateButton(node.content, language)) && (
                           <button
                             type="button"
                             disabled={translatedComments[node.id]?.loading}
@@ -2441,7 +2453,7 @@ export const ViewGuide: React.FC = () => {
                                       <span>{reply.vote_count}</span>
                                     </button>
                                   )}
-                                  {currentUser && !reply.is_deleted && reply.content && (
+                                  {currentUser && !reply.is_deleted && reply.content && (translatedComments[reply.id]?.show || shouldShowTranslateButton(reply.content, language)) && (
                                     <button
                                       type="button"
                                       disabled={translatedComments[reply.id]?.loading}
