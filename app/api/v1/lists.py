@@ -45,6 +45,40 @@ from app.schemas.list import (
 
 router = APIRouter()
 
+def _extract_flow_item_ids(flow) -> set:
+    ids = set()
+    if not isinstance(flow, list):
+        return ids
+    for el in flow:
+        if not isinstance(el, dict):
+            continue
+        for it in (el.get("items") or []):
+            if isinstance(it, dict) and it.get("id") is not None:
+                ids.add(it["id"])
+        for sub in (el.get("subblocks") or []):
+            if isinstance(sub, dict):
+                for si in (sub.get("items") or []):
+                    if isinstance(si, dict) and si.get("id") is not None:
+                        ids.add(si["id"])
+        for blk in (el.get("blocks") or []):
+            ids.update(_extract_flow_item_ids([blk]))
+    return ids
+
+
+def _get_guide_visible_items(rl: ReadingList) -> list:
+    all_items = rl.items or []
+    sec_desc = rl.section_descriptions if isinstance(rl.section_descriptions, dict) else {}
+    flow = sec_desc.get("flow")
+    if not flow and rl.visibility == VisibilityEnum.DRAFT:
+        flow = sec_desc.get("draft_flow")
+    flow_ids = _extract_flow_item_ids(flow)
+    if flow_ids:
+        filtered = [it for it in all_items if it.id in flow_ids]
+        if filtered:
+            return filtered
+    return all_items
+
+
 # 0. Explore Guides: Populares, Mejor Valoradas, Más Guardadas, Nuevas
 @router.get("/explore", response_model=ExploreGuidesResponse)
 def get_explore_guides(db: Session = Depends(get_db)):
@@ -55,17 +89,20 @@ def get_explore_guides(db: Session = Depends(get_db)):
 
     guide_items = []
     for l in lists:
-        if len(l.items) < 2:
+        visible_items = _get_guide_visible_items(l)
+        if len(visible_items) < 2:
             continue
 
         covers = []
         media_types = set()
-        for it in l.items:
+        media_type_counts = {}
+        for it in visible_items:
             if it.image_url and it.image_url not in covers and len(covers) < 4:
                 covers.append(it.image_url)
             if it.item_type:
-                m_type = it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)
+                m_type = (it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)).lower()
                 media_types.add(m_type)
+                media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
 
         votes = l.votes or []
         saves = l.saved_by_users or []
@@ -96,12 +133,13 @@ def get_explore_guides(db: Session = Depends(get_db)):
             creator_id=l.creator_id,
             creator_username=creator_name,
             creator_photo_url=creator_photo,
-            items_count=len(l.items),
+            items_count=len(visible_items),
             saves_count=saves_count,
             votes_count=votes_count,
             average_rating=avg_rating,
             covers=covers,
             media_types=sorted(list(media_types)),
+            media_type_counts=media_type_counts,
             accent_color=guide_accent,
             banner_url=guide_banner
         )

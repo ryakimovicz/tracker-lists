@@ -19,6 +19,7 @@ import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, updateCachedShelfItem, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 import { SwipeViewPager } from '../components/SwipeViewPager';
+import { GuideMediaTypeBar } from '../components/GuideMediaTypeBar';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock, Tag, RefreshCw, Zap } from 'lucide-react';
 
@@ -36,6 +37,7 @@ interface SearchResultItem {
   cv_id?: string;
   metron_id?: string;
   covers?: string[];
+  media_type_counts?: Record<string, number>;
   accent_color?: string | null;
   banner_url?: string | null;
   items_count?: number;
@@ -675,6 +677,8 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                   </div>
                 )}
               </div>
+
+              <GuideMediaTypeBar mediaTypeCounts={guide.media_type_counts} language={language} />
 
               {/* Body Content */}
               <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
@@ -2297,6 +2301,8 @@ export const Search: React.FC = () => {
                         </div>
                       )}
                     </div>
+
+                    <GuideMediaTypeBar mediaTypeCounts={item.media_type_counts} language={language} />
 
                     {/* Body Content + Follow (+) button */}
                     <div

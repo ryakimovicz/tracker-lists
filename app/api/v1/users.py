@@ -147,15 +147,21 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
 
 
 def _enrich_reading_list_response(rl: ReadingList, can_edit: bool = True) -> ReadingListResponse:
+    from app.api.v1.lists import _get_guide_visible_items
     rl_data = ReadingListResponse.model_validate(rl)
     rl_data.can_edit = can_edit
-    items = rl.items or []
+    items = _get_guide_visible_items(rl)
     rl_data.items_count = len(items)
     covers = []
+    media_type_counts = {}
     for it in items:
         if it.image_url and it.image_url not in covers and len(covers) < 4:
             covers.append(it.image_url)
+        if it.item_type:
+            m_type = (it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)).lower()
+            media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
     rl_data.covers = covers
+    rl_data.media_type_counts = media_type_counts
     votes = rl.votes or []
     if votes:
         valid_ratings = [v.rating for v in votes if v.rating is not None]

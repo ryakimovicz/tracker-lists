@@ -467,10 +467,16 @@ def search_all_media(
                     sec_desc = g.section_descriptions if isinstance(g.section_descriptions, dict) else {}
                     guide_accent = sec_desc.get("accent_color") if creator_is_pro else None
                     guide_banner = sec_desc.get("banner_url") if creator_is_pro else None
+                    from app.api.v1.lists import _get_guide_visible_items
+                    visible_items = _get_guide_visible_items(g)
                     covers = []
-                    for it in (g.items or []):
+                    media_type_counts = {}
+                    for it in visible_items:
                         if it.image_url and it.image_url not in covers and len(covers) < 4:
                             covers.append(it.image_url)
+                        if it.item_type:
+                            m_type = (it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)).lower()
+                            media_type_counts[m_type] = media_type_counts.get(m_type, 0) + 1
                     votes = g.votes or []
                     votes_count = len(votes)
                     avg_rating = round(sum(v.rating for v in votes if v.rating is not None) / votes_count, 1) if votes_count > 0 else None
@@ -485,9 +491,10 @@ def search_all_media(
                         creator=creator_name,
                         creator_photo_url=creator_photo,
                         covers=covers,
+                        media_type_counts=media_type_counts,
                         accent_color=guide_accent,
                         banner_url=guide_banner,
-                        items_count=len(g.items or []),
+                        items_count=len(visible_items),
                         saves_count=saves_count,
                         average_rating=avg_rating
                     ))

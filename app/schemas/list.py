@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 from app.models.list import VisibilityEnum
 from app.models.list_item import ItemTypeEnum
@@ -70,6 +70,7 @@ class ReadingListResponse(ReadingListBase):
     saves_count: int = 0
     average_rating: Optional[float] = None
     covers: List[str] = []
+    media_type_counts: Dict[str, int] = {}
     accent_color: Optional[str] = None
     banner_url: Optional[str] = None
 
@@ -148,6 +149,7 @@ class ExploreGuideItem(BaseModel):
     average_rating: Optional[float] = None
     covers: List[str] = []
     media_types: List[str] = []
+    media_type_counts: Dict[str, int] = {}
     accent_color: Optional[str] = None
     banner_url: Optional[str] = None
 

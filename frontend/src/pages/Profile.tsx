@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { GuideMediaTypeBar } from '../components/GuideMediaTypeBar';
 import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
@@ -3769,7 +3770,7 @@ export const Profile: React.FC = () => {
             </div>
           )}
 
-          {!isSaved && isOwnProfile && (
+          {isOwnProfile && (
             <span
               className="guide-visibility-badge"
               style={{
@@ -3790,6 +3791,8 @@ export const Profile: React.FC = () => {
             </span>
           )}
         </div>
+
+        <GuideMediaTypeBar mediaTypeCounts={list.media_type_counts} language={language} />
 
         <div
           className="card-body-content"
@@ -4008,7 +4011,7 @@ export const Profile: React.FC = () => {
         {/* Desktop View */}
         <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
           {/* Desktop Sub-tabs Pills */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
               <button
                 type="button"
@@ -4053,46 +4056,28 @@ export const Profile: React.FC = () => {
                 <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
               </button>
             </div>
+            {canExpandCreated && (
+              <button
+                type="button"
+                onClick={handleToggleCreatedGuidesExpanded}
+                className="shelf-view-toggle-btn"
+                title={isCreatedGuidesExpanded
+                  ? (language === 'es' ? 'Contraer' : 'Collapse')
+                  : (language === 'es' ? 'Expandir' : 'Expand')
+                }
+                aria-label={isCreatedGuidesExpanded
+                  ? (language === 'es' ? 'Contraer' : 'Collapse')
+                  : (language === 'es' ? 'Expandir' : 'Expand')
+                }
+                style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+              >
+                {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            )}
           </div>
 
           {/* Created Guides Section */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    padding: '0.15rem 0.55rem',
-                    borderRadius: '12px',
-                    background: 'rgba(45, 212, 191, 0.15)',
-                    color: 'var(--color-guide, #2DD4BF)',
-                    border: '1px solid rgba(45, 212, 191, 0.3)'
-                  }}
-                >
-                  {profile.created_lists.length}
-                </span>
-              </div>
-              {canExpandCreated && (
-                <button
-                  type="button"
-                  onClick={handleToggleCreatedGuidesExpanded}
-                  className="shelf-view-toggle-btn"
-                  title={isCreatedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  aria-label={isCreatedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                >
-                  {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              )}
-            </div>
 
             {profile.created_lists.length === 0 ? (
               <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -4278,7 +4263,7 @@ export const Profile: React.FC = () => {
         {/* Desktop View */}
         <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
           {/* Desktop Sub-tabs Pills */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
               <button
                 type="button"
@@ -4323,46 +4308,28 @@ export const Profile: React.FC = () => {
                 <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
               </button>
             </div>
+            {canExpandSaved && (
+              <button
+                type="button"
+                onClick={handleToggleSavedGuidesExpanded}
+                className="shelf-view-toggle-btn"
+                title={isSavedGuidesExpanded
+                  ? (language === 'es' ? 'Contraer' : 'Collapse')
+                  : (language === 'es' ? 'Expandir' : 'Expand')
+                }
+                aria-label={isSavedGuidesExpanded
+                  ? (language === 'es' ? 'Contraer' : 'Collapse')
+                  : (language === 'es' ? 'Expandir' : 'Expand')
+                }
+                style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+              >
+                {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            )}
           </div>
 
           {/* Saved Guides Section */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    padding: '0.15rem 0.55rem',
-                    borderRadius: '12px',
-                    background: 'rgba(45, 212, 191, 0.15)',
-                    color: 'var(--color-guide, #2DD4BF)',
-                    border: '1px solid rgba(45, 212, 191, 0.3)'
-                  }}
-                >
-                  {profile.saved_lists.length}
-                </span>
-              </div>
-              {canExpandSaved && (
-                <button
-                  type="button"
-                  onClick={handleToggleSavedGuidesExpanded}
-                  className="shelf-view-toggle-btn"
-                  title={isSavedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  aria-label={isSavedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                >
-                  {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              )}
-            </div>
 
             {profile.saved_lists.length === 0 ? (
               <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
