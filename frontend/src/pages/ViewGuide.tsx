@@ -2286,7 +2286,7 @@ export const ViewGuide: React.FC = () => {
                           <button
                             type="button"
                             disabled={translatedComments[node.id]?.loading}
-                            onClick={() => handleTranslateComment(node.id, node.content)}
+                            onClick={() => handleTranslateComment(node.id, node.content || '')}
                             style={{
                               background: 'transparent',
                               border: '1px solid var(--border-color)',
@@ -2529,7 +2529,7 @@ export const ViewGuide: React.FC = () => {
                                     <button
                                       type="button"
                                       disabled={translatedComments[reply.id]?.loading}
-                                      onClick={() => handleTranslateComment(reply.id, reply.content)}
+                                      onClick={() => handleTranslateComment(reply.id, reply.content || '')}
                                       style={{
                                         background: 'transparent',
                                         border: '1px solid var(--border-color)',
