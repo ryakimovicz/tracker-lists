@@ -460,14 +460,36 @@ def search_all_media(
                 ext_id = str(g.id)
                 if ext_id not in seen:
                     seen.add(ext_id)
-                    creator_name = g.creator.username if g.creator else "Usuario"
+                    creator_name = g.creator.username if g.creator else "Comunidad de Pathd"
+                    creator_photo = getattr(g.creator, 'photo_url', None) or getattr(g.creator, 'profile_image_url', None) if g.creator else None
+                    from app.api.v1.users import check_user_is_pro
+                    creator_is_pro = check_user_is_pro(g.creator) if g.creator else False
+                    sec_desc = g.section_descriptions if isinstance(g.section_descriptions, dict) else {}
+                    guide_accent = sec_desc.get("accent_color") if creator_is_pro else None
+                    guide_banner = sec_desc.get("banner_url") if creator_is_pro else None
+                    covers = []
+                    for it in (g.items or []):
+                        if it.image_url and it.image_url not in covers and len(covers) < 4:
+                            covers.append(it.image_url)
+                    votes = g.votes or []
+                    votes_count = len(votes)
+                    avg_rating = round(sum(v.rating for v in votes if v.rating is not None) / votes_count, 1) if votes_count > 0 else None
+                    saves_count = len(g.saved_by_users or [])
                     combined.append(SearchResultItem(
                         external_id=ext_id,
                         title=g.title,
-                        image_url="",
+                        image_url=guide_banner or (covers[0] if covers else ""),
                         description=g.description or f"Guía creada por {creator_name}",
                         item_type="guide",
-                        popularity=10.0
+                        popularity=10.0,
+                        creator=creator_name,
+                        creator_photo_url=creator_photo,
+                        covers=covers,
+                        accent_color=guide_accent,
+                        banner_url=guide_banner,
+                        items_count=len(g.items or []),
+                        saves_count=saves_count,
+                        average_rating=avg_rating
                     ))
 
     user_category_order = None

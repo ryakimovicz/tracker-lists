@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Monitor, Star } from 'lucide-react';
+import { Monitor, Star, X } from 'lucide-react';
 import { BackgroundSelectorModal } from './BackgroundSelectorModal';
 
 interface GuideBackgroundPickerProps {
@@ -9,12 +9,14 @@ interface GuideBackgroundPickerProps {
   onChange: (url: string | null) => void;
   currentUser: any;
   language: string;
+  compact?: boolean;
 }
 
 export const GuideBackgroundPicker: React.FC<GuideBackgroundPickerProps> = ({
   backgroundUrl,
   onChange,
-  language
+  language,
+  compact = false
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isOpen, setIsOpen] = useState(() => searchParams.get('bg') === '1');
@@ -37,6 +39,65 @@ export const GuideBackgroundPicker: React.FC<GuideBackgroundPickerProps> = ({
       setIsOpen(false);
     }
   }, [searchParams]);
+
+  if (compact) {
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="btn-secondary"
+          title={backgroundUrl
+            ? (language === 'es' ? 'Cambiar fondo de la guía' : 'Change guide background')
+            : (language === 'es' ? 'Elegir fondo de la guía' : 'Choose guide background')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            height: '38px',
+            padding: '0.4rem 0.85rem',
+            fontSize: '0.82rem'
+          }}
+        >
+          <Monitor size={15} />
+          <span>{language === 'es' ? 'Fondo' : 'Background'}</span>
+          <span style={{ fontSize: '0.62rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
+            <Star size={9} fill="#f59e0b" />
+          </span>
+        </button>
+        {backgroundUrl && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="btn-secondary"
+            title={language === 'es' ? 'Quitar fondo' : 'Remove background'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '38px',
+              width: '34px',
+              padding: 0,
+              color: '#ef4444'
+            }}
+          >
+            <X size={15} />
+          </button>
+        )}
+
+        {createPortal(
+          <BackgroundSelectorModal
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            currentBackgroundUrl={backgroundUrl}
+            onBackgroundUpdated={(newUrl) => onChange(newUrl)}
+            mode="guide"
+          />,
+          document.body
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>

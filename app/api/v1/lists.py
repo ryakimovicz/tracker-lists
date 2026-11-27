@@ -82,7 +82,11 @@ def get_explore_guides(db: Session = Depends(get_db)):
         pop_score = (saves_count * 3) + (votes_count * 2) + (comments_count * 2)
 
         creator_name = l.creator.username if l.creator else "Comunidad de Pathd"
-        creator_photo = getattr(l.creator, 'profile_image_url', None) if l.creator else None
+        creator_photo = getattr(l.creator, 'photo_url', None) or getattr(l.creator, 'profile_image_url', None) if l.creator else None
+        creator_is_pro = check_user_is_pro(l.creator) if l.creator else False
+        sec_desc = l.section_descriptions if isinstance(l.section_descriptions, dict) else {}
+        guide_accent = sec_desc.get("accent_color") if creator_is_pro else None
+        guide_banner = sec_desc.get("banner_url") if creator_is_pro else None
 
         guide_item = ExploreGuideItem(
             id=l.id,
@@ -97,7 +101,9 @@ def get_explore_guides(db: Session = Depends(get_db)):
             votes_count=votes_count,
             average_rating=avg_rating,
             covers=covers,
-            media_types=sorted(list(media_types))
+            media_types=sorted(list(media_types)),
+            accent_color=guide_accent,
+            banner_url=guide_banner
         )
         guide_items.append((guide_item, pop_score, avg_rating or 0, saves_count, l.created_at))
 
@@ -387,6 +393,14 @@ def get_list_details(
     
     creator = db.query(User).filter(User.id == reading_list.creator_id).first() if reading_list.creator_id else None
     creator_username = creator.username if creator else "Comunidad de Pathd"
+    creator_plan_tier = None
+    if creator:
+        if getattr(creator, 'is_vip', False) or getattr(creator, 'is_admin', False):
+            creator_plan_tier = "vip"
+        elif check_user_is_pro(creator):
+            creator_plan_tier = "pro"
+        else:
+            creator_plan_tier = "free"
 
     # Calculate edit permissions
     can_edit = False
@@ -630,6 +644,7 @@ def get_list_details(
         created_at=reading_list.created_at,
         creator_username=creator_username,
         creator_photo_url=creator.photo_url if creator else None,
+        creator_plan_tier=creator_plan_tier,
         is_saved_by_me=is_saved_by_me,
         can_edit=can_edit,
         completed_count=completed_count,

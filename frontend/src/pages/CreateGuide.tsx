@@ -6,7 +6,11 @@ import { apiClient } from '../api/client';
 import { SearchPanel } from '../components/SearchPanel';
 import { GuideBannerPicker } from '../components/GuideBannerPicker';
 import { GuideBackgroundPicker } from '../components/GuideBackgroundPicker';
+import { GuideAccentColorPicker } from '../components/GuideAccentColorPicker';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
+import { canCustomizeColor } from '../utils/planPermissions';
 import {
   ArrowRight,
   PlusCircle,
@@ -354,6 +358,9 @@ export const CreateGuide: React.FC = () => {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerItemType, setBannerItemType] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  const [accentColor, setAccentColor] = useState<string | null>(null);
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const [sectionBannerTargetId, setSectionBannerTargetId] = useState<string | null>(null);
 
   // Step 2: Word-style Document Flow Editor state
@@ -461,6 +468,7 @@ export const CreateGuide: React.FC = () => {
       setBannerUrl(savedStructure?.banner_url || null);
       setBannerItemType(savedStructure?.banner_item_type || null);
       setBackgroundUrl(savedStructure?.background_url || null);
+      setAccentColor(savedStructure?.accent_color || null);
     }
   }, [guide]);
 
@@ -503,7 +511,8 @@ export const CreateGuide: React.FC = () => {
           draft_description: description.trim(),
           banner_url: bannerUrl,
           banner_item_type: bannerItemType,
-          background_url: backgroundUrl
+          background_url: backgroundUrl,
+          accent_color: accentColor
         };
         await apiClient.put(`/lists/${guide.id}`, {
           section_descriptions: updatedSecDesc
@@ -518,7 +527,7 @@ export const CreateGuide: React.FC = () => {
     }, 1500);
 
     return () => clearTimeout(delayDebounce);
-  }, [docFlow, title, description, bannerUrl, bannerItemType, backgroundUrl, guide?.id]);
+  }, [docFlow, title, description, bannerUrl, bannerItemType, backgroundUrl, accentColor, guide?.id]);
 
   const handleCreateGuideSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -582,6 +591,7 @@ export const CreateGuide: React.FC = () => {
           banner_url: bannerUrl,
           banner_item_type: bannerItemType,
           background_url: backgroundUrl,
+          accent_color: accentColor,
           intended_visibility: visibility
         }
       });
@@ -593,7 +603,8 @@ export const CreateGuide: React.FC = () => {
           : initialFlow,
         banner_url: createdGuide.section_descriptions?.banner_url ?? bannerUrl,
         banner_item_type: createdGuide.section_descriptions?.banner_item_type ?? bannerItemType,
-        background_url: createdGuide.section_descriptions?.background_url ?? backgroundUrl
+        background_url: createdGuide.section_descriptions?.background_url ?? backgroundUrl,
+        accent_color: createdGuide.section_descriptions?.accent_color ?? accentColor
       };
       setGuide(createdGuide);
       setDocFlow(initialFlow);
@@ -621,7 +632,8 @@ export const CreateGuide: React.FC = () => {
         draft_description: description.trim(),
         banner_url: bannerUrl,
         banner_item_type: bannerItemType,
-        background_url: backgroundUrl
+        background_url: backgroundUrl,
+        accent_color: accentColor
       };
       
       const response = await apiClient.put(`/lists/${guide.id}`, {
@@ -1774,8 +1786,12 @@ export const CreateGuide: React.FC = () => {
   }
 
 
+  const activeGuideAccentVars = (accentColor && canCustomizeColor(currentUser))
+    ? getProfileTheme(accentColor, isLight).cssVariables
+    : undefined;
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left', ...(activeGuideAccentVars || {}) }}>
 
       
       {errorMsg && (
@@ -1840,6 +1856,15 @@ export const CreateGuide: React.FC = () => {
                 onChange={(url) => setBackgroundUrl(url)}
                 currentUser={currentUser}
                 language={language}
+              />
+            </div>
+            <div>
+              <GuideAccentColorPicker
+                accentColor={accentColor}
+                onChange={(colorId) => setAccentColor(colorId)}
+                currentUser={currentUser}
+                language={language}
+                onRequirePro={() => setShowProModal(true)}
               />
             </div>
             <div>
@@ -1994,8 +2019,23 @@ export const CreateGuide: React.FC = () => {
                 ) : null}
               </div>
 
-              {/* Target visibility selector, View Guide & Publish action */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* Target visibility selector, Guide Appearance (Background & Accent Color), View Guide & Publish action */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <GuideBackgroundPicker
+                  backgroundUrl={backgroundUrl}
+                  onChange={(url) => setBackgroundUrl(url)}
+                  currentUser={currentUser}
+                  language={language}
+                  compact
+                />
+                <GuideAccentColorPicker
+                  accentColor={accentColor}
+                  onChange={(colorId) => setAccentColor(colorId)}
+                  currentUser={currentUser}
+                  language={language}
+                  compact
+                  onRequirePro={() => setShowProModal(true)}
+                />
                 <select
                   className="input-field"
                   value={guide?.section_descriptions?.intended_visibility || 'public'}
@@ -2070,14 +2110,6 @@ export const CreateGuide: React.FC = () => {
             {/* Title Block */}
             <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <div>
-                  <GuideBackgroundPicker
-                    backgroundUrl={backgroundUrl}
-                    onChange={(url) => setBackgroundUrl(url)}
-                    currentUser={currentUser}
-                    language={language}
-                  />
-                </div>
                 <div>
                   <GuideBannerPicker
                     bannerUrl={bannerUrl}

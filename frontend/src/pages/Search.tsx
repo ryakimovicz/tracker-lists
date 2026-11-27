@@ -2,7 +2,9 @@ import { HorizontalScroll } from '../components/HorizontalScroll';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { getProfileTheme } from '../utils/profileThemes';
 import { useEffectiveSearchParams } from '../hooks/useEffectiveSearchParams';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
@@ -33,6 +35,13 @@ interface SearchResultItem {
   page_count?: number;
   cv_id?: string;
   metron_id?: string;
+  covers?: string[];
+  accent_color?: string | null;
+  banner_url?: string | null;
+  items_count?: number;
+  saves_count?: number;
+  average_rating?: number | null;
+  creator_photo_url?: string | null;
   creator?: string;
 }
 
@@ -475,6 +484,7 @@ interface ExploreGuidesSectionProps {
   loading: boolean;
   guidesData: any;
   language: string;
+  isLight: boolean;
   t: (key: string) => string;
   navigate: (path: string) => void;
 }
@@ -483,6 +493,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
   loading,
   guidesData,
   language,
+  isLight,
   t,
   navigate
 }) => {
@@ -565,7 +576,20 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
           outlineColor={row.outlineColor}
           itemCount={row.items.length}
         >
-          {row.items.map((guide: any) => (
+          {row.items.map((guide: any) => {
+            const gTheme = guide.accent_color ? getProfileTheme(guide.accent_color, isLight) : null;
+            const guideColorVars: React.CSSProperties = (gTheme
+              ? {
+                  '--guide-accent': gTheme.accent,
+                  '--title-hover-color': gTheme.accent,
+                  '--card-hover-glow': gTheme.glow,
+                  '--accent-primary': gTheme.accent,
+                }
+              : {
+                  '--guide-accent': 'var(--color-guide)',
+                  '--title-hover-color': 'var(--color-guide)',
+                }) as unknown as React.CSSProperties;
+            return (
             <div
               key={guide.id}
               className="activity-card activity-card-portrait guide-explore-card"
@@ -580,7 +604,8 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+                ...guideColorVars
               }}
               onClick={() => navigate(`/guide/${guide.id}`)}
             >
@@ -594,14 +619,15 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                   borderBottom: '1px solid var(--border-color)', 
                   whiteSpace: 'nowrap', 
                   overflow: 'hidden', 
-                  textOverflow: 'ellipsis' 
+                  textOverflow: 'ellipsis',
+                  transition: 'color 0.2s ease'
                 }}
                 title={guide.title}
               >
                 {guide.title}
               </div>
 
-              {/* Cover Collage */}
+              {/* Cover Collage or Banner */}
               <div className="card-media-cover" style={{
                 position: 'relative',
                 width: '100%',
@@ -612,7 +638,14 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 justifyContent: 'center',
                 overflow: 'hidden'
               }}>
-                {guide.covers && guide.covers.length > 0 ? (
+                {guide.banner_url ? (
+                  <img
+                    src={guide.banner_url}
+                    alt={guide.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : guide.covers && guide.covers.length > 0 ? (
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: guide.covers.length >= 2 ? '1fr 1fr' : '1fr',
@@ -638,7 +671,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                    <BookOpen size={28} color="var(--color-guide)" />
+                    <BookOpen size={28} color="var(--guide-accent, var(--color-guide))" />
                   </div>
                 )}
 
@@ -708,7 +741,8 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </HorizontalScroll>
       ))}
     </div>
@@ -718,6 +752,8 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
 export const Search: React.FC = () => {
   const { user } = useAuth();
   const { t, language } = useTranslation();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const navigate = useNavigate();
 
   const getTagClass = (type: string) => {
@@ -2073,6 +2109,7 @@ export const Search: React.FC = () => {
               loading={loadingGuides}
               guidesData={guidesData}
               language={language}
+              isLight={isLight}
               t={t}
               navigate={navigate}
             />
@@ -2170,43 +2207,229 @@ export const Search: React.FC = () => {
 
               if (item.item_type === 'guide') {
                 const isSaved = savedGuides.some(g => String(g.id) === item.external_id);
+                const gTheme = item.accent_color ? getProfileTheme(item.accent_color, isLight) : null;
+                const guideAccent = gTheme ? gTheme.accent : 'var(--color-guide)';
+                const guideAccentText = gTheme
+                  ? ((gTheme.cssVariables as any)['--accent-text'] || '#fff')
+                  : 'var(--color-text-guide, #fff)';
+                const guideColorVars: React.CSSProperties = (gTheme
+                  ? {
+                      '--guide-accent': gTheme.accent,
+                      '--title-hover-color': gTheme.accent,
+                      '--card-hover-glow': gTheme.glow,
+                      '--accent-primary': gTheme.accent,
+                    }
+                  : {
+                      '--guide-accent': 'var(--color-guide)',
+                      '--title-hover-color': 'var(--color-guide)',
+                    }) as unknown as React.CSSProperties;
+                const covers = item.covers || [];
+                const itemsCount = item.items_count ?? 0;
+                const savesCount = item.saves_count ?? 0;
+                const avgRating = item.average_rating;
+                const creatorName = item.creator || 'Comunidad de Pathd';
+
                 return (
-                  <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <BookOpen size={18} color="var(--accent-primary)" />
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                        {language === 'es' ? 'Guía Pública' : 'Public Guide'}
-                      </span>
+                  <div
+                    key={`${item.external_id}-${item.item_type}`}
+                    className="activity-card activity-card-portrait guide-explore-card"
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      textAlign: 'left',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+                      ...guideColorVars
+                    }}
+                    onClick={() => navigate(`/guide/${item.external_id}`)}
+                  >
+                    {/* Card Title */}
+                    <div
+                      className="card-item-title"
+                      style={{
+                        padding: '0.6rem 0.85rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        borderBottom: '1px solid var(--border-color)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        transition: 'color 0.2s ease'
+                      }}
+                      title={item.title}
+                    >
+                      {item.title}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                        {item.title}
-                      </h4>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                        {item.description}
-                      </p>
+
+                    {/* Cover Banner or Collage */}
+                    <div
+                      className="card-media-cover"
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '180px',
+                        background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {item.banner_url ? (
+                        <img
+                          src={item.banner_url}
+                          alt={item.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : covers.length > 0 ? (
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: covers.length >= 2 ? '1fr 1fr' : '1fr',
+                            gridTemplateRows: covers.length >= 3 ? '1fr 1fr' : '1fr',
+                            width: '100%',
+                            height: '100%',
+                            gap: '2px',
+                            background: '#000'
+                          }}
+                        >
+                          {covers.slice(0, 4).map((img: string, cIdx: number) => (
+                            <img
+                              key={cIdx}
+                              src={img}
+                              alt=""
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                          <BookOpen size={32} color={guideAccent} />
+                        </div>
+                      )}
+
+                      {itemsCount > 0 && (
+                        <div
+                          className="guide-items-badge"
+                          style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            right: '6px',
+                            background: 'rgba(0,0,0,0.75)',
+                            backdropFilter: 'blur(4px)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: '#fff'
+                          }}
+                        >
+                          {itemsCount} {t('guidesWorksCount')}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button
-                        onClick={() => navigate(`/guide/${item.external_id}`)}
-                        className="btn-primary"
-                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem' }}
-                      >
-                        {language === 'es' ? 'Ver' : 'View'}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleSaveGuide(parseInt(item.external_id), isSaved);
-                        }}
-                        className="btn-secondary"
-                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? 'var(--accent-primary)' : 'var(--text-primary)', borderColor: isSaved ? 'var(--accent-primary)' : 'var(--border-color)', background: isSaved ? 'rgba(124, 58, 237, 0.1)' : 'transparent' }}
-                      >
-                        {isSaved 
-                          ? (language === 'es' ? 'Siguiendo' : 'Following') 
-                          : (language === 'es' ? 'Seguir' : 'Follow')
-                        }
-                      </button>
+
+                    {/* Body Content + Follow (+) button */}
+                    <div
+                      className="card-body-content"
+                      style={{
+                        padding: '0.85rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem',
+                        flex: 1,
+                        justifyContent: 'space-between',
+                        position: 'relative',
+                        paddingRight: user ? '3rem' : '0.85rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            background: guideAccent,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            color: guideAccentText,
+                            overflow: 'hidden',
+                            flexShrink: 0
+                          }}
+                        >
+                          {item.creator_photo_url ? (
+                            <img src={item.creator_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            creatorName.charAt(0).toUpperCase() || 'P'
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {creatorName}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.74rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                        <span>{itemsCount} {t('guidesWorksCount')}</span>
+                        {avgRating != null && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
+                            <Star size={11} fill="#eab308" color="#eab308" />
+                            {avgRating}
+                          </span>
+                        )}
+                        {savesCount > 0 && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
+                            <Plus size={11} strokeWidth={2.5} />
+                            {savesCount}
+                          </span>
+                        )}
+                      </div>
+
+                      {user && (
+                        <button
+                          type="button"
+                          className={`btn-card-add-shelf ${isSaved ? 'on-shelf' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleSaveGuide(parseInt(item.external_id), isSaved);
+                          }}
+                          title={isSaved
+                            ? (language === 'es' ? 'Dejar de seguir guía' : 'Unfollow guide')
+                            : (language === 'es' ? 'Seguir guía' : 'Follow guide')
+                          }
+                          style={{
+                            position: 'absolute',
+                            right: '0.75rem',
+                            bottom: '0.75rem',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            padding: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid',
+                            background: isSaved ? guideAccent : 'var(--bg-tertiary)',
+                            borderColor: isSaved ? guideAccent : 'var(--border-color)',
+                            color: isSaved ? guideAccentText : 'var(--text-primary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            ...({ '--category-color': guideAccent, '--category-text-color': guideAccentText } as unknown as React.CSSProperties)
+                          }}
+                        >
+                          <Plus size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

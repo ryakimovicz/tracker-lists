@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { getUserPlanTier } from '../utils/planPermissions';
+import { getProfileTheme } from '../utils/profileThemes';
 import { shouldShowTranslateButton } from '../utils/languageDetect';
 import {
   ChevronDown,
@@ -59,6 +61,8 @@ export const ViewGuide: React.FC = () => {
   const location = useLocation();
   const { hash } = location;
   const { language } = useTranslation();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   const [guide, setGuide] = useState<any | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -854,8 +858,12 @@ export const ViewGuide: React.FC = () => {
     return true;
   })();
 
+  const guideAccentCssVars = (canShowGuideImages && guide?.section_descriptions?.accent_color)
+    ? getProfileTheme(guide.section_descriptions.accent_color, isLight).cssVariables
+    : undefined;
+
   return (
-    <div className="container" style={{ padding: '2rem 1rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="container" style={{ padding: '2rem 1rem', maxWidth: '1200px', margin: '0 auto', ...(guideAccentCssVars || {}) }}>
       {canShowGuideImages && guide.section_descriptions?.background_url && createPortal(
         <div
           style={{

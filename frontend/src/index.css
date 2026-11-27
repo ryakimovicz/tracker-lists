@@ -645,6 +645,15 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 4px 20px var(--card-hover-glow, color-mix(in srgb, var(--accent-primary) 20%, transparent));
 }
 
+.guide-explore-card:hover {
+  border-color: var(--guide-accent, var(--color-guide)) !important;
+  box-shadow: 0 6px 22px var(--card-hover-glow, color-mix(in srgb, var(--color-guide) 30%, transparent)) !important;
+}
+
+.guide-explore-card:hover:not(:has(.btn-card-add-shelf:hover)) .card-item-title {
+  color: var(--guide-accent, var(--color-guide)) !important;
+}
+
 .btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -952,6 +961,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-card-add-shelf.on-shelf:hover {
+  color: var(--category-text-color, #ffffff) !important;
   opacity: 0.9;
   transform: scale(1.1);
 }

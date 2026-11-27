@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 
 class SearchResultItem(BaseModel):
     external_id: str
@@ -22,4 +22,11 @@ class SearchResultItem(BaseModel):
     creator: Optional[str] = None
     volumes: Optional[int] = None
     chapters: Optional[int] = None
+    covers: Optional[List[str]] = None
+    accent_color: Optional[str] = None
+    banner_url: Optional[str] = None
+    items_count: Optional[int] = None
+    saves_count: Optional[int] = None
+    average_rating: Optional[float] = None
+    creator_photo_url: Optional[str] = None
 

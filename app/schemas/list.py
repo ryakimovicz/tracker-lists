@@ -71,6 +71,7 @@ class ReadingListResponse(ReadingListBase):
 class ReadingListDetailsResponse(ReadingListResponse):
     creator_username: Optional[str] = "Comunidad de Pathd"
     creator_photo_url: Optional[str] = None
+    creator_plan_tier: Optional[str] = None
     is_saved_by_me: bool = False
     can_edit: bool = False
     completed_count: int = 0
@@ -139,6 +140,8 @@ class ExploreGuideItem(BaseModel):
     average_rating: Optional[float] = None
     covers: List[str] = []
     media_types: List[str] = []
+    accent_color: Optional[str] = None
+    banner_url: Optional[str] = None
 
 class ExploreGuidesResponse(BaseModel):
     populares: List[ExploreGuideItem] = []
