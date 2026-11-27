@@ -36,6 +36,7 @@ from app.schemas.list import (
     TVImportType,
     SectionBulkActionRequest,
     BulkToggleRequest,
+    BulkSkipRequest,
     ToggleSeriesEpisodeRequest,
     BulkToggleSeasonRequest,
     BulkToggleAllSeasonsRequest,
@@ -1669,6 +1670,71 @@ def bulk_toggle_items_progress(
                 }
             )
             
+    db.commit()
+    return {"status": "success"}
+
+
+@router.post("/{list_id}/items/bulk-skip", status_code=status.HTTP_200_OK)
+def bulk_skip_items_progress(
+    list_id: int,
+    req_body: BulkSkipRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+    if reading_list.visibility == VisibilityEnum.PRIVATE and reading_list.creator_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
+
+    is_tracker = _is_tracker_list(db, reading_list)
+    now_dt = datetime.now(timezone.utc)
+
+    for item_id in req_body.item_ids:
+        item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
+        if not item:
+            continue
+
+        if is_tracker and item.external_id:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.item_type == item.item_type,
+                ItemProgress.external_id == item.external_id
+            ).first()
+        else:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.list_item_id == item_id
+            ).first()
+            if not is_tracker and progress and progress.external_id:
+                _detach_legacy_guide_progress(db, current_user.id, progress)
+
+        if progress:
+            progress.is_skipped = req_body.skipped
+            if req_body.skipped:
+                progress.is_completed = False
+            progress.completed_at = now_dt if req_body.skipped else None
+        elif req_body.skipped:
+            if is_tracker and item.external_id:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
+                    external_id=item.external_id,
+                    list_item_id=item_id,
+                    is_completed=False,
+                    is_skipped=True,
+                    completed_at=now_dt
+                )
+            else:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    list_item_id=item_id,
+                    is_completed=False,
+                    is_skipped=True,
+                    completed_at=now_dt
+                )
+            db.add(progress)
+
     db.commit()
     return {"status": "success"}
 

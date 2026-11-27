@@ -117,6 +117,10 @@ class BulkToggleRequest(BaseModel):
     item_ids: List[int]
     completed: bool
 
+class BulkSkipRequest(BaseModel):
+    item_ids: List[int]
+    skipped: bool
+
 class ToggleSeriesEpisodeRequest(BaseModel):
     episode_id: Union[int, str]
     title: str

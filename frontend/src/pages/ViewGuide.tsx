@@ -804,6 +804,106 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
+  const handleBulkSkip = async (itemIds: number[], skipped: boolean) => {
+    if (!guide || itemIds.length === 0) return;
+    const prevGuide = guide;
+
+    // Optimistic update (0ms UI latency)
+    setGuide((prev: any) => {
+      if (!prev) return null;
+      const idSet = new Set(itemIds);
+      const updatedItems = (prev.items || []).map((item: any) =>
+        idSet.has(item.id)
+          ? { ...item, is_skipped: skipped, is_completed: skipped ? false : item.is_completed }
+          : item
+      );
+      return {
+        ...prev,
+        items: updatedItems,
+        ...computeGuideCounts(updatedItems)
+      };
+    });
+
+    try {
+      await apiClient.post(`/lists/${guide.id}/items/bulk-skip`, {
+        item_ids: itemIds,
+        skipped
+      });
+      window.dispatchEvent(new Event('library-updated'));
+    } catch (err: any) {
+      setGuide(prevGuide);
+      setErrorMsg(language === 'es' ? 'Error al saltear los elementos.' : 'Failed to update bulk skip.');
+    }
+  };
+
+  const renderSkipIconButton = (
+    isSkipped: boolean,
+    onClick: () => void,
+    size: number,
+    title: string
+  ) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={title}
+      aria-label={title}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        flexShrink: 0,
+        border: isSkipped ? '1.5px solid #94a3b8' : '1.5px solid var(--border-color)',
+        background: isSkipped ? 'rgba(148, 163, 184, 0.24)' : 'transparent',
+        color: isSkipped ? '#94a3b8' : 'var(--text-secondary)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        padding: 0,
+        transition: 'all 0.2s'
+      }}
+    >
+      <SkipForward size={Math.round(size * 0.54)} />
+    </button>
+  );
+
+  const renderTickButton = (
+    isCompleted: boolean,
+    onClick: () => void,
+    size: number,
+    title: string
+  ) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={title}
+      aria-label={title}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        flexShrink: 0,
+        border: `2px solid ${isCompleted ? 'var(--accent-primary)' : 'var(--text-secondary)'}`,
+        background: isCompleted ? 'var(--accent-primary)' : 'transparent',
+        color: isCompleted ? '#fff' : 'transparent',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        padding: 0,
+        transition: 'all 0.2s'
+      }}
+    >
+      <Check size={Math.round(size * 0.6)} strokeWidth={3} />
+    </button>
+  );
+
   const handleOpenItemDetails = (item: any) => {
     if (!item) return;
     const targetType = item.item_type || 'movie';
@@ -1407,53 +1507,40 @@ export const ViewGuide: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {itemsList.map((item: any) => {
                     return (
-                      <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div
+                        key={item.id}
+                        data-guide-item-id={item.id}
+                        onClick={() => handleOpenItemDetails(item)}
+                        style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', opacity: item.is_skipped ? 0.65 : 1, transition: 'opacity 0.2s ease, border-color 0.2s ease' }}
+                      >
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={item.is_completed}
-                            onChange={() => handleToggleItemProgress(item.id)}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                          />
                           {item.image_url && (
                             <img
                               src={item.image_url}
                               alt={item.title}
                               loading="lazy"
                               decoding="async"
-                              onClick={() => setZoomedImage(item.image_url)}
-                              style={{ width: '36px', height: '54px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
+                              onClick={(e) => { e.stopPropagation(); setZoomedImage(item.image_url); }}
+                              style={{ width: '36px', height: '54px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in', flexShrink: 0 }}
                             />
                           )}
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <h5 style={{ margin: 0, fontSize: '0.95rem' }}>{item.title}</h5>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleItemSkip(item.id)}
-                            className="btn-secondary"
-                            title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
-                            style={{
-                              padding: '0.2rem 0.5rem',
-                              fontSize: '0.75rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
-                              background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
-                              borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
-                            }}
-                          >
-                            <SkipForward size={12} />
-                            {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
-                          </button>
-                          <button
-                            onClick={() => handleOpenItemDetails(item)}
-                            className="btn-secondary"
-                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                          >
-                            {language === 'es' ? 'Ver info' : 'View info'}
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                            {renderSkipIconButton(
+                              Boolean(item.is_skipped),
+                              () => handleToggleItemSkip(item.id),
+                              24,
+                              item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')
+                            )}
+                            {renderTickButton(
+                              Boolean(item.is_completed),
+                              () => handleToggleItemProgress(item.id),
+                              24,
+                              item.is_completed ? (language === 'es' ? 'Desmarcar' : 'Unmark') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1467,6 +1554,7 @@ export const ViewGuide: React.FC = () => {
               if (el.type === 'section') {
                 const sectionIds = getSectionItemIds(el);
                 const isSectionCompleted = sectionIds.length > 0 && sectionIds.every((id: number) => itemsById.get(id)?.is_completed);
+                const isSectionSkipped = sectionIds.length > 0 && sectionIds.every((id: number) => itemsById.get(id)?.is_skipped);
                 const isCollapsed = collapsedNodes[el.id] || false;
                 currentSectionCollapsed = isCollapsed;
                 
@@ -1480,38 +1568,32 @@ export const ViewGuide: React.FC = () => {
                     <div id={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: el.banner_url ? '0.25rem' : '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', transition: 'background-color 2.5s ease-out' }}>
                     <button
                       onClick={() => toggleNodeCollapse(el.id)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}
                     >
                       {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                     </button>
-                    {sectionIds.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleBulkToggle(sectionIds, !isSectionCompleted)}
-                        style={{
-                          background: isSectionCompleted ? '#10b981' : 'transparent',
-                          border: isSectionCompleted ? 'none' : '1px solid var(--border-color)',
-                          borderRadius: '50%',
-                          width: '22px',
-                          height: '22px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          color: isSectionCompleted ? 'white' : 'transparent',
-                          transition: 'all 0.2s ease',
-                          padding: 0
-                        }}
-                      >
-                        <Check size={14} strokeWidth={3} />
-                      </button>
-                    )}
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <h3 style={{ color: 'var(--accent-primary)', fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
                         {tGuide(el.title).toUpperCase() || (language === 'es' ? 'SECCIÓN SIN TÍTULO' : 'UNTITLED SECTION')}
                       </h3>
                       {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: '0.25rem 0 0 0' }}>{tGuide(el.description)}</p>}
                     </div>
+                    {sectionIds.length > 0 && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                        {renderSkipIconButton(
+                          isSectionSkipped,
+                          () => handleBulkSkip(sectionIds, !isSectionSkipped),
+                          26,
+                          isSectionSkipped ? (language === 'es' ? 'Dejar de saltear sección' : 'Unskip section') : (language === 'es' ? 'Saltear sección' : 'Skip section')
+                        )}
+                        {renderTickButton(
+                          isSectionCompleted,
+                          () => handleBulkToggle(sectionIds, !isSectionCompleted),
+                          26,
+                          isSectionCompleted ? (language === 'es' ? 'Desmarcar sección' : 'Unmark section') : (language === 'es' ? 'Completar sección' : 'Complete section')
+                        )}
+                      </div>
+                    )}
                   </div>
                   </React.Fragment>
                 );
@@ -1534,6 +1616,7 @@ export const ViewGuide: React.FC = () => {
                 }
                 const allBlockIds = getBlockItemIds(el);
                 const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsById.get(id)?.is_completed);
+                const isBlockSkipped = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsById.get(id)?.is_skipped);
                 const isCollapsed = collapsedNodes[el.id] || false;
                 
                 const priorityLabel = getPriorityLabel(el.importance_rank, language);
@@ -1543,39 +1626,33 @@ export const ViewGuide: React.FC = () => {
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                       <button
                         onClick={() => toggleNodeCollapse(el.id)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}
                       >
                         {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                       </button>
-                      {allBlockIds.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleBulkToggle(allBlockIds, !isBlockCompleted)}
-                          style={{
-                            background: isBlockCompleted ? '#10b981' : 'transparent',
-                            border: isBlockCompleted ? 'none' : '1px solid var(--border-color)',
-                            borderRadius: '50%',
-                            width: '20px',
-                            height: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: isBlockCompleted ? 'white' : 'transparent',
-                            transition: 'all 0.2s ease',
-                            padding: 0
-                          }}
-                        >
-                          <Check size={12} strokeWidth={3} />
-                        </button>
-                      )}
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{tGuide(el.title) || (language === 'es' ? 'Bloque sin título' : 'Untitled Block')}</h4>
                           {priorityLabel && renderImportanceTag(el.importance_rank, '0.75rem')}
                         </div>
                         {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{tGuide(el.description)}</p>}
                       </div>
+                      {allBlockIds.length > 0 && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                          {renderSkipIconButton(
+                            isBlockSkipped,
+                            () => handleBulkSkip(allBlockIds, !isBlockSkipped),
+                            24,
+                            isBlockSkipped ? (language === 'es' ? 'Dejar de saltear bloque' : 'Unskip block') : (language === 'es' ? 'Saltear bloque' : 'Skip block')
+                          )}
+                          {renderTickButton(
+                            isBlockCompleted,
+                            () => handleBulkToggle(allBlockIds, !isBlockCompleted),
+                            24,
+                            isBlockCompleted ? (language === 'es' ? 'Desmarcar bloque' : 'Unmark block') : (language === 'es' ? 'Completar bloque' : 'Complete block')
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {!isCollapsed && (
@@ -1589,39 +1666,24 @@ export const ViewGuide: React.FC = () => {
                             const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
 
                             return (
-                              <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                              <div
+                                key={item.id}
+                                data-guide-item-id={item.id}
+                                onClick={() => handleOpenItemDetails(item)}
+                                style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', opacity: item.is_skipped ? 0.65 : 1, transition: 'opacity 0.2s ease, border-color 0.2s ease' }}
+                              >
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleItemProgress(item.id)}
-                                    style={{
-                                      background: item.is_completed ? '#10b981' : 'transparent',
-                                      border: item.is_completed ? 'none' : '1px solid var(--border-color)',
-                                      borderRadius: '50%',
-                                      width: '20px',
-                                      height: '20px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      color: item.is_completed ? 'white' : 'transparent',
-                                      transition: 'all 0.2s ease',
-                                      padding: 0
-                                    }}
-                                  >
-                                    <Check size={12} strokeWidth={3} />
-                                  </button>
                                   {item.image_url && (
                                     <img
                                       src={item.image_url}
                                       alt={item.title}
                                       loading="lazy"
                                       decoding="async"
-                                      onClick={() => setZoomedImage(item.image_url)}
-                                      style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
+                                      onClick={(e) => { e.stopPropagation(); setZoomedImage(item.image_url); }}
+                                      style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in', flexShrink: 0 }}
                                     />
                                   )}
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     {(() => {
                                       const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
                                       if (match) {
@@ -1649,32 +1711,20 @@ export const ViewGuide: React.FC = () => {
                                       );
                                     })()}
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleItemSkip(item.id)}
-                                    className="btn-secondary"
-                                    title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
-                                    style={{
-                                      padding: '0.2rem 0.5rem',
-                                      fontSize: '0.75rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem',
-                                      color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                      background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
-                                      borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
-                                    }}
-                                  >
-                                    <SkipForward size={12} />
-                                    {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
-                                  </button>
-                                  <button
-                                    onClick={() => handleOpenItemDetails(item)}
-                                    className="btn-secondary"
-                                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                                  >
-                                    {language === 'es' ? 'Ver info' : 'View info'}
-                                  </button>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                                    {renderSkipIconButton(
+                                      Boolean(item.is_skipped),
+                                      () => handleToggleItemSkip(item.id),
+                                      24,
+                                      item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')
+                                    )}
+                                    {renderTickButton(
+                                      Boolean(item.is_completed),
+                                      () => handleToggleItemProgress(item.id),
+                                      24,
+                                      item.is_completed ? (language === 'es' ? 'Desmarcar' : 'Unmark') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -1696,6 +1746,7 @@ export const ViewGuide: React.FC = () => {
                           }
                           const allSubblockIds = getSubblockItemIds(sub);
                           const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsById.get(id)?.is_completed);
+                          const isSubblockSkipped = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsById.get(id)?.is_skipped);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;
                           
                           const blockImportance = el.importance_rank ?? 3;
@@ -1707,39 +1758,33 @@ export const ViewGuide: React.FC = () => {
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                 <button
                                   onClick={() => toggleNodeCollapse(sub.id)}
-                                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}
                                 >
                                   {isSubCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                                 </button>
-                                {allSubblockIds.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleBulkToggle(allSubblockIds, !isSubblockCompleted)}
-                                    style={{
-                                      background: isSubblockCompleted ? '#10b981' : 'transparent',
-                                      border: isSubblockCompleted ? 'none' : '1px solid var(--border-color)',
-                                      borderRadius: '50%',
-                                      width: '18px',
-                                      height: '18px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      color: isSubblockCompleted ? 'white' : 'transparent',
-                                      transition: 'all 0.2s ease',
-                                      padding: 0
-                                    }}
-                                  >
-                                    <Check size={12} strokeWidth={3} />
-                                  </button>
-                                )}
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
                                     <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{tGuide(sub.title) || (language === 'es' ? 'Subbloque sin título' : 'Untitled Subblock')}</h5>
                                     {subPriorityLabel && renderImportanceTag(sub.importance_rank, '0.72rem')}
                                   </div>
                                   {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{tGuide(sub.description)}</p>}
                                 </div>
+                                {allSubblockIds.length > 0 && (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                                    {renderSkipIconButton(
+                                      isSubblockSkipped,
+                                      () => handleBulkSkip(allSubblockIds, !isSubblockSkipped),
+                                      22,
+                                      isSubblockSkipped ? (language === 'es' ? 'Dejar de saltear subbloque' : 'Unskip subblock') : (language === 'es' ? 'Saltear subbloque' : 'Skip subblock')
+                                    )}
+                                    {renderTickButton(
+                                      isSubblockCompleted,
+                                      () => handleBulkToggle(allSubblockIds, !isSubblockCompleted),
+                                      22,
+                                      isSubblockCompleted ? (language === 'es' ? 'Desmarcar subbloque' : 'Unmark subblock') : (language === 'es' ? 'Completar subbloque' : 'Complete subblock')
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {!isSubCollapsed && (
@@ -1752,39 +1797,24 @@ export const ViewGuide: React.FC = () => {
                                     const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
 
                                     return (
-                                      <div key={item.id} data-guide-item-id={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                      <div
+                                        key={item.id}
+                                        data-guide-item-id={item.id}
+                                        onClick={() => handleOpenItemDetails(item)}
+                                        style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.45rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer', opacity: item.is_skipped ? 0.65 : 1, transition: 'opacity 0.2s ease, border-color 0.2s ease' }}
+                                      >
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleToggleItemProgress(item.id)}
-                                            style={{
-                                              background: item.is_completed ? '#10b981' : 'transparent',
-                                              border: item.is_completed ? 'none' : '1px solid var(--border-color)',
-                                              borderRadius: '50%',
-                                              width: '18px',
-                                              height: '18px',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              cursor: 'pointer',
-                                              color: item.is_completed ? 'white' : 'transparent',
-                                              transition: 'all 0.2s ease',
-                                              padding: 0
-                                            }}
-                                          >
-                                            <Check size={12} strokeWidth={3} />
-                                          </button>
                                           {item.image_url && (
                                             <img
                                               src={item.image_url}
                                               alt={item.title}
                                               loading="lazy"
                                               decoding="async"
-                                              onClick={() => setZoomedImage(item.image_url)}
-                                              style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in' }}
+                                              onClick={(e) => { e.stopPropagation(); setZoomedImage(item.image_url); }}
+                                              style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in', flexShrink: 0 }}
                                             />
                                           )}
-                                          <div style={{ flex: 1 }}>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
                                             {(() => {
                                               const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
                                               if (match) {
@@ -1812,32 +1842,20 @@ export const ViewGuide: React.FC = () => {
                                               );
                                             })()}
                                           </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleToggleItemSkip(item.id)}
-                                            className="btn-secondary"
-                                            title={item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')}
-                                            style={{
-                                              padding: '0.15rem 0.45rem',
-                                              fontSize: '0.72rem',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '0.25rem',
-                                              color: item.is_skipped ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                              background: item.is_skipped ? 'rgba(148, 163, 184, 0.16)' : undefined,
-                                              borderColor: item.is_skipped ? 'rgba(148, 163, 184, 0.45)' : undefined
-                                            }}
-                                          >
-                                            <SkipForward size={11} />
-                                            {item.is_skipped ? (language === 'es' ? 'Salteado' : 'Skipped') : (language === 'es' ? 'Saltear' : 'Skip')}
-                                          </button>
-                                          <button
-                                            onClick={() => handleOpenItemDetails(item)}
-                                            className="btn-secondary"
-                                            style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
-                                          >
-                                            {language === 'es' ? 'Ver info' : 'View info'}
-                                          </button>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                                            {renderSkipIconButton(
+                                              Boolean(item.is_skipped),
+                                              () => handleToggleItemSkip(item.id),
+                                              22,
+                                              item.is_skipped ? (language === 'es' ? 'Dejar de saltear' : 'Unskip') : (language === 'es' ? 'Saltear obra' : 'Skip')
+                                            )}
+                                            {renderTickButton(
+                                              Boolean(item.is_completed),
+                                              () => handleToggleItemProgress(item.id),
+                                              22,
+                                              item.is_completed ? (language === 'es' ? 'Desmarcar' : 'Unmark') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     );
