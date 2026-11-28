@@ -51,6 +51,37 @@ class ActivityService:
                 db.refresh(existing_fav)
                 return existing_fav
 
+        # Reactivate a previously hidden completion activity for the same work (preserves original created_at, likes & comments)
+        is_completion_event = (
+            activity_type in ["item_completed", "item_status_changed"]
+            and external_id is not None
+            and (activity_type == "item_completed" or (details or "").lower() in ["completed", "read", "watched"])
+        )
+        if is_completion_event:
+            hidden_existing = (
+                db.query(UserActivityLog)
+                .filter(
+                    UserActivityLog.user_id == user_id,
+                    UserActivityLog.external_id == str(external_id),
+                    UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+                    UserActivityLog.is_hidden == True
+                )
+                .order_by(desc(UserActivityLog.id))
+                .first()
+            )
+            if hidden_existing:
+                hidden_existing.is_hidden = False
+                hidden_existing.details = details or hidden_existing.details
+                hidden_existing.image_url = image_url or hidden_existing.image_url
+                hidden_existing.item_title = item_title or hidden_existing.item_title
+                hidden_existing.item_type = item_type or hidden_existing.item_type
+                if meta_dict:
+                    hidden_existing.metadata_json = json.dumps(meta_dict, ensure_ascii=False)
+                hidden_existing.updated_at = now
+                db.commit()
+                db.refresh(hidden_existing)
+                return hidden_existing
+
         # Check for 24h consecutive progress aggregation
         # Relevant progress activity types: item_progress, item_status_changed with progress
         is_progress_event = activity_type in ["item_progress", "item_status_changed"] and external_id is not None
@@ -155,5 +186,38 @@ class ActivityService:
             query = query.filter(UserActivityLog.list_id == list_id)
 
         count = query.delete(synchronize_session=False)
+        db.commit()
+        return count
+
+    @staticmethod
+    def hide_activity(
+        db: Session,
+        user_id: Optional[int] = None,
+        activity_type: Optional[str] = None,
+        activity_types: Optional[list] = None,
+        external_id: Optional[str] = None,
+        external_ids: Optional[list] = None,
+        list_id: Optional[int] = None,
+    ) -> int:
+        """
+        Soft-hides matching activity logs (is_hidden=True) so likes and comments are preserved
+        and the same record can be reactivated with its original date if re-completed later.
+        """
+        query = db.query(UserActivityLog).filter(UserActivityLog.is_hidden == False)
+
+        if user_id is not None:
+            query = query.filter(UserActivityLog.user_id == user_id)
+        if activity_type is not None:
+            query = query.filter(UserActivityLog.activity_type == activity_type)
+        if activity_types:
+            query = query.filter(UserActivityLog.activity_type.in_(activity_types))
+        if external_id is not None:
+            query = query.filter(UserActivityLog.external_id == str(external_id))
+        if external_ids:
+            query = query.filter(UserActivityLog.external_id.in_([str(x) for x in external_ids]))
+        if list_id is not None:
+            query = query.filter(UserActivityLog.list_id == list_id)
+
+        count = query.update({"is_hidden": True}, synchronize_session=False)
         db.commit()
         return count

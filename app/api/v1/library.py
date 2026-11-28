@@ -370,6 +370,7 @@ def remove_latest_consumption(
             # Completely unconsumed (0 remaining): also unmark in all guides
             if item.external_id:
                 from app.models.item_progress import ItemProgress
+                from app.services.activity_service import ActivityService
                 guide_item_ids = [
                     r[0] for r in db.query(ListItem.id).filter(
                         ListItem.external_id == item.external_id
@@ -384,6 +385,7 @@ def remove_latest_consumption(
                         ItemProgress.user_id == current_user.id,
                         ItemProgress.list_item_id.in_(guide_item_ids)
                     ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+                ActivityService.hide_activity(db=db, user_id=current_user.id, activity_types=["item_status_changed", "item_completed"], external_id=item.external_id)
     else:
         # No history entries -> uncomplete
         item.completed_at = None
@@ -396,6 +398,7 @@ def remove_latest_consumption(
             item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
         if item.external_id:
             from app.models.item_progress import ItemProgress
+            from app.services.activity_service import ActivityService
             guide_item_ids = [
                 r[0] for r in db.query(ListItem.id).filter(
                     ListItem.external_id == item.external_id
@@ -410,6 +413,7 @@ def remove_latest_consumption(
                     ItemProgress.user_id == current_user.id,
                     ItemProgress.list_item_id.in_(guide_item_ids)
                 ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+            ActivityService.hide_activity(db=db, user_id=current_user.id, activity_types=["item_status_changed", "item_completed"], external_id=item.external_id)
             
     db.commit()
     db.refresh(item)
@@ -1252,6 +1256,11 @@ def update_library_item(
             t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
             stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
 
+            # If transitioning OUT of completed/read, soft-hide previous completion activity (preserves comments/likes & original date on re-complete)
+            if old_status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ) and item_in.status not in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+                if lib_item.external_id:
+                    ActivityService.hide_activity(db=db, user_id=current_user.id, activity_types=["item_status_changed", "item_completed"], external_id=lib_item.external_id)
+
             act_meta = {
                 "status": stat_str,
                 "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else lib_item.is_hundred_percent),
@@ -1484,13 +1493,20 @@ def delete_from_library(
             item_type=item_type
         )
 
-    # Clean up activities for this library item (reversible cleanup)
+    # Clean up activities for this library item (soft-hide so comments/likes & original date are preserved if re-completed)
     from app.services.activity_service import ActivityService
-    ActivityService.delete_activity(
-        db=db,
-        user_id=current_user.id,
-        external_id=ext_id
-    )
+    if ext_id:
+        ActivityService.hide_activity(
+            db=db,
+            user_id=current_user.id,
+            external_id=ext_id
+        )
+    if tracking_list_id:
+        ActivityService.hide_activity(
+            db=db,
+            user_id=current_user.id,
+            list_id=tracking_list_id
+        )
 
     # If delete_history is requested, completely wipe progress, consumption history, and reviews
     if delete_history:

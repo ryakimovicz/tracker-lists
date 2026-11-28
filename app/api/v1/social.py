@@ -799,6 +799,20 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
 
 # --- 5. The 4 Social Feeds (/social/feed) ---
 
+_SOCIAL_BASE_EXCLUDED_TYPES = [
+    "guide_commented", "item_commented", "guide_review_commented",
+    "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited",
+    "shelf_add", "item_added_to_library",
+]
+_COMPLETED_STATUS_VALUES = ["completed", "read", "watched"]
+
+def _social_completion_filter():
+    from sqlalchemy import or_, func
+    return or_(
+        UserActivityLog.activity_type != "item_status_changed",
+        func.lower(UserActivityLog.details).in_(_COMPLETED_STATUS_VALUES)
+    )
+
 @router.get("/feed/following", response_model=List[ActivityFeedItemResponse])
 def get_following_feed(
     request: Request,
@@ -813,15 +827,12 @@ def get_following_feed(
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
-    excluded_types = [
-        "guide_commented", "item_commented", "guide_review_commented",
-        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited"
-    ]
     
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id.in_(followed_ids_query),
         UserActivityLog.is_hidden == False,
-        ~UserActivityLog.activity_type.in_(excluded_types)
+        ~UserActivityLog.activity_type.in_(_SOCIAL_BASE_EXCLUDED_TYPES),
+        _social_completion_filter()
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []
@@ -853,18 +864,17 @@ def get_discover_feed(
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
     # Discover feed: activities from public users (excluding self and already-followed users),
-    # not hidden, no comment events, ranked by recency + engagement (likes & comments)
+    # not hidden, no comment/review/follow/shelf-add/in-progress events, ranked by recency + engagement
     public_users_query = db.query(User.id).filter(User.is_private == False)
-    excluded_types = [
-        "guide_commented", "item_commented", "guide_review_commented",
-        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited",
-        "item_reviewed", "item_rated", "guide_rated"
+    excluded_types = _SOCIAL_BASE_EXCLUDED_TYPES + [
+        "item_reviewed", "item_rated", "guide_rated", "user_followed"
     ]
 
     filters = [
         UserActivityLog.user_id.in_(public_users_query),
         UserActivityLog.is_hidden == False,
         ~UserActivityLog.activity_type.in_(excluded_types),
+        _social_completion_filter(),
     ]
     if current_user:
         followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
@@ -975,13 +985,12 @@ def get_my_activity_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    excluded_types = [
-        "guide_commented", "item_commented", "guide_review_commented",
-        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited"
-    ]
+    excluded_types = _SOCIAL_BASE_EXCLUDED_TYPES + ["user_followed"]
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id == current_user.id,
-        ~UserActivityLog.activity_type.in_(excluded_types)
+        UserActivityLog.is_hidden == False,
+        ~UserActivityLog.activity_type.in_(excluded_types),
+        _social_completion_filter()
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []

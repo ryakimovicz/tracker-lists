@@ -1543,6 +1543,16 @@ def toggle_item_progress(
         if latest_ch:
             db.delete(latest_ch)
             db.flush()
+        # Soft-hide the latest completion activity for this item (preserves comments/likes & original date on re-complete)
+        if item.external_id:
+            latest_act = db.query(UserActivityLog).filter(
+                UserActivityLog.user_id == current_user.id,
+                UserActivityLog.external_id == item.external_id,
+                UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+                UserActivityLog.is_hidden == False
+            ).order_by(UserActivityLog.id.desc()).first()
+            if latest_act:
+                latest_act.is_hidden = True
         _cleanup_orphan_from_guide_library_items(db, current_user.id)
         
     db.commit()
@@ -1709,6 +1719,12 @@ def unmark_item_progress_by_external_id(
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.list_item_id.in_(matching_guide_lids)
             ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+        db.query(UserActivityLog).filter(
+            UserActivityLog.user_id == current_user.id,
+            UserActivityLog.external_id.in_(variants),
+            UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+            UserActivityLog.is_hidden == False
+        ).update({"is_hidden": True}, synchronize_session=False)
         db.flush()
         _cleanup_orphan_from_guide_library_items(db, current_user.id)
 
@@ -2672,28 +2688,126 @@ def toggle_series_episode(
                 item.title = final_item_title
                 db.flush()
 
-        meta_dict = {
-            "series_external_id": parent_ext_id,
-            "series_title": parent_title,
-            "series_item_type": parent_type,
-            "series_image_url": parent_img,
-            "show_name": parent_title,
-            "season_number": ep_req.season_number if hasattr(ep_req, 'season_number') else None,
-            "episode_number": ep_req.episode_number if hasattr(ep_req, 'episode_number') else None,
-            "is_single_episode": not is_comic
-        }
-        activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="item_completed",
-            item_title=final_item_title,
-            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
-            external_id=item.external_id,
-            list_id=list_id,
-            image_url=item.image_url or parent_img,
-            details="completed",
-            metadata_json=json.dumps(meta_dict)
-        )
-        db.add(activity)
+        # Build unit code ("T1 | E2" or "#12") for same-day range consolidation
+        import re as _re_unit
+        unit_label = None
+        if is_comic:
+            m_num = _re_unit.search(r'#\s*(\d+(?:\.\d+)?)', final_item_title or '')
+            if m_num:
+                unit_label = f"#{m_num.group(1)}"
+            elif hasattr(ep_req, 'episode_number') and ep_req.episode_number is not None:
+                unit_label = f"#{ep_req.episode_number}"
+        else:
+            s_num = ep_req.season_number if hasattr(ep_req, 'season_number') and ep_req.season_number is not None else None
+            e_num = ep_req.episode_number if hasattr(ep_req, 'episode_number') and ep_req.episode_number is not None else None
+            if s_num is None or e_num is None:
+                m_se = _re_unit.search(r'S(\d+)E(\d+)', final_item_title or '', _re_unit.IGNORECASE)
+                if m_se:
+                    s_num = int(m_se.group(1))
+                    e_num = int(m_se.group(2))
+            if s_num is not None and e_num is not None:
+                unit_label = f"T{int(s_num)} | E{int(e_num)}"
+
+        # Check if user already logged an episode/issue completion for this same work today
+        today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        same_day_candidates = db.query(UserActivityLog).filter(
+            UserActivityLog.user_id == current_user.id,
+            UserActivityLog.list_id == list_id,
+            UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+            UserActivityLog.created_at >= today_start
+        ).order_by(UserActivityLog.created_at.desc()).all()
+
+        merged_existing = None
+        for cand in same_day_candidates:
+            try:
+                c_meta = json.loads(cand.metadata_json) if cand.metadata_json else {}
+            except Exception:
+                c_meta = {}
+            if c_meta.get("finished_work") or c_meta.get("is_season"):
+                continue
+            if cand.activity_type == "item_completed" or c_meta.get("is_range") or c_meta.get("is_single_episode"):
+                merged_existing = (cand, c_meta)
+                break
+
+        if merged_existing and unit_label:
+            cand, c_meta = merged_existing
+            # Resolve start_unit from existing activity
+            start_unit = c_meta.get("start_unit")
+            if not start_unit:
+                if is_comic:
+                    m_old = _re_unit.search(r'#\s*(\d+(?:\.\d+)?)', cand.item_title or '')
+                    start_unit = f"#{m_old.group(1)}" if m_old else (f"#{c_meta['episode_number']}" if c_meta.get("episode_number") is not None else unit_label)
+                else:
+                    m_old = _re_unit.search(r'S(\d+)E(\d+)', cand.item_title or '', _re_unit.IGNORECASE)
+                    if m_old:
+                        start_unit = f"T{int(m_old.group(1))} | E{int(m_old.group(2))}"
+                    elif c_meta.get("season_number") is not None and c_meta.get("episode_number") is not None:
+                        start_unit = f"T{int(c_meta['season_number'])} | E{int(c_meta['episode_number'])}"
+                    else:
+                        start_unit = unit_label
+
+            if start_unit != unit_label:
+                c_meta.update({
+                    "series_external_id": parent_ext_id,
+                    "series_title": parent_title,
+                    "series_item_type": parent_type,
+                    "series_image_url": parent_img,
+                    "show_name": parent_title,
+                    "work_title": parent_title,
+                    "is_range": True,
+                    "is_single_episode": False,
+                    "start_unit": start_unit,
+                    "end_unit": unit_label,
+                    "finished_work": False,
+                    "status": "completed",
+                    "item_type": parent_type,
+                })
+                cand.activity_type = "item_status_changed"
+                cand.item_title = f"{parent_title} ({start_unit} - {unit_label})" if parent_title else final_item_title
+                cand.item_type = parent_type
+                cand.external_id = parent_ext_id or item.external_id
+                cand.image_url = parent_img or item.image_url
+                cand.details = "read" if is_comic else "completed"
+                cand.metadata_json = json.dumps(c_meta)
+            cand.created_at = now_dt
+        else:
+            # First check if there is a previously hidden activity for this exact episode/issue to reactivate with original date
+            hidden_ep_act = db.query(UserActivityLog).filter(
+                UserActivityLog.user_id == current_user.id,
+                UserActivityLog.external_id == item.external_id,
+                UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+                UserActivityLog.is_hidden == True
+            ).order_by(UserActivityLog.id.desc()).first() if item.external_id else None
+
+            if hidden_ep_act:
+                hidden_ep_act.is_hidden = False
+                hidden_ep_act.updated_at = now_dt
+            else:
+                meta_dict = {
+                    "series_external_id": parent_ext_id,
+                    "series_title": parent_title,
+                    "series_item_type": parent_type,
+                    "series_image_url": parent_img,
+                    "show_name": parent_title,
+                    "work_title": parent_title,
+                    "season_number": ep_req.season_number if hasattr(ep_req, 'season_number') else None,
+                    "episode_number": ep_req.episode_number if hasattr(ep_req, 'episode_number') else None,
+                    "start_unit": unit_label,
+                    "end_unit": unit_label,
+                    "is_single_episode": not is_comic
+                }
+                activity = UserActivityLog(
+                    user_id=current_user.id,
+                    activity_type="item_completed",
+                    item_title=final_item_title,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                    external_id=item.external_id,
+                    list_id=list_id,
+                    image_url=item.image_url or parent_img,
+                    details="completed",
+                    metadata_json=json.dumps(meta_dict)
+                )
+                db.add(activity)
         
     db.commit()
     
@@ -3160,6 +3274,40 @@ def bulk_toggle_season(
             
             background_tasks.add_task(check_series_completion, current_user.id, list_id, lib_item.id, lib_item.external_id, all_item_ids, all_ext_ids)
 
+            if req.completed and not is_comic:
+                from app.services.activity_service import ActivityService
+                t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+                today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+                # Remove same-day partial episode/range cards for this series so the season card stays clean
+                db.query(UserActivityLog).filter(
+                    UserActivityLog.user_id == current_user.id,
+                    UserActivityLog.list_id == list_id,
+                    UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+                    UserActivityLog.created_at >= today_start
+                ).delete(synchronize_session=False)
+                season_meta = {
+                    "is_season": True,
+                    "season_number": req.season_number,
+                    "work_title": lib_item.title,
+                    "series_external_id": lib_item.external_id,
+                    "series_title": lib_item.title,
+                    "item_type": t_str,
+                    "status": "completed"
+                }
+                ActivityService.record_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="item_status_changed",
+                    item_title=f"{lib_item.title} - Temporada {req.season_number}",
+                    item_type=t_str,
+                    external_id=lib_item.external_id,
+                    list_id=list_id,
+                    image_url=lib_item.image_url,
+                    details="completed",
+                    metadata=season_meta
+                )
+                db.commit()
+
         return {"message": "Season progress toggled successfully"}
     except HTTPException:
         db.rollback()
@@ -3490,9 +3638,17 @@ def bulk_toggle_all_seasons(
             if req.completed:
                 from app.services.activity_service import ActivityService
                 t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
-                stat_str = lib_item.status.value if hasattr(lib_item.status, 'value') else str(lib_item.status)
+                today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+                # Remove same-day partial episode/season/range cards for this work
+                db.query(UserActivityLog).filter(
+                    UserActivityLog.user_id == current_user.id,
+                    UserActivityLog.list_id == list_id,
+                    UserActivityLog.activity_type.in_(["item_completed", "item_status_changed"]),
+                    UserActivityLog.created_at >= today_start
+                ).delete(synchronize_session=False)
+                comp_detail = "read" if is_comic else "completed"
                 act_meta = {
-                    "status": stat_str,
+                    "status": comp_detail,
                     "finished_work": True,
                     "last_seen_episode": lib_item.last_seen_episode,
                     "item_type": t_str
@@ -3504,8 +3660,9 @@ def bulk_toggle_all_seasons(
                     item_title=lib_item.title,
                     item_type=t_str,
                     external_id=lib_item.external_id,
+                    list_id=list_id,
                     image_url=lib_item.image_url,
-                    details=stat_str,
+                    details=comp_detail,
                     metadata=act_meta
                 )
 
@@ -3986,7 +4143,7 @@ def bulk_toggle_episodes(
                 "also_added": is_unified,
                 "is_range": count > 1,
                 "finished_work": is_finished_work,
-                "status": "completed" if is_finished_work else "in_progress"
+                "status": "read" if is_comic else "completed"
             }
 
             if count == 1:
@@ -4004,7 +4161,7 @@ def bulk_toggle_episodes(
                 external_id=work_ext_id,
                 list_id=list_id,
                 image_url=work_image_url,
-                details="completed" if is_finished_work else "in_progress",
+                details="read" if is_comic else "completed",
                 metadata=act_meta
             )
 

@@ -891,7 +891,21 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
         {/* 3. Action Sentence with badge */}
         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          {meta.is_range ? (
+          {meta.is_season && meta.season_number ? (
+            (() => {
+              const workName = meta.work_title || meta.series_title || activity.item_title?.split(' - Temporada')[0] || activity.item_title;
+              return (
+                <>
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Completó la' : 'Finished'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                    {isEs ? `Temporada ${meta.season_number}` : `Season ${meta.season_number}`}
+                  </span>
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                  {renderTitleWithBadge(workName)}
+                </>
+              );
+            })()
+          ) : meta.is_range ? (
             (() => {
               const isComic = (activity.item_type || meta.item_type) === 'comic' || (activity.item_type || meta.item_type) === 'manga';
               const workName = meta.work_title || activity.item_title?.split(' (')[0] || activity.item_title;
