@@ -1311,6 +1311,16 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(0.95);
 }
 
+.guides-swipe-pager {
+  margin: 0 -1.25rem;
+  width: calc(100% + 2.5rem) !important;
+}
+
+.guides-slide-inner {
+  padding: 1.25rem 1.25rem 2rem 1.25rem;
+  box-sizing: border-box;
+}
+
 /* Desktop Grid when a single category is filtered in Home */
 .desktop-category-grid {
   display: grid;
@@ -1667,6 +1677,15 @@ h1, h2, h3, h4, h5, h6 {
     right: 1rem;
     width: 52px;
     height: 52px;
+  }
+
+  .guides-swipe-pager {
+    margin: 0 -1rem !important;
+    width: calc(100% + 2rem) !important;
+  }
+
+  .guides-slide-inner {
+    padding: 1rem 1rem 1.75rem 1rem !important;
   }
 
   [data-theme="light"] .mobile-bottom-nav {

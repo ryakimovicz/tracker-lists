@@ -854,9 +854,10 @@ export const Guides: React.FC = () => {
         totalSlides={4}
         onSlideChange={goToStep}
         onScrollProgress={handleScrollProgress}
+        className="guides-swipe-pager"
       >
         {/* Slide 0: Seguidas */}
-        <div style={{ width: '100%', flex: 1, marginTop: '1.25rem' }}>
+        <div className="guides-slide-inner" style={{ width: '100%', flex: 1 }}>
           {loadingUserGuides ? (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>
               {language === 'es' ? 'Cargando guías...' : 'Loading guides...'}
@@ -921,7 +922,7 @@ export const Guides: React.FC = () => {
         </div>
 
         {/* Slide 1: Mis guías */}
-        <div style={{ width: '100%', flex: 1, marginTop: '1.25rem' }}>
+        <div className="guides-slide-inner" style={{ width: '100%', flex: 1 }}>
           {loadingUserGuides ? (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>
               {language === 'es' ? 'Cargando guías...' : 'Loading guides...'}
@@ -989,7 +990,7 @@ export const Guides: React.FC = () => {
         </div>
 
         {/* Slide 2: Populares */}
-        <div style={{ width: '100%', flex: 1, marginTop: '1.25rem' }}>
+        <div className="guides-slide-inner" style={{ width: '100%', flex: 1 }}>
           {loadingExploreGuides ? (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>
               {language === 'es' ? 'Cargando guías...' : 'Loading guides...'}
@@ -1019,7 +1020,7 @@ export const Guides: React.FC = () => {
         </div>
 
         {/* Slide 3: Nuevas */}
-        <div style={{ width: '100%', flex: 1, marginTop: '1.25rem' }}>
+        <div className="guides-slide-inner" style={{ width: '100%', flex: 1 }}>
           {loadingExploreGuides ? (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>
               {language === 'es' ? 'Cargando guías...' : 'Loading guides...'}
