@@ -36,6 +36,8 @@ import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
 import { ProModal } from '../components/ProModal';
 import { AdBanner } from '../components/AdBanner';
 import { renderFormattedContentWithMentions, AuthorUsername } from '../components/MentionTag';
+import { CommentSortBar } from '../components/CommentSortBar';
+import { sortRepliesOldestFirst, sortRootComments, type CommentSortMode } from '../utils/commentSort';
 
 
 interface CommentItem {
@@ -143,6 +145,7 @@ export const ViewGuide: React.FC = () => {
   } | null>(null);
   const [replyText, setReplyText] = useState('');
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
@@ -547,10 +550,13 @@ export const ViewGuide: React.FC = () => {
   };
 
   const toggleCollapseReplies = (commentId: number) => {
-    setCollapsedReplies(prev => ({
-      ...prev,
-      [commentId]: !prev[commentId]
-    }));
+    setCollapsedReplies(prev => {
+      const currentlyCollapsed = prev[commentId] !== false;
+      return {
+        ...prev,
+        [commentId]: !currentlyCollapsed
+      };
+    });
   };
 
   const renderCommentContent = (content: string | null) => {
@@ -588,7 +594,11 @@ export const ViewGuide: React.FC = () => {
       }
     });
 
-    return roots;
+    roots.forEach(r => {
+      r.replies = sortRepliesOldestFirst(r.replies);
+    });
+
+    return sortRootComments(roots, commentSortMode, (r) => r.replies.length);
   };
 
   const handleVoteComment = async (commentId: number) => {
@@ -2252,9 +2262,18 @@ export const ViewGuide: React.FC = () => {
                 );
               };
 
-              return rootNodes.map((node) => {
+              return (
+                <>
+                  {rootNodes.length > 1 && (
+                    <CommentSortBar
+                      sortMode={commentSortMode}
+                      onChange={setCommentSortMode}
+                      language={language}
+                    />
+                  )}
+                  {rootNodes.map((node) => {
                 const isReplyingRoot = replyTarget?.targetCommentId === node.id;
-                const isCollapsed = !!collapsedReplies[node.id];
+                const isCollapsed = collapsedReplies[node.id] !== false;
                 const hasReplies = node.replies && node.replies.length > 0;
 
                 return (
@@ -2709,7 +2728,9 @@ export const ViewGuide: React.FC = () => {
                     )}
                   </div>
                 );
-              });
+              })}
+                </>
+              );
             })()}
           </div>
         )}

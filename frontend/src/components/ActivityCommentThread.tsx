@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
+import { CommentSortBar } from './CommentSortBar';
+import { sortRepliesOldestFirst, sortRootComments, type CommentSortMode } from '../utils/commentSort';
 import { MediaAttachmentView } from './ItemDetailsModal';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 import { ConfirmModal } from './ConfirmModal';
@@ -41,6 +43,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const isEs = language === 'es';
 
   const [comments, setComments] = useState<ActivityCommentItem[]>([]);
+  const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -55,10 +58,13 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const [showReplyKlipy, setShowReplyKlipy] = useState(false);
 
   const toggleCollapseReplies = (commentId: number) => {
-    setCollapsedReplies(prev => ({
-      ...prev,
-      [commentId]: !prev[commentId]
-    }));
+    setCollapsedReplies(prev => {
+      const currentlyCollapsed = prev[commentId] !== false;
+      return {
+        ...prev,
+        [commentId]: !currentlyCollapsed
+      };
+    });
   };
 
   const countTotal = (items: ActivityCommentItem[]): number => {
@@ -640,10 +646,18 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {comments.map(rootComment => {
-            const descendantReplies = getAllDescendantReplies(rootComment);
+          {comments.length > 1 && (
+            <CommentSortBar
+              sortMode={commentSortMode}
+              onChange={setCommentSortMode}
+              language={language}
+              compact
+            />
+          )}
+          {sortRootComments(comments, commentSortMode, (c) => getAllDescendantReplies(c).length).map(rootComment => {
+            const descendantReplies = sortRepliesOldestFirst(getAllDescendantReplies(rootComment));
             const hasReplies = descendantReplies.length > 0;
-            const isCollapsed = !!collapsedReplies[rootComment.id];
+            const isCollapsed = collapsedReplies[rootComment.id] !== false;
 
             return (
               <div key={rootComment.id} style={{ display: 'flex', flexDirection: 'column' }}>

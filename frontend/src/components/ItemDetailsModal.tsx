@@ -15,6 +15,8 @@ import { getCachedShelfItems, createShelfMap, findInShelfMap, updateCachedShelfI
 import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
+import { CommentSortBar } from './CommentSortBar';
+import { sortRepliesOldestFirst, sortRootComments, type CommentSortMode } from '../utils/commentSort';
 import { isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 import { ConfirmModal } from './ConfirmModal';
@@ -1494,6 +1496,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [replyText, setReplyText] = useState<string>('');
   const [replyMedia, setReplyMedia] = useState<SelectedKlipyMedia | null>(null);
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [isSubmittingReply, setIsSubmittingReply] = useState<boolean>(false);
   const [isEditingComment, setIsEditingComment] = useState<boolean>(false);
   const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
@@ -5085,10 +5088,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   const toggleCollapseReplies = (reviewId: number) => {
-    setCollapsedReplies(prev => ({
-      ...prev,
-      [reviewId]: !prev[reviewId]
-    }));
+    setCollapsedReplies(prev => {
+      const currentlyCollapsed = prev[reviewId] !== false;
+      return {
+        ...prev,
+        [reviewId]: !currentlyCollapsed
+      };
+    });
   };
 
   const isWithinEditWindow = (createdDateStr: string) => {
@@ -10185,12 +10191,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     );
                   };
 
+                  const sortedDisplayedList = sortRootComments(
+                    displayedList,
+                    commentSortMode,
+                    (rootNode: any) => (itemReviews || []).filter((r: any) => r.parent_id === rootNode.id).length
+                  );
+
                   return (
+                    <>
+                    {sortedDisplayedList.length > 1 && (
+                      <CommentSortBar
+                        sortMode={commentSortMode}
+                        onChange={setCommentSortMode}
+                        language={language}
+                        compact
+                      />
+                    )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                      {displayedList.map((rootNode: any) => {
-                        const childReplies = (itemReviews || []).filter((r: any) => r.parent_id === rootNode.id);
+                      {sortedDisplayedList.map((rootNode: any) => {
+                        const childReplies = sortRepliesOldestFirst((itemReviews || []).filter((r: any) => r.parent_id === rootNode.id));
                         const hasReplies = childReplies.length > 0;
-                        const isCollapsed = !!collapsedReplies[rootNode.id];
+                        const isCollapsed = collapsedReplies[rootNode.id] !== false;
                         const isReplyingRoot = replyTarget?.targetReviewId === rootNode.id;
                         const isEditingThisComment = editingCommentId === rootNode.id;
 
@@ -10872,6 +10893,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         );
                       })}
                     </div>
+                    </>
                   );
                 })()}
               </div>
