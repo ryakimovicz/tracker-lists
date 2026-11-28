@@ -882,10 +882,13 @@ def get_discover_feed(
         filters.append(UserActivityLog.user_id != current_user.id)
         filters.append(~UserActivityLog.user_id.in_(followed_ids_query))
 
-    pool_limit = max(120, (skip + limit) * 4)
+    DISCOVER_MAX_POOL = 500
+    if skip >= DISCOVER_MAX_POOL:
+        return []
+
     activity_records = db.query(UserActivityLog).filter(
         *filters
-    ).order_by(UserActivityLog.created_at.desc()).limit(pool_limit).all()
+    ).order_by(UserActivityLog.created_at.desc()).limit(DISCOVER_MAX_POOL).all()
 
     if not activity_records:
         return []
