@@ -73,18 +73,24 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
         '--title-hover-color': 'var(--color-guide, #2DD4BF)',
       }) as unknown as React.CSSProperties;
 
-  const isDraft = guide.visibility === 'DRAFT';
-  const isPrivate = guide.visibility === 'PRIVATE';
-  const visibilityLabel = isDraft
-    ? (language === 'es' ? 'Borrador' : 'Draft')
-    : isPrivate
-      ? (language === 'es' ? 'Privada' : 'Private')
-      : (language === 'es' ? 'Pública' : 'Public');
-  const visibilityBg = isDraft
-    ? 'rgba(245, 158, 11, 0.9)'
-    : isPrivate
-      ? 'rgba(100, 116, 139, 0.9)'
-      : 'rgba(16, 185, 129, 0.9)';
+  const vis = String(guide.visibility || 'public').toLowerCase();
+  const visibilityLabel =
+    vis === 'draft'
+      ? (language === 'es' ? 'Borrador' : 'Draft')
+      : vis === 'private'
+        ? (language === 'es' ? 'Privada' : 'Private')
+        : vis === 'unlisted'
+          ? (language === 'es' ? 'No listada' : 'Unlisted')
+          : (language === 'es' ? 'Pública' : 'Public');
+  const visibilityBg =
+    vis === 'draft'
+      ? 'rgba(245, 158, 11, 0.92)'
+      : vis === 'private'
+        ? 'rgba(15, 23, 42, 0.88)'
+        : vis === 'unlisted'
+          ? 'rgba(100, 116, 139, 0.9)'
+          : 'rgba(45, 212, 191, 0.9)';
+  const visibilityColor = vis === 'draft' ? '#0f172a' : '#ffffff';
 
   const itemsCount = guide.items_count ?? (Array.isArray(guide.items) ? guide.items.length : 0);
   const creatorName = guide.creator_username || guide.creator || '';
@@ -243,7 +249,7 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
 
         {showVisibility && (
           <span
-            className="guide-visibility-badge"
+            className="guide-visibility-badge home-desktop-only"
             style={{
               position: 'absolute',
               top: '6px',
@@ -252,7 +258,7 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
               padding: '0.15rem 0.45rem',
               borderRadius: '4px',
               background: visibilityBg,
-              color: '#ffffff',
+              color: visibilityColor,
               fontWeight: 700,
               backdropFilter: 'blur(4px)',
               zIndex: 2,
@@ -349,18 +355,37 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-          <span
-            style={{
-              fontSize: '0.82rem',
-              color: 'var(--text-secondary)',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {itemsCount} {t('guidesWorksCount')}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: '0.82rem',
+                color: 'var(--text-secondary)',
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {itemsCount} {t('guidesWorksCount')}
+            </span>
+            {showVisibility && (
+              <span
+                className="home-mobile-only"
+                style={{
+                  fontSize: '0.66rem',
+                  padding: '0.1rem 0.4rem',
+                  borderRadius: '4px',
+                  background: visibilityBg,
+                  color: visibilityColor,
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {visibilityLabel}
+              </span>
+            )}
+          </div>
 
           {showOwnerActions && (
             <div
@@ -888,6 +913,7 @@ export const Guides: React.FC = () => {
                   t={t}
                   onOpen={handleOpenGuide}
                   showCreator
+                  showVisibility
                 />
               ))}
             </div>
