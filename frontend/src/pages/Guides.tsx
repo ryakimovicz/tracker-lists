@@ -214,6 +214,7 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
           />
         ) : guide.covers && guide.covers.length > 0 ? (
           <div
+            className="guide-cover-collage"
             style={{
               display: 'grid',
               gridTemplateColumns: guide.covers.length >= 2 ? '1fr 1fr' : '1fr',
@@ -235,7 +236,7 @@ const GuideHubCard: React.FC<GuideCardProps> = React.memo(({
             ))}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+          <div className="guide-cover-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
             <BookOpen size={28} color={guideAccent} />
           </div>
         )}

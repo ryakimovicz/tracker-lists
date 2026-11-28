@@ -35,6 +35,7 @@ export const GuideMediaTypeBar: React.FC<GuideMediaTypeBarProps> = ({
 
   return (
     <div
+      className="guide-media-type-bar"
       style={{
         width: '100%',
         height: `${height}px`,

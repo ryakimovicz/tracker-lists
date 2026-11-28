@@ -2732,13 +2732,55 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Guide card specific mobile adaptations for horizontal card */
+  .activity-card.guide-explore-card {
+    height: auto !important;
+    min-height: 82px !important;
+    max-height: none !important;
+    padding: 0.55rem 0.65rem 0.7rem 0.65rem !important;
+    position: relative !important;
+    row-gap: 0.25rem !important;
+  }
+
+  .guide-explore-card > div:first-child {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+  }
+
+  .guide-explore-card .card-item-title {
+    order: 0 !important;
+    white-space: normal !important;
+  }
+
   .guide-explore-card .card-media-cover {
     background: #000 !important;
     position: relative !important;
   }
 
+  .guide-explore-card .card-media-cover > .guide-cover-collage {
+    display: grid !important;
+  }
+
+  .guide-explore-card .card-media-cover > .guide-cover-fallback {
+    display: flex !important;
+  }
+
   .guide-explore-card .card-media-cover .guide-items-badge {
     display: none !important;
+  }
+
+  .guide-explore-card .guide-media-type-bar {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 4px !important;
+    z-index: 2 !important;
   }
 
   .profile-guides-carousel .profile-guide-item-wrapper {
