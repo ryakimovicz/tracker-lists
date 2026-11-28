@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import logging
 from typing import List, Dict, Any, Optional
@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db

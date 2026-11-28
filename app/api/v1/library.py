@@ -2,6 +2,7 @@ from typing import List, Optional, Any
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,6 +14,7 @@ from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.item_progress import ItemProgress
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse, ReorderFavoritesRequest
 from app.services.tvmaze import TVMazeService
+from app.services.metron import MetronService
 from app.models.activity import UserActivityLog
 
 router = APIRouter()
