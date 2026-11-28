@@ -1652,7 +1652,7 @@ export const Search: React.FC = () => {
                   ? 'var(--color-user, #ec4899)' 
                   : `var(--color-${tab.value})`;
                 const tabTextColor = tab.value === 'all' 
-                  ? '#ffffff' 
+                  ? 'var(--accent-text, #0f172a)' 
                   : `var(--color-text-${tab.value})`;
 
                 return (

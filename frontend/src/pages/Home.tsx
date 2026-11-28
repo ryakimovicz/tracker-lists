@@ -4949,7 +4949,7 @@ export const Home: React.FC = () => {
                 ? 'var(--accent-primary)' 
                 : `var(--color-${tab.value})`;
               const tabTextColor = tab.value === 'all' 
-                ? '#ffffff' 
+                ? 'var(--accent-text, #0f172a)' 
                 : `var(--color-text-${tab.value})`;
 
               const handleFilterClick = () => {
@@ -4995,7 +4995,7 @@ export const Home: React.FC = () => {
                   style={{
                     border: "none",
                     background: currentHomeStep === 5 ? "var(--accent-primary, #6366f1)" : "transparent",
-                    color: currentHomeStep === 5 ? "#ffffff" : "var(--text-secondary)",
+                    color: currentHomeStep === 5 ? "var(--accent-text, #0f172a)" : "var(--text-secondary)",
                     padding: "6px 14px",
                     borderRadius: "6px",
                     fontSize: "0.85rem",
@@ -5012,7 +5012,7 @@ export const Home: React.FC = () => {
                   style={{
                     border: "none",
                     background: currentHomeStep === 6 ? "var(--accent-primary, #6366f1)" : "transparent",
-                    color: currentHomeStep === 6 ? "#ffffff" : "var(--text-secondary)",
+                    color: currentHomeStep === 6 ? "var(--accent-text, #0f172a)" : "var(--text-secondary)",
                     padding: "6px 14px",
                     borderRadius: "6px",
                     fontSize: "0.85rem",

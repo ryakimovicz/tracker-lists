@@ -5745,7 +5745,7 @@ export const Profile: React.FC = () => {
                 });
                 return allowedTypes.map(type => {
                   const typeColor = type === 'all' ? 'var(--accent-primary)' : `var(--color-${type})`;
-                  const typeTextColor = type === 'all' ? '#ffffff' : `var(--color-text-${type})`;
+                  const typeTextColor = type === 'all' ? 'var(--accent-text, #0f172a)' : `var(--color-text-${type})`;
                   const isSelected = mediaFilter === type;
 
                   const typeCount = categoryItemCounts[type] || 0;

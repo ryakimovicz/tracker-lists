@@ -189,7 +189,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               ], user?.category_order).map(tab => {
                 const isSelected = activeSearchTab === tab.value;
                 const tabColor = tab.value === 'all' ? 'var(--accent-primary)' : `var(--color-${tab.value})`;
-                const tabTextColor = tab.value === 'all' ? '#ffffff' : `var(--color-text-${tab.value})`;
+                const tabTextColor = tab.value === 'all' ? 'var(--accent-text, #0f172a)' : `var(--color-text-${tab.value})`;
 
                 return (
                   <button

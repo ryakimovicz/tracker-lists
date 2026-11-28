@@ -995,7 +995,7 @@ h1, h2, h3, h4, h5, h6 {
 .shelf-view-toggle-btn.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: #ffffff;
+  color: var(--accent-text, #0f172a);
 }
 
 /* Profile Tabs Styling */
