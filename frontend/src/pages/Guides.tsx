@@ -663,45 +663,7 @@ export const Guides: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', paddingBottom: '2.5rem' }}>
-      {/* Header + Create Guide CTA */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          marginBottom: '1rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <GuideIcon size={24} style={{ color: 'var(--color-guide, #2DD4BF)' }} />
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {t('navGuides') || (language === 'es' ? 'Guías' : 'Guides')}
-          </h1>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => navigate('/create')}
-          className="btn-primary"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.55rem 1rem',
-            borderRadius: '10px',
-            fontWeight: 600,
-            fontSize: '0.92rem',
-            cursor: 'pointer',
-          }}
-        >
-          <CreateGuideIcon size={18} idSuffix="guides-cta" />
-          <span>{language === 'es' ? 'Crear guía' : 'Create Guide'}</span>
-        </button>
-      </div>
-
+    <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', paddingBottom: '5.5rem' }}>
       {/* Subtabs Bar */}
       <div
         ref={subtabsContainerRef}
@@ -1131,6 +1093,17 @@ export const Guides: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Action Button: Create Guide */}
+      <button
+        type="button"
+        className="guides-create-fab"
+        onClick={() => navigate('/create')}
+        aria-label={language === 'es' ? 'Crear guía' : 'Create Guide'}
+        title={language === 'es' ? 'Crear guía' : 'Create Guide'}
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
 
       {showProModal && <ProModal onClose={() => setShowProModal(false)} />}
     </div>

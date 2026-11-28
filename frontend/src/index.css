@@ -1282,6 +1282,35 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
 }
 
+.guides-create-fab {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-primary);
+  color: var(--accent-text, #0f172a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 900;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 14px var(--btn-glow, rgba(56, 189, 248, 0.3));
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.guides-create-fab:hover {
+  transform: scale(1.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 18px var(--btn-glow-hover, rgba(56, 189, 248, 0.45));
+}
+
+.guides-create-fab:active {
+  transform: scale(0.95);
+}
+
 /* Desktop Grid when a single category is filtered in Home */
 .desktop-category-grid {
   display: grid;
@@ -1631,6 +1660,13 @@ h1, h2, h3, h4, h5, h6 {
     z-index: 1000;
     box-sizing: content-box;
     touch-action: manipulation;
+  }
+
+  .guides-create-fab {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
+    right: 1rem;
+    width: 52px;
+    height: 52px;
   }
 
   [data-theme="light"] .mobile-bottom-nav {
