@@ -813,12 +813,15 @@ def get_following_feed(
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
-    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
+    excluded_types = [
+        "guide_commented", "item_commented", "guide_review_commented",
+        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited"
+    ]
     
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id.in_(followed_ids_query),
         UserActivityLog.is_hidden == False,
-        ~UserActivityLog.activity_type.in_(comment_types)
+        ~UserActivityLog.activity_type.in_(excluded_types)
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []
@@ -852,12 +855,16 @@ def get_discover_feed(
     # Discover feed: activities from public users (excluding self and already-followed users),
     # not hidden, no comment events, ranked by recency + engagement (likes & comments)
     public_users_query = db.query(User.id).filter(User.is_private == False)
-    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
+    excluded_types = [
+        "guide_commented", "item_commented", "guide_review_commented",
+        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited",
+        "item_reviewed", "item_rated", "guide_rated"
+    ]
 
     filters = [
         UserActivityLog.user_id.in_(public_users_query),
         UserActivityLog.is_hidden == False,
-        ~UserActivityLog.activity_type.in_(comment_types),
+        ~UserActivityLog.activity_type.in_(excluded_types),
     ]
     if current_user:
         followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
@@ -968,10 +975,13 @@ def get_my_activity_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
+    excluded_types = [
+        "guide_commented", "item_commented", "guide_review_commented",
+        "guide_created", "guide_edited", "item_added", "item_removed", "item_moved", "block_edited"
+    ]
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id == current_user.id,
-        ~UserActivityLog.activity_type.in_(comment_types)
+        ~UserActivityLog.activity_type.in_(excluded_types)
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []

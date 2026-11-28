@@ -297,6 +297,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       case 'item_reviewed':
         return isEs ? 'Escribió una reseña de' : 'Reviewed';
       case 'guide_created':
+      case 'guide_published':
         return isEs ? 'Creó la guía' : 'Created the guide';
       case 'guide_rated':
         return isEs ? 'Calificó la guía' : 'Rated the guide';
@@ -1216,7 +1217,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 );
               }
 
-              if (activity.activity_type === 'guide_created') {
+              if (activity.activity_type === 'guide_created' || activity.activity_type === 'guide_published') {
                 return (
                   <>
                     <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Creó la guía' : 'Created the guide'}</span>

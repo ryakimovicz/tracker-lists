@@ -348,18 +348,6 @@ def create_list(
     db.add(saved)
     db.commit()
 
-    # Record activity log
-    from app.services.activity_service import ActivityService
-    ActivityService.record_activity(
-        db=db,
-        user_id=current_user.id,
-        activity_type="guide_created",
-        item_title=new_list.title,
-        item_type="guide",
-        list_id=new_list.id,
-        details="created"
-    )
-
     return new_list
 
 def _is_tracker_list(db: Session, reading_list: Optional[ReadingList]) -> bool:
@@ -858,15 +846,16 @@ def update_list(
 
     if reading_list.visibility != VisibilityEnum.DRAFT:
         if old_visibility == VisibilityEnum.DRAFT:
-            ActivityService.record_activity(
-                db=db,
-                user_id=current_user.id,
-                activity_type="guide_published",
-                item_title=reading_list.title,
-                item_type="guide",
-                list_id=reading_list.id,
-                details="published"
-            )
+            if reading_list.visibility == VisibilityEnum.PUBLIC:
+                ActivityService.record_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="guide_published",
+                    item_title=reading_list.title,
+                    item_type="guide",
+                    list_id=reading_list.id,
+                    details="published"
+                )
         else:
             changed_parts = []
             if reading_list.title != old_title:
