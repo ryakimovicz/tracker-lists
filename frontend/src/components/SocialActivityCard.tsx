@@ -192,6 +192,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   };
 
   const handleDeleteActivity = async () => {
+    if (isDeleting) return;
     try {
       setIsDeleting(true);
       await apiClient.delete(`/social/feed/activity/${activity.id}`);
@@ -731,9 +732,13 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  openDeleteConfirm();
+                  if (e.shiftKey) {
+                    handleDeleteActivity();
+                  } else {
+                    openDeleteConfirm();
+                  }
                 }}
-                title={isEs ? 'Eliminar publicación' : 'Delete post'}
+                title={isEs ? 'Eliminar publicación (Shift+clic para eliminar directo)' : 'Delete post (Shift+click to delete immediately)'}
                 style={{
                   background: 'transparent',
                   border: 'none',
