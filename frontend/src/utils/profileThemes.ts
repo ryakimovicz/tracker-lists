@@ -61,7 +61,7 @@ export const PROFILE_THEME_COLORS: ProfileThemeColor[] = [
   },
   {
     id: 'rose',
-    name: { es: 'Fucsia Sunset', en: 'Sunset Fuchsia' },
+    name: { es: 'Fucsia Ocaso', en: 'Sunset Fuchsia' },
     dark: {
       accent: '#f43f5e',
       hover: '#e11d48',
@@ -268,11 +268,11 @@ export const PROFILE_THEME_COLORS: ProfileThemeColor[] = [
       glassBorder: 'rgba(250, 204, 21, 0.35)',
     },
     light: {
-      accent: '#ca8a04',
-      hover: '#a16207',
-      border: 'rgba(202, 138, 4, 0.25)',
-      glow: 'rgba(202, 138, 4, 0.35)',
-      glassBorder: 'rgba(202, 138, 4, 0.3)',
+      accent: '#eab308',
+      hover: '#ca8a04',
+      border: 'rgba(234, 179, 8, 0.3)',
+      glow: 'rgba(234, 179, 8, 0.38)',
+      glassBorder: 'rgba(234, 179, 8, 0.32)',
     },
   },
   {
@@ -322,11 +322,11 @@ export const PROFILE_THEME_COLORS: ProfileThemeColor[] = [
       glassBorder: 'rgba(254, 243, 199, 0.28)',
     },
     light: {
-      accent: '#d97706',
-      hover: '#b45309',
-      border: 'rgba(217, 119, 6, 0.25)',
-      glow: 'rgba(217, 119, 6, 0.32)',
-      glassBorder: 'rgba(217, 119, 6, 0.25)',
+      accent: '#a68a64',
+      hover: '#8c704c',
+      border: 'rgba(166, 138, 100, 0.28)',
+      glow: 'rgba(166, 138, 100, 0.34)',
+      glassBorder: 'rgba(166, 138, 100, 0.25)',
     },
   },
   {
@@ -396,10 +396,10 @@ export function getProfileTheme(colorId?: string | null, isLight: boolean = fals
       '--btn-glow': mode.glow,
       '--btn-glow-hover': mode.glow,
       '--accent-text': isLight 
-        ? '#ffffff' 
+        ? (theme.id === 'yellow' ? '#0f172a' : '#ffffff')
         : (theme.id === 'amber' || theme.id === 'yellow' || theme.id === 'lime' || theme.id === 'platinum' || theme.id === 'lavender' || theme.id === 'cream' ? '#0f172a' : '#ffffff'),
       '--accent-text-hover': isLight 
-        ? '#ffffff' 
+        ? (theme.id === 'yellow' ? '#0f172a' : '#ffffff')
         : (theme.id === 'platinum' || theme.id === 'yellow' || theme.id === 'cream' ? '#0f172a' : '#ffffff'),
     } as React.CSSProperties,
     modalStyles: {
