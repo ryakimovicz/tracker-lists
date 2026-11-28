@@ -21,6 +21,7 @@ const translations: Translations = {
   navHome: { en: 'Home', es: 'Inicio' },
   navSocial: { en: 'Social', es: 'Social' },
   navCreate: { en: 'Create', es: 'Crear' },
+  navGuides: { en: 'Guides', es: 'Guías' },
   navExplore: { en: 'Explore', es: 'Explorar' },
   navProfile: { en: 'Profile', es: 'Perfil' },
   navSettings: { en: 'Settings', es: 'Ajustes' },

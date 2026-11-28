@@ -16,6 +16,7 @@ const VerifyEmail = React.lazy(() => import('./pages/VerifyEmail'));
 const Home = React.lazy(() => import('./pages/Home'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 const Social = React.lazy(() => import('./pages/Social'));
+const Guides = React.lazy(() => import('./pages/Guides'));
 const CreateGuide = React.lazy(() => import('./pages/CreateGuide'));
 const ViewGuide = React.lazy(() => import('./pages/ViewGuide'));
 const SettingsPage = React.lazy(() => import('./pages/Settings'));
@@ -70,7 +71,7 @@ function AppContent() {
   const activeMainTab: MainTabType | null = React.useMemo(() => {
     if (effectivePathname === '/') return 'home';
     if (effectivePathname.startsWith('/social')) return 'social';
-    if (effectivePathname.startsWith('/create')) return 'create';
+    if (effectivePathname.startsWith('/guides')) return 'guides';
     if (effectivePathname.startsWith('/search')) return 'search';
     if (effectivePathname === '/profile' && !isEffectiveOtherUserProfile) return 'profile';
     return null;
@@ -301,13 +302,21 @@ function AppContent() {
                 }
               />
               <Route
-                path="/create"
+                path="/guides"
                 element={
                   isMainTabActive ? null : (
                     <RouteGuard>
-                      <CreateGuide />
+                      <Guides />
                     </RouteGuard>
                   )
+                }
+              />
+              <Route
+                path="/create"
+                element={
+                  <RouteGuard>
+                    <CreateGuide />
+                  </RouteGuard>
                 }
               />
               <Route

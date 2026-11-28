@@ -154,6 +154,24 @@ export const prefetchRoute = (route: string) => {
       }).catch(() => {});
       break;
     }
+    case '/guides': {
+      Promise.allSettled([
+        apiClient.get('/lists/explore'),
+        apiClient.get('/users/me')
+      ]).then(([guidesRes, meRes]) => {
+        if (guidesRes.status === 'fulfilled' && guidesRes.value.data) {
+          try {
+            sessionStorage.setItem('pathd_guides_explore_cache', JSON.stringify(guidesRes.value.data));
+          } catch (_) {}
+        }
+        if (meRes.status === 'fulfilled' && meRes.value.data) {
+          try {
+            sessionStorage.setItem('pathd_me_cache', JSON.stringify(meRes.value.data));
+          } catch (_) {}
+        }
+      }).catch(() => {});
+      break;
+    }
     case '/': {
       // Prefetch home dashboard data
       Promise.allSettled([
@@ -183,6 +201,7 @@ export const initGlobalPrefetch = () => {
     try {
       import('../pages/Home');
       import('../pages/Social');
+      import('../pages/Guides');
       import('../pages/Search');
       import('../pages/Profile');
       import('../pages/CreateGuide');

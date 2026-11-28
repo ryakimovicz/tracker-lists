@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star, Settings, Bell } from 'lucide-react';
 import { prefetchRoute } from '../utils/prefetch';
-import { CreateGuideIcon } from './CreateGuideIcon';
+import { GuideIcon } from './CreateGuideIcon';
 
 import { ProModal } from './ProModal';
 import { BrandLogo } from './BrandLogo';
@@ -28,6 +28,9 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, currentPath, c
   const isOtherUserProfile = currentPath === '/profile' && !!userIdParam && String(userIdParam) !== String(currentUserId);
 
   let isActive = currentPath === to || (to !== '/' && currentPath.startsWith(to));
+  if (to === '/guides' && currentPath.startsWith('/create')) {
+    isActive = true;
+  }
   if (to === '/profile' && isOtherUserProfile) {
     isActive = false;
   }
@@ -144,11 +147,11 @@ export const Sidebar: React.FC = () => {
           <>
             <NavItem to="/social" icon={Users} label={t('navSocial') || 'Social'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
             <NavItem
-              to="/create"
+              to="/guides"
               icon={({ size }: { size?: number }) => (
-                <CreateGuideIcon size={size || 20} idSuffix="sidebar" />
+                <GuideIcon size={size || 20} />
               )}
-              label={t('navCreate') || 'Crear'}
+              label={t('navGuides') || 'Guías'}
               currentPath={location.pathname}
               currentSearch={location.search}
               currentUserId={user?.id}

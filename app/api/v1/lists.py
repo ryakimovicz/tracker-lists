@@ -219,7 +219,7 @@ def get_explore_guides(
         saves_count = len(saves)
         comments_count = len(comments)
 
-        pop_score = (saves_count * 3) + (votes_count * 2) + (comments_count * 2)
+        pop_score = (saves_count * 3) + (votes_count * (avg_rating or 0) * 0.6) + (comments_count * 2)
 
         creator_name = l.creator.username if l.creator else "Comunidad de Pathd"
         creator_photo = getattr(l.creator, 'photo_url', None) or getattr(l.creator, 'profile_image_url', None) if l.creator else None
@@ -253,7 +253,7 @@ def get_explore_guides(
     populares = [
         item[0] for item in sorted(
             guide_items,
-            key=lambda x: (x[1], x[3], x[4]),
+            key=lambda x: (x[1], x[2], x[3], x[4]),
             reverse=True
         )[:20]
     ]

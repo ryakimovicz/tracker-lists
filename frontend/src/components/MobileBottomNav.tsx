@@ -4,7 +4,7 @@ import { Home, Users, Compass, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { prefetchRoute } from '../utils/prefetch';
-import { CreateGuideIcon } from './CreateGuideIcon';
+import { GuideIcon } from './CreateGuideIcon';
 
 export const MobileBottomNav: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -34,10 +34,10 @@ export const MobileBottomNav: React.FC = () => {
       isActive: currentPath.startsWith('/social')
     },
     {
-      to: '/create',
-      label: t('navCreate') || 'Crear',
-      icon: 'create-guide',
-      isActive: currentPath.startsWith('/create')
+      to: '/guides',
+      label: t('navGuides') || 'Guías',
+      icon: 'guides',
+      isActive: currentPath.startsWith('/guides') || currentPath.startsWith('/create')
     },
     {
       to: '/search',
@@ -75,11 +75,10 @@ export const MobileBottomNav: React.FC = () => {
             title={item.label}
           >
             <div className="mobile-bottom-nav-icon-wrap">
-              {item.icon === 'create-guide' ? (
-                <CreateGuideIcon
+              {item.icon === 'guides' ? (
+                <GuideIcon
                   size={24}
                   strokeWidth={item.isActive ? 2.3 : 1.85}
-                  idSuffix={`mobile-${item.isActive ? 'active' : 'idle'}`}
                 />
               ) : (
                 (() => {

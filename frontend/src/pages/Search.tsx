@@ -483,337 +483,6 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   );
 });
 
-interface ExploreGuidesSectionProps {
-  loading: boolean;
-  guidesData: any;
-  language: string;
-  isLight: boolean;
-  t: (key: string) => string;
-  navigate: (path: string) => void;
-}
-
-const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
-  loading,
-  guidesData,
-  language,
-  isLight,
-  t,
-  navigate
-}) => {
-  if (loading) {
-    return <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>{language === 'es' ? 'Cargando guías...' : 'Loading guides...'}</div>;
-  }
-
-  const rows = [
-    { 
-      key: 'populares', 
-      title: t('guidesPopular'), 
-      icon: <Flame size={18} color="#f97316" />, 
-      outlineColor: '#f97316',
-      items: guidesData?.populares || [] 
-    },
-    { 
-      key: 'mejor_valoradas', 
-      title: t('guidesTopRated'), 
-      icon: <Trophy size={18} color="#eab308" />, 
-      outlineColor: '#eab308',
-      items: guidesData?.mejor_valoradas || [] 
-    },
-    { 
-      key: 'mas_guardadas', 
-      title: t('guidesMostSaved'), 
-      icon: <Plus size={18} color="#ec4899" strokeWidth={2.5} />, 
-      outlineColor: '#ec4899',
-      items: guidesData?.mas_guardadas || [] 
-    },
-    { 
-      key: 'nuevas', 
-      title: t('guidesNew'), 
-      icon: <Clock size={18} color="var(--accent-primary)" />, 
-      outlineColor: 'var(--accent-primary)',
-      items: guidesData?.nuevas || [] 
-    },
-  ].filter(r => r.items.length > 0);
-
-  if (rows.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1rem' }}>
-        <BookOpen size={40} style={{ opacity: 0.4, marginBottom: '0.75rem' }} />
-        <p style={{ margin: 0 }}>{language === 'es' ? 'Aún no hay guías públicas disponibles.' : 'No public guides available yet.'}</p>
-      </div>
-    );
-  }
-
-  const renderMediaIcon = (mt: string) => {
-    switch (mt) {
-      case 'movie':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
-      case 'series':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'TV Shows'}><Tv size={13} color="var(--color-series)" /></span>;
-      case 'anime':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
-      case 'manga':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><MessageCircle size={13} color="var(--color-manga)" /></span>;
-      case 'game':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
-      case 'book':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
-      case 'comic':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><MessageSquare size={13} color="var(--color-comic)" /></span>;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {rows.map(row => (
-        <HorizontalScroll 
-          key={row.key} 
-          title={
-            <>
-              {row.icon}
-              <span>{row.title}</span>
-            </>
-          } 
-          outlineColor={row.outlineColor}
-          itemCount={row.items.length}
-        >
-          {row.items.map((guide: any) => {
-            const gTheme = guide.accent_color ? getProfileTheme(guide.accent_color, isLight) : null;
-            const guideColorVars: React.CSSProperties = (gTheme
-              ? {
-                  '--guide-accent': gTheme.accent,
-                  '--title-hover-color': gTheme.accent,
-                  '--card-hover-glow': gTheme.glow,
-                  '--accent-primary': gTheme.accent,
-                }
-              : {
-                  '--guide-accent': 'var(--color-guide)',
-                  '--title-hover-color': 'var(--color-guide)',
-                }) as unknown as React.CSSProperties;
-            return (
-            <div
-              key={guide.id}
-              className="activity-card activity-card-portrait guide-explore-card"
-              style={{
-                minWidth: '240px',
-                width: '240px',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
-                ...guideColorVars
-              }}
-              onClick={() => navigate(`/guide/${guide.id}`)}
-            >
-              {/* Desktop Title / Card Title + Rating */}
-              <div
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderBottom: '1px solid var(--border-color)',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem'
-                }}
-              >
-                <div
-                  className="card-item-title"
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    lineHeight: 1.3,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    flex: 1,
-                    minWidth: 0,
-                    transition: 'color 0.2s ease'
-                  }}
-                  title={guide.title}
-                >
-                  {guide.title}
-                </div>
-                {(guide.average_rating != null || guide.saves_count > 0) && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: '2px',
-                      flexShrink: 0,
-                      paddingTop: '1px'
-                    }}
-                  >
-                    {guide.saves_count > 0 && (
-                      <span
-                        title={language === 'es' ? 'Seguidores de la guía' : 'Guide followers'}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          color: '#ec4899',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          lineHeight: 1.2,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        <Plus size={12} strokeWidth={2.5} />
-                        {guide.saves_count >= 1000 ? `${(guide.saves_count / 1000).toFixed(guide.saves_count >= 10000 ? 0 : 1)}k` : guide.saves_count}
-                      </span>
-                    )}
-                    {guide.average_rating != null && (
-                      <span
-                        title={language === 'es' ? 'Valoración promedio' : 'Average rating'}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          color: '#eab308',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          lineHeight: 1.2,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        <Star size={12} fill="#eab308" color="#eab308" />
-                        {guide.average_rating}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Cover Collage or Banner */}
-              <div className="card-media-cover" style={{
-                position: 'relative',
-                width: '100%',
-                height: '140px',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-              }}>
-                {guide.banner_url ? (
-                  <img
-                    src={guide.banner_url}
-                    alt={guide.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                ) : guide.covers && guide.covers.length > 0 ? (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: guide.covers.length >= 2 ? '1fr 1fr' : '1fr',
-                    gridTemplateRows: guide.covers.length >= 3 ? '1fr 1fr' : '1fr',
-                    width: '100%',
-                    height: '100%',
-                    gap: '2px',
-                    background: '#000'
-                  }}>
-                    {guide.covers.slice(0, 4).map((img: string, cIdx: number) => (
-                      <img
-                        key={cIdx}
-                        src={img}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                    <BookOpen size={28} color="var(--guide-accent, var(--color-guide))" />
-                  </div>
-                )}
-
-                {guide.user_progress_percentage != null && (
-                  <span
-                    title={language === 'es'
-                      ? `Tu progreso: ${Math.round(guide.user_progress_percentage)}%`
-                      : `Your progress: ${Math.round(guide.user_progress_percentage)}%`}
-                    style={{
-                      position: 'absolute',
-                      bottom: '6px',
-                      right: '6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      background: Math.round(guide.user_progress_percentage) >= 100
-                        ? (gTheme ? gTheme.accent : 'var(--color-guide)')
-                        : 'rgba(15, 23, 42, 0.84)',
-                      color: Math.round(guide.user_progress_percentage) >= 100
-                        ? (gTheme ? ((gTheme.cssVariables as any)['--accent-text'] || '#fff') : '#fff')
-                        : '#ffffff',
-                      border: `1px solid ${gTheme ? gTheme.accent : 'var(--color-guide)'}`,
-                      backdropFilter: 'blur(4px)',
-                      zIndex: 2
-                    }}
-                  >
-                    {Math.round(guide.user_progress_percentage)}%
-                  </span>
-                )}
-              </div>
-
-              <GuideMediaTypeBar mediaTypeCounts={guide.media_type_counts} language={language} />
-
-              {/* Body Content */}
-              <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.62rem',
-                    fontWeight: 700,
-                    color: '#fff',
-                    overflow: 'hidden',
-                    flexShrink: 0
-                  }}>
-                    {guide.creator_photo_url ? (
-                      <img src={guide.creator_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      guide.creator_username?.charAt(0).toUpperCase() || 'P'
-                    )}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {guide.creator_username}
-                  </span>
-                </div>
-
-                {/* Badges / Metrics */}
-                <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', minWidth: 0 }}>
-                  <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{guide.items_count} {t('guidesWorksCount')}</span>
-                </div>
-              </div>
-            </div>
-            );
-          })}
-        </HorizontalScroll>
-      ))}
-    </div>
-  );
-});
-
 export const Search: React.FC = () => {
   const { user } = useAuth();
   const { t, language } = useTranslation();
@@ -915,15 +584,22 @@ export const Search: React.FC = () => {
 
   const { effectiveSearchParams, searchParams, setSearchParams } = useEffectiveSearchParams('/search');
 
-  const validExploreTabs = ['new', 'trending', 'guides'] as const;
+  const validExploreTabs = ['new', 'trending'] as const;
   type ExploreTab = typeof validExploreTabs[number];
 
   const exploreTabParamRaw = effectiveSearchParams?.get('tab');
-  // Backwards compatibility for legacy Spanish params: 'nuevo' -> 'new', 'tendencias' -> 'trending', 'guias' -> 'guides'
+
+  // Redirect legacy /search?tab=guides (or guias) links to the dedicated /guides hub
+  useEffect(() => {
+    if (exploreTabParamRaw === 'guides' || exploreTabParamRaw === 'guias') {
+      navigate('/guides?tab=popular', { replace: true });
+    }
+  }, [exploreTabParamRaw, navigate]);
+
+  // Backwards compatibility for legacy Spanish params: 'nuevo' -> 'new', 'tendencias' -> 'trending'
   const normalizedTabParam = 
     exploreTabParamRaw === 'nuevo' ? 'new' :
     exploreTabParamRaw === 'tendencias' ? 'trending' :
-    exploreTabParamRaw === 'guias' ? 'guides' :
     exploreTabParamRaw;
 
   const exploreSubTab: ExploreTab = (normalizedTabParam && validExploreTabs.includes(normalizedTabParam as any))
@@ -943,11 +619,10 @@ export const Search: React.FC = () => {
     }
     setActiveExploreSubTab(tab);
 
-    const step = tab === 'trending' ? 1 : tab === 'guides' ? 2 : 0;
+    const step = tab === 'trending' ? 1 : 0;
     if (exploreSubtabsContainerRef.current) {
       exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', String(step));
-      const indColor = step === 1 ? '#f97316' : step === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
-      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', 'var(--accent-primary)');
     }
     subtabItemRefs.current.forEach((el, i) => {
       if (!el) return;
@@ -963,19 +638,18 @@ export const Search: React.FC = () => {
     setSearchParams(newParams);
   };
 
-  const currentExploreStep = activeExploreSubTab === 'trending' ? 1 : activeExploreSubTab === 'guides' ? 2 : 0;
+  const currentExploreStep = activeExploreSubTab === 'trending' ? 1 : 0;
 
   const goToExploreStep = (step: number) => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
-    const targetTab = step === 1 ? 'trending' : step === 2 ? 'guides' : 'new';
+    const targetTab = step === 1 ? 'trending' : 'new';
     setActiveExploreSubTab(targetTab);
 
     if (exploreSubtabsContainerRef.current) {
       exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', String(step));
-      const indColor = step === 1 ? '#f97316' : step === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
-      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', 'var(--accent-primary)');
     }
     subtabItemRefs.current.forEach((el, i) => {
       if (!el) return;
@@ -993,13 +667,12 @@ export const Search: React.FC = () => {
     const indicator = desktopExploreIndicatorRef.current;
     const el = subtabItemRefs.current[targetIdx];
     if (!indicator || !el) return;
-    const color = targetIdx === 1 ? '#f97316' : targetIdx === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
     if (instant) {
       indicator.style.transition = 'none';
     }
     indicator.style.transform = `translate3d(${el.offsetLeft}px, 0, 0)`;
     indicator.style.width = `${el.offsetWidth}px`;
-    indicator.style.background = color;
+    indicator.style.background = 'var(--accent-primary)';
     indicator.style.opacity = '1';
     if (instant) {
       void indicator.offsetWidth;
@@ -1016,17 +689,10 @@ export const Search: React.FC = () => {
   }, [currentExploreStep, submittedQuery, language, moveDesktopExploreIndicator]);
 
   const handleScrollProgress = React.useCallback((progress: number) => {
-    const clamped = Math.min(2, Math.max(0, progress));
+    const clamped = Math.min(1, Math.max(0, progress));
     if (exploreSubtabsContainerRef.current) {
       exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', clamped.toFixed(4));
-
-      let indColor = 'var(--accent-primary)';
-      if (clamped <= 1) {
-        indColor = `color-mix(in srgb, #f97316 ${Math.round(clamped * 100)}%, var(--accent-primary))`;
-      } else {
-        indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round((clamped - 1) * 100)}%, #f97316)`;
-      }
-      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', 'var(--accent-primary)');
     }
     subtabItemRefs.current.forEach((el, i) => {
       if (!el) return;
@@ -1042,8 +708,6 @@ export const Search: React.FC = () => {
 
   const [exploreData, setExploreData] = useState<any>(null);
   const [loadingExplore, setLoadingExplore] = useState(false);
-  const [guidesData, setGuidesData] = useState<any>(null);
-  const [loadingGuides, setLoadingGuides] = useState(false);
 
   const buildCategorizedList = (items: any[]) => {
     if (!items || items.length === 0) return [];
@@ -1298,32 +962,6 @@ export const Search: React.FC = () => {
       fetchExplore();
     }
   }, [submittedQuery]);
-
-  useEffect(() => {
-    if (submittedQuery === '' && activeExploreSubTab === 'guides' && !guidesData) {
-      const fetchGuides = async () => {
-        const cachedRaw = sessionStorage.getItem('pathd_guides_explore_cache');
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            if (parsed) setGuidesData(parsed);
-          } catch (e) {}
-        } else {
-          setLoadingGuides(true);
-        }
-        try {
-          const res = await apiClient.get('/lists/explore');
-          setGuidesData(res.data);
-          sessionStorage.setItem('pathd_guides_explore_cache', JSON.stringify(res.data));
-        } catch (e) {
-          console.error("Failed to load explore guides", e);
-        } finally {
-          setLoadingGuides(false);
-        }
-      };
-      fetchGuides();
-    }
-  }, [submittedQuery, activeExploreSubTab, guidesData]);
 
   const searchRequestIdRef = React.useRef<number>(0);
 
@@ -2060,11 +1698,8 @@ export const Search: React.FC = () => {
               paddingTop: "0.25rem",
               position: "relative",
               '--tab-progress': String(currentExploreStep),
-              '--explore-indicator-color': (
-                currentExploreStep === 1 ? '#f97316' :
-                currentExploreStep === 2 ? 'var(--color-guide, #2DD4BF)' :
-                'var(--accent-primary)'
-              )
+              '--explore-tab-count': '2',
+              '--explore-indicator-color': 'var(--accent-primary)'
             } as React.CSSProperties}
           >
               <button 
@@ -2111,7 +1746,7 @@ export const Search: React.FC = () => {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "0.5rem",
-                  '--tab-color': '#f97316',
+                  '--tab-color': 'var(--accent-primary)',
                   '--tab-act': activeExploreSubTab === 'trending' ? '1' : '0'
                 } as React.CSSProperties}
               >
@@ -2119,33 +1754,6 @@ export const Search: React.FC = () => {
                   <Flame size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreTrending')}</span>
-              </button>
-
-              <button 
-                type="button"
-                ref={el => { subtabItemRefs.current[2] = el; }}
-                className={`explore-subtab-item explore-tab-guides ${activeExploreSubTab === 'guides' ? 'active' : ''}`}
-                onClick={() => goToExploreStep(2)}
-                onMouseEnter={() => moveDesktopExploreIndicator(2)}
-                title={t('exploreGuides')}
-                style={{
-                  fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'guides' ? 600 : 500,
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "0.25rem 0",
-                  position: "relative",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  '--tab-color': 'var(--color-guide, #2DD4BF)',
-                  '--tab-act': activeExploreSubTab === 'guides' ? '1' : '0'
-                } as React.CSSProperties}
-              >
-                <span className="explore-subtab-icon">
-                  <BookOpen size={17} />
-                </span>
-                <span className="explore-subtab-label">{t('exploreGuides')}</span>
               </button>
 
               {/* Sliding Hover & Active Indicator for Desktop Explore Subtabs */}
@@ -2175,7 +1783,7 @@ export const Search: React.FC = () => {
       {submittedQuery === '' ? (
         <SwipeViewPager
           currentIndex={currentExploreStep}
-          totalSlides={3}
+          totalSlides={2}
           onSlideChange={goToExploreStep}
           onScrollProgress={handleScrollProgress}
           ignoreSelector={activeTab === 'all' ? '.horizontal-scroll-container, .horizontal-scroll-content, .scroll-fade-zone, .scroll-nav-arrow, .home-scroll-carousel' : undefined}
@@ -2205,18 +1813,6 @@ export const Search: React.FC = () => {
               onOpenItem={handleOpenItemDetails}
               getTagClass={getTagClass}
               isFiltered={activeTab !== 'all'}
-            />
-          </div>
-
-          {/* Slide 2: Guías */}
-          <div style={{ width: "100%", flex: 1, marginTop: '1rem' }}>
-            <ExploreGuidesSection
-              loading={loadingGuides}
-              guidesData={guidesData}
-              language={language}
-              isLight={isLight}
-              t={t}
-              navigate={navigate}
             />
           </div>
         </SwipeViewPager>

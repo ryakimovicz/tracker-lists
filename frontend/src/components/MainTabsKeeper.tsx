@@ -3,11 +3,11 @@ import { PathdLoader } from './PathdLoader';
 
 const Home = React.lazy(() => import('../pages/Home'));
 const Social = React.lazy(() => import('../pages/Social'));
-const CreateGuide = React.lazy(() => import('../pages/CreateGuide'));
+const Guides = React.lazy(() => import('../pages/Guides'));
 const Search = React.lazy(() => import('../pages/Search'));
 const Profile = React.lazy(() => import('../pages/Profile'));
 
-export type MainTabType = 'home' | 'social' | 'create' | 'search' | 'profile';
+export type MainTabType = 'home' | 'social' | 'guides' | 'search' | 'profile';
 
 interface MainTabsKeeperProps {
   activeTab: MainTabType | null;
@@ -20,7 +20,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
   const [visitedTabs, setVisitedTabs] = useState<Record<MainTabType, boolean>>(() => ({
     home: activeTab === 'home',
     social: activeTab === 'social',
-    create: activeTab === 'create',
+    guides: activeTab === 'guides',
     search: activeTab === 'search',
     profile: activeTab === 'profile'
   }));
@@ -29,7 +29,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
   const scrollPositionsRef = useRef<Record<MainTabType, number>>({
     home: 0,
     social: 0,
-    create: 0,
+    guides: 0,
     search: 0,
     profile: 0
   });
@@ -127,15 +127,15 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
       </div>
 
       <div
-        id="tab-view-create"
+        id="tab-view-guides"
         style={{
-          display: activeTab === 'create' ? 'block' : 'none',
+          display: activeTab === 'guides' ? 'block' : 'none',
           width: '100%'
         }}
       >
-        {(visitedTabs.create || activeTab === 'create') && (
+        {(visitedTabs.guides || activeTab === 'guides') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
-            <CreateGuide />
+            <Guides />
           </Suspense>
         )}
       </div>
