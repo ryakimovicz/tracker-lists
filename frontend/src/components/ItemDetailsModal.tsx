@@ -1495,7 +1495,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [replyTarget, setReplyTarget] = useState<{ rootReviewId: number; replyToUser: string; targetReviewId: number } | null>(null);
   const [replyText, setReplyText] = useState<string>('');
   const [replyMedia, setReplyMedia] = useState<SelectedKlipyMedia | null>(null);
+  const REPLIES_PAGE_SIZE = 5;
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [visibleRepliesCount, setVisibleRepliesCount] = useState<Record<number, number>>({});
   const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [isSubmittingReply, setIsSubmittingReply] = useState<boolean>(false);
   const [isEditingComment, setIsEditingComment] = useState<boolean>(false);
@@ -5053,6 +5055,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setReplyMedia(null);
       setReplyTarget(null);
       setCollapsedReplies(prev => ({ ...prev, [rootParentId]: false }));
+      setVisibleRepliesCount(prev => ({ ...prev, [rootParentId]: Math.max(prev[rootParentId] || REPLIES_PAGE_SIZE, 9999) }));
     } catch (err) {
       console.error("Failed to post reply", err);
     } finally {
@@ -5090,6 +5093,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const toggleCollapseReplies = (reviewId: number) => {
     setCollapsedReplies(prev => {
       const currentlyCollapsed = prev[reviewId] !== false;
+      if (!currentlyCollapsed) {
+        setVisibleRepliesCount(v => ({ ...v, [reviewId]: REPLIES_PAGE_SIZE }));
+      }
       return {
         ...prev,
         [reviewId]: !currentlyCollapsed
@@ -10212,6 +10218,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         const childReplies = sortRepliesOldestFirst((itemReviews || []).filter((r: any) => r.parent_id === rootNode.id));
                         const hasReplies = childReplies.length > 0;
                         const isCollapsed = collapsedReplies[rootNode.id] !== false;
+                        const replyLimit = visibleRepliesCount[rootNode.id] ?? REPLIES_PAGE_SIZE;
+                        const visibleChildReplies = hasReplies ? childReplies.slice(0, replyLimit) : [];
+                        const remainingChildReplies = hasReplies ? childReplies.length - visibleChildReplies.length : 0;
                         const isReplyingRoot = replyTarget?.targetReviewId === rootNode.id;
                         const isEditingThisComment = editingCommentId === rootNode.id;
 
@@ -10219,15 +10228,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           <div
                             key={rootNode.id}
                             style={{
-                              padding: '1rem',
-                              background: 'var(--bg-secondary)',
-                              borderRadius: '8px',
-                              border: '1px solid var(--border-color)',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '0.6rem'
+                              gap: '0.5rem'
                             }}
                           >
+                            <div
+                              className={hasReplies && !isCollapsed ? 'sticky-comment-parent' : undefined}
+                              style={{
+                                padding: '1rem',
+                                background: 'var(--bg-secondary)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.6rem',
+                                ...(hasReplies && !isCollapsed ? {
+                                  position: 'sticky',
+                                  top: 0,
+                                  zIndex: 5,
+                                  background: 'var(--bg-card-solid, var(--bg-primary))',
+                                  boxShadow: '0 -24px 0 12px var(--bg-primary), 0 4px 12px rgba(0, 0, 0, 0.26)'
+                                } : {})
+                              }}
+                            >
                             {/* Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -10586,6 +10610,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 language={language}
                               />
                             )}
+                            </div>
 
                             {/* Replies List */}
                             {hasReplies && !isCollapsed && (
@@ -10597,10 +10622,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   marginLeft: '1.25rem',
                                   paddingLeft: '0.85rem',
                                   borderLeft: '2px solid var(--border-color)',
-                                  marginTop: '0.25rem'
+                                  marginTop: '0.1rem'
                                 }}
                               >
-                                {childReplies.map((reply: any) => {
+                                {visibleChildReplies.map((reply: any) => {
                                   const isReplyingChild = replyTarget?.targetReviewId === reply.id;
                                   const isEditingThisReply = editingReplyId === reply.id;
 
@@ -10887,6 +10912,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     </div>
                                   );
                                 })}
+                                {remainingChildReplies > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setVisibleRepliesCount(prev => ({
+                                        ...prev,
+                                        [rootNode.id]: (prev[rootNode.id] ?? REPLIES_PAGE_SIZE) + REPLIES_PAGE_SIZE
+                                      }))
+                                    }
+                                    style={{
+                                      alignSelf: 'flex-start',
+                                      marginTop: '0.2rem',
+                                      padding: '0.28rem 0.75rem',
+                                      borderRadius: '999px',
+                                      background: 'var(--bg-tertiary)',
+                                      border: '1px solid var(--border-color)',
+                                      color: 'var(--accent-primary)',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {language === 'es'
+                                      ? `Cargar más respuestas (${remainingChildReplies})`
+                                      : `Load more replies (${remainingChildReplies})`}
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>

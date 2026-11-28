@@ -144,7 +144,9 @@ export const ViewGuide: React.FC = () => {
     targetCommentId: number;
   } | null>(null);
   const [replyText, setReplyText] = useState('');
+  const REPLIES_PAGE_SIZE = 5;
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [visibleRepliesCount, setVisibleRepliesCount] = useState<Record<number, number>>({});
   const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -542,6 +544,7 @@ export const ViewGuide: React.FC = () => {
       setReplyTarget(null);
       // Auto un-collapse parent so the new reply is visible immediately
       setCollapsedReplies(prev => ({ ...prev, [rootParentId]: false }));
+      setVisibleRepliesCount(prev => ({ ...prev, [rootParentId]: Math.max(prev[rootParentId] || REPLIES_PAGE_SIZE, 9999) }));
     } catch (err) {
       console.error("Failed to post reply", err);
     } finally {
@@ -552,6 +555,9 @@ export const ViewGuide: React.FC = () => {
   const toggleCollapseReplies = (commentId: number) => {
     setCollapsedReplies(prev => {
       const currentlyCollapsed = prev[commentId] !== false;
+      if (!currentlyCollapsed) {
+        setVisibleRepliesCount(v => ({ ...v, [commentId]: REPLIES_PAGE_SIZE }));
+      }
       return {
         ...prev,
         [commentId]: !currentlyCollapsed
@@ -2275,11 +2281,15 @@ export const ViewGuide: React.FC = () => {
                 const isReplyingRoot = replyTarget?.targetCommentId === node.id;
                 const isCollapsed = collapsedReplies[node.id] !== false;
                 const hasReplies = node.replies && node.replies.length > 0;
+                const replyLimit = visibleRepliesCount[node.id] ?? REPLIES_PAGE_SIZE;
+                const visibleNodeReplies = hasReplies ? node.replies.slice(0, replyLimit) : [];
+                const remainingNodeReplies = hasReplies ? node.replies.length - visibleNodeReplies.length : 0;
 
                 return (
                   <div key={node.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                    {/* Root Comment Card (Depth 0) */}
+                    {/* Root Comment Card (Depth 0 - sticky while replies are expanded) */}
                     <div
+                      className={hasReplies && !isCollapsed ? 'sticky-comment-parent sticky-comment-parent-page' : undefined}
                       style={{
                         padding: '1.15rem',
                         background: 'var(--bg-secondary)',
@@ -2287,7 +2297,14 @@ export const ViewGuide: React.FC = () => {
                         border: '1px solid var(--border-color)',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.6rem'
+                        gap: '0.6rem',
+                        ...(hasReplies && !isCollapsed ? {
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 5,
+                          background: 'var(--bg-card-solid, var(--bg-primary))',
+                          boxShadow: '0 -24px 0 12px var(--bg-primary), 0 4px 14px rgba(0, 0, 0, 0.28)'
+                        } : {})
                       }}
                     >
                       {/* Header */}
@@ -2518,7 +2535,7 @@ export const ViewGuide: React.FC = () => {
                           marginTop: '0.25rem'
                         }}
                       >
-                        {node.replies.map((reply) => {
+                        {visibleNodeReplies.map((reply) => {
                           const isReplyingChild = replyTarget?.targetCommentId === reply.id;
                           return (
                             <div key={reply.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -2724,6 +2741,33 @@ export const ViewGuide: React.FC = () => {
                             </div>
                           );
                         })}
+                        {remainingNodeReplies > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisibleRepliesCount(prev => ({
+                                ...prev,
+                                [node.id]: (prev[node.id] ?? REPLIES_PAGE_SIZE) + REPLIES_PAGE_SIZE
+                              }))
+                            }
+                            style={{
+                              alignSelf: 'flex-start',
+                              marginTop: '0.25rem',
+                              padding: '0.3rem 0.8rem',
+                              borderRadius: '999px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--accent-primary)',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {language === 'es'
+                              ? `Cargar más respuestas (${remainingNodeReplies})`
+                              : `Load more replies (${remainingNodeReplies})`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

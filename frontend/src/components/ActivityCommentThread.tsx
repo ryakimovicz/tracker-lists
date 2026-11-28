@@ -42,9 +42,11 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const { language } = useTranslation();
   const isEs = language === 'es';
 
+  const REPLIES_PAGE_SIZE = 5;
   const [comments, setComments] = useState<ActivityCommentItem[]>([]);
   const [commentSortMode, setCommentSortMode] = useState<CommentSortMode>('relevance');
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [visibleRepliesCount, setVisibleRepliesCount] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +62,9 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const toggleCollapseReplies = (commentId: number) => {
     setCollapsedReplies(prev => {
       const currentlyCollapsed = prev[commentId] !== false;
+      if (!currentlyCollapsed) {
+        setVisibleRepliesCount(v => ({ ...v, [commentId]: REPLIES_PAGE_SIZE }));
+      }
       return {
         ...prev,
         [commentId]: !currentlyCollapsed
@@ -150,6 +155,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
       const rootId = findRootCommentId(comments, parentId);
       if (rootId) {
         setCollapsedReplies(prev => ({ ...prev, [rootId]: false }));
+        setVisibleRepliesCount(prev => ({ ...prev, [rootId]: Math.max(prev[rootId] || REPLIES_PAGE_SIZE, 9999) }));
       }
       await fetchComments();
     } catch (err) {
@@ -658,16 +664,31 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
             const descendantReplies = sortRepliesOldestFirst(getAllDescendantReplies(rootComment));
             const hasReplies = descendantReplies.length > 0;
             const isCollapsed = collapsedReplies[rootComment.id] !== false;
+            const replyLimit = visibleRepliesCount[rootComment.id] ?? REPLIES_PAGE_SIZE;
+            const visibleReplies = descendantReplies.slice(0, replyLimit);
+            const remainingReplies = descendantReplies.length - visibleReplies.length;
 
             return (
               <div key={rootComment.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* Root Comment */}
-                {renderSingleComment(rootComment, false, hasReplies ? {
-                  hasReplies,
-                  isCollapsed,
-                  repliesCount: descendantReplies.length,
-                  onToggle: () => toggleCollapseReplies(rootComment.id)
-                } : undefined)}
+                {/* Root Comment (sticky while its replies are expanded) */}
+                <div
+                  className={hasReplies && !isCollapsed ? 'sticky-comment-parent' : undefined}
+                  style={hasReplies && !isCollapsed ? {
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 5,
+                    background: 'var(--bg-card-solid, var(--bg-primary))',
+                    boxShadow: '0 -24px 0 12px var(--bg-primary), 0 4px 10px rgba(0, 0, 0, 0.22)',
+                    borderRadius: '6px'
+                  } : undefined}
+                >
+                  {renderSingleComment(rootComment, false, hasReplies ? {
+                    hasReplies,
+                    isCollapsed,
+                    repliesCount: descendantReplies.length,
+                    onToggle: () => toggleCollapseReplies(rootComment.id)
+                  } : undefined)}
+                </div>
 
                 {/* All descendant replies flattened at a single indentation level */}
                 {hasReplies && !isCollapsed && (
@@ -682,7 +703,35 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
                       marginBottom: '0.4rem'
                     }}
                   >
-                    {descendantReplies.map(reply => renderSingleComment(reply, true))}
+                    {visibleReplies.map(reply => renderSingleComment(reply, true))}
+                    {remainingReplies > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVisibleRepliesCount(prev => ({
+                            ...prev,
+                            [rootComment.id]: (prev[rootComment.id] ?? REPLIES_PAGE_SIZE) + REPLIES_PAGE_SIZE
+                          }))
+                        }
+                        style={{
+                          alignSelf: 'flex-start',
+                          marginTop: '0.35rem',
+                          marginBottom: '0.2rem',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '999px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--accent-primary)',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isEs
+                          ? `Cargar más respuestas (${remainingReplies})`
+                          : `Load more replies (${remainingReplies})`}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

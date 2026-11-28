@@ -5,6 +5,7 @@
   /* Premium Dark Theme Color Tokens (Letterboxd/Cinema Deep Charcoal Style) */
   --bg-primary: #090d16; /* Deep Cinema Charcoal */
   --bg-secondary: rgba(18, 24, 38, 0.65); /* Translucent charcoal card */
+  --bg-card-solid: #121826; /* Opaque charcoal card for sticky surfaces */
   --bg-tertiary: rgba(30, 41, 59, 0.55); /* Elevated slate surface */
   
   --text-primary: #f8fafc; /* Crisp light */
@@ -66,6 +67,7 @@
   /* Premium Light Theme Color Tokens (Clean Modern Studio Style) */
   --bg-primary: #f8fafc; /* Slate-50 Clean Soft Canvas */
   --bg-secondary: #ffffff; /* Crisp white card */
+  --bg-card-solid: #ffffff; /* Opaque white card for sticky surfaces */
   --bg-tertiary: #f1f5f9; /* Slate-100 subtle surface */
   
   --text-primary: #0f172a; /* Slate-900 high contrast */
@@ -3674,6 +3676,15 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: 1rem !important;
     padding-bottom: 1.5rem !important;
     overflow-y: auto !important;
+  }
+
+  .activity-modal-card {
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sticky-comment-parent-page {
+    top: 56px !important;
   }
 
   /* Customize Selector Modals (Avatar, Banner, Background) Layout on Mobile:
