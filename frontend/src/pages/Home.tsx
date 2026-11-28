@@ -38,13 +38,18 @@ export const getTagClass = (type: string) => {
   }
 };
 
-export const cleanComicIssueName = (rawName?: string, issueNum?: any): string => {
+export const cleanComicIssueName = (rawName?: string, issueNum?: any, volumeTitle?: string): string => {
   if (!rawName) return '';
   let name = String(rawName).trim();
   const numStr = issueNum != null ? String(issueNum).trim() : '';
 
   // If name is just "#1" or "Issue 1" or "Issue #1" or identical to number
   if (/^#?\s*\d+(\.\d+)?$/i.test(name) || /^issue\s*#?\s*\d+(\.\d+)?$/i.test(name)) {
+    return '';
+  }
+
+  // If name is just "<Volume Title> #<num>" or "<Volume Title> Issue #<num>" with no actual issue subtitle
+  if (/^.+?\s+(?:issue\s*)?#\s*\d+(\.\d+)?$/i.test(name)) {
     return '';
   }
 
@@ -57,8 +62,12 @@ export const cleanComicIssueName = (rawName?: string, issueNum?: any): string =>
   // Strip leading issue number prefix, e.g. "#1 - Title", "#1: Title", "1. Title", "Issue #1 - Title"
   name = name.replace(/^(issue\s*)?#?\s*\d+(\.\d+)?\s*[-:–—.]\s*/i, '').trim();
 
-  // If after stripping it's empty or still just the issue number
-  if (!name || (numStr && (name === numStr || name === `#${numStr}` || name.toLowerCase() === `issue ${numStr}` || name.toLowerCase() === `issue #${numStr}`))) {
+  // If after stripping it's empty, identical to volume title, or still just the issue number
+  if (
+    !name ||
+    (volumeTitle && name.toLowerCase() === String(volumeTitle).trim().toLowerCase()) ||
+    (numStr && (name === numStr || name === `#${numStr}` || name.toLowerCase() === `issue ${numStr}` || name.toLowerCase() === `issue #${numStr}`))
+  ) {
     return '';
   }
   return name;
@@ -3870,11 +3879,17 @@ export const Home: React.FC = () => {
                                         {epLabel}
                                       </span>
                                     )}
-                                    {isEpisodeItem && uItem.name && (
-                                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        - {uItem.name}
-                                      </span>
-                                    )}
+                                    {isEpisodeItem && (() => {
+                                      const displaySubName = uItem.item_type === 'comic'
+                                        ? cleanComicIssueName(uItem.name, uItem.episode_number, uItem.title)
+                                        : uItem.name;
+                                      if (!displaySubName) return null;
+                                      return (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          - {displaySubName}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
 
                                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
