@@ -4055,8 +4055,12 @@ export const Home: React.FC = () => {
                   }
                 }
 
-                const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
-                const canBlurGuideSetting = !currentUser || ((currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) && currentUser?.blur_unwatched_episodes);
+                const isGuideEpisode = Boolean(
+                  g.item_type === 'episode' ||
+                  String(g.external_id || '').startsWith('tvm-ep-') ||
+                  /S(\d+)E(\d+)/i.test(g.title || '')
+                );
+                const canBlurGuideSetting = !currentUser || (canUseAntiSpoiler(currentUser) && currentUser?.blur_unwatched_episodes);
                 const shouldBlurGuide = Boolean(
                   canBlurGuideSetting &&
                   isGuideEpisode &&
@@ -4144,8 +4148,12 @@ export const Home: React.FC = () => {
                     }
                   }
 
-                  const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
-                  const canBlurGuideSetting = !currentUser || ((currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) && currentUser?.blur_unwatched_episodes);
+                  const isGuideEpisode = Boolean(
+                    g.item_type === 'episode' ||
+                    String(g.external_id || '').startsWith('tvm-ep-') ||
+                    /S(\d+)E(\d+)/i.test(g.title || '')
+                  );
+                  const canBlurGuideSetting = !currentUser || (canUseAntiSpoiler(currentUser) && currentUser?.blur_unwatched_episodes);
                   const shouldBlurGuide = Boolean(
                     canBlurGuideSetting &&
                     isGuideEpisode &&
