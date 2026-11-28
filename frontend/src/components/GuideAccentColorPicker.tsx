@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Palette, Star, Check, RotateCcw } from 'lucide-react';
+import { Palette, Star, Check } from 'lucide-react';
 import { PROFILE_THEME_COLORS, findProfileThemeColor } from '../utils/profileThemes';
 import { canCustomizeColor } from '../utils/planPermissions';
 import { useTheme } from '../context/ThemeContext';
@@ -30,7 +30,8 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   const isPro = canCustomizeColor(currentUser);
-  const selectedTheme = findProfileThemeColor(accentColor);
+  const effectiveColorId = accentColor || 'amber';
+  const selectedTheme = findProfileThemeColor(effectiveColorId);
   const selectedHex = selectedTheme
     ? (isLight ? selectedTheme.light.accent : selectedTheme.dark.accent)
     : null;
@@ -111,7 +112,7 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
             <Palette size={14} />
-            {language === 'es' ? 'Color de la guía' : 'Guide accent color'}
+            {language === 'es' ? 'Color de guía' : 'Guide color'}
           </span>
           <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.12rem 0.4rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
             <Star size={9} fill="#f59e0b" /> PREMIUM
@@ -121,7 +122,7 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.45rem' }}>
           {PROFILE_THEME_COLORS.map((c) => {
             const swatch = isLight ? c.light.accent : c.dark.accent;
-            const isSelected = accentColor === c.id;
+            const isSelected = effectiveColorId === c.id;
             return (
               <button
                 key={c.id}
@@ -148,26 +149,6 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
             );
           })}
         </div>
-
-        {accentColor && (
-          <button
-            type="button"
-            onClick={() => handlePickColor(null)}
-            className="btn-secondary"
-            style={{
-              fontSize: '0.78rem',
-              padding: '0.35rem 0.65rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.35rem',
-              width: '100%'
-            }}
-          >
-            <RotateCcw size={13} />
-            {language === 'es' ? 'Usar color por defecto' : 'Use default color'}
-          </button>
-        )}
       </div>,
       document.body
     );
@@ -181,7 +162,7 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className="btn-secondary"
-          title={language === 'es' ? 'Color de acento de la guía' : 'Guide accent color'}
+          title={language === 'es' ? 'Color de guía' : 'Guide color'}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -218,7 +199,7 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
       <label style={{ fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-        <Palette size={15} /> {language === 'es' ? 'Color de acento' : 'Accent color'}
+        <Palette size={15} /> {language === 'es' ? 'Color' : 'Color'}
         <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
           <Star size={10} fill="#f59e0b" />
         </span>
@@ -252,18 +233,8 @@ export const GuideAccentColorPicker: React.FC<GuideAccentColorPickerProps> = ({
           )}
           {selectedTheme
             ? (language === 'es' ? selectedTheme.name.es : selectedTheme.name.en)
-            : (language === 'es' ? 'Elegir color' : 'Choose color')}
+            : (language === 'es' ? 'Ámbar Solar' : 'Solar Amber')}
         </button>
-        {accentColor && (
-          <button
-            type="button"
-            onClick={() => handlePickColor(null)}
-            className="btn-secondary"
-            style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', color: '#ef4444' }}
-          >
-            {language === 'es' ? 'Quitar' : 'Remove'}
-          </button>
-        )}
       </div>
 
       {renderPopover()}

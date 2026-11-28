@@ -359,7 +359,7 @@ export const CreateGuide: React.FC = () => {
   const [bannerItemType, setBannerItemType] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [accentColor, setAccentColor] = useState<string | null>(() =>
-    canCustomizeColor(currentUser) ? (currentUser?.profile_color || null) : null
+    canCustomizeColor(currentUser) ? (currentUser?.profile_color || 'amber') : 'amber'
   );
   const hasUserPickedAccentRef = useRef(false);
   const { theme } = useTheme();
@@ -367,8 +367,12 @@ export const CreateGuide: React.FC = () => {
   const [sectionBannerTargetId, setSectionBannerTargetId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!guide && !hasUserPickedAccentRef.current && canCustomizeColor(currentUser) && currentUser?.profile_color) {
-      setAccentColor(currentUser.profile_color);
+    if (!guide && !hasUserPickedAccentRef.current) {
+      if (canCustomizeColor(currentUser)) {
+        setAccentColor(currentUser?.profile_color || 'amber');
+      } else {
+        setAccentColor('amber');
+      }
     }
   }, [guide, currentUser]);
 
