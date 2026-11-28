@@ -834,8 +834,13 @@ def update_list(
                 list_in.visibility = VisibilityEnum.PUBLIC
                 
     old_title = reading_list.title
+    old_description = reading_list.description
     old_visibility = reading_list.visibility
-    old_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
+    old_sec_desc = reading_list.section_descriptions if isinstance(reading_list.section_descriptions, dict) else {}
+    old_flow = old_sec_desc.get("flow", [])
+    old_banner = old_sec_desc.get("banner_url")
+    old_bg = old_sec_desc.get("background_url")
+    old_accent = old_sec_desc.get("accent_color")
     update_data = list_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(reading_list, field, value)
@@ -845,26 +850,43 @@ def update_list(
 
     from app.services.activity_service import ActivityService
 
-    new_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
-    is_published_update = (
-        reading_list.visibility != VisibilityEnum.DRAFT
-        and (
-            old_visibility == VisibilityEnum.DRAFT
-            or new_flow != old_flow
-            or list_in.title is not None
-            or list_in.description is not None
-        )
-    )
-    if is_published_update:
-        ActivityService.record_activity(
-            db=db,
-            user_id=current_user.id,
-            activity_type="guide_edited",
-            item_title=reading_list.title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details="edited"
-        )
+    new_sec_desc = reading_list.section_descriptions if isinstance(reading_list.section_descriptions, dict) else {}
+    new_flow = new_sec_desc.get("flow", [])
+    new_banner = new_sec_desc.get("banner_url")
+    new_bg = new_sec_desc.get("background_url")
+    new_accent = new_sec_desc.get("accent_color")
+
+    if reading_list.visibility != VisibilityEnum.DRAFT:
+        if old_visibility == VisibilityEnum.DRAFT:
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="guide_published",
+                item_title=reading_list.title,
+                item_type="guide",
+                list_id=reading_list.id,
+                details="published"
+            )
+        else:
+            changed_parts = []
+            if reading_list.title != old_title:
+                changed_parts.append("title")
+            if (reading_list.description or "") != (old_description or ""):
+                changed_parts.append("description")
+            if new_flow != old_flow:
+                changed_parts.append("structure")
+            if new_banner != old_banner or new_bg != old_bg or new_accent != old_accent:
+                changed_parts.append("appearance")
+            if changed_parts:
+                ActivityService.record_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="guide_edited",
+                    item_title=reading_list.title,
+                    item_type="guide",
+                    list_id=reading_list.id,
+                    details="edited:" + ",".join(changed_parts)
+                )
 
     return reading_list
 

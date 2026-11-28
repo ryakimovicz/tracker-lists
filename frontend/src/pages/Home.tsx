@@ -2543,6 +2543,7 @@ export const Home: React.FC = () => {
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
+  const [expandedGuideUpdateIds, setExpandedGuideUpdateIds] = useState<Record<string, boolean>>({});
   const [upcomingEpisodes, setUpcomingEpisodes] = useState<any[]>(() => {
     try {
       const cached = localStorage.getItem('pathd_upcoming_episodes_cache') || sessionStorage.getItem('pathd_upcoming_episodes_cache');
@@ -4208,117 +4209,328 @@ export const Home: React.FC = () => {
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {(() => {
-            const normalizedUpdates: any[] = [];
-            if (Array.isArray(guideUpdates)) {
-              for (const u of guideUpdates) {
-                if (u && Array.isArray(u.updates) && u.updates.length > 0) {
-                  for (const sub of u.updates) {
-                    normalizedUpdates.push({
-                      id: sub.id || `${u.list_id}-${sub.created_at}`,
-                      username: sub.username || u.creator_name || u.username || (language === 'es' ? 'Usuario' : 'User'),
-                      photo_url: sub.photo_url || u.creator_photo || u.photo_url,
-                      activity_type: sub.activity_type || 'guide_edited',
-                      item_title: sub.item_title || u.guide_title || u.list_title || '',
-                      item_type: sub.item_type || 'guide',
-                      list_id: u.list_id,
-                      list_title: u.guide_title || u.list_title || '',
-                      created_at: sub.created_at || u.created_at
-                    });
+            const formatEditChanges = (details?: string) => {
+              if (!details || !details.startsWith('edited:')) return '';
+              const parts = details.slice('edited:'.length).split(',').map(p => p.trim()).filter(Boolean);
+              const labels = parts.map(p => {
+                if (p === 'title') return language === 'es' ? 'título' : 'title';
+                if (p === 'description') return language === 'es' ? 'descripción' : 'description';
+                if (p === 'structure') return language === 'es' ? 'estructura/bloques' : 'structure/blocks';
+                if (p === 'appearance') return language === 'es' ? 'diseño/portada' : 'appearance/cover';
+                return p;
+              });
+              return labels.join(', ');
+            };
+
+            const describeSubUpdate = (sub: any, listTitle: string) => {
+              const itemTitle = sub.item_title || listTitle;
+              if (sub.activity_type === 'item_added') {
+                return { icon: '+', color: '#22c55e', text: language === 'es' ? `Agregó ${itemTitle}` : `Added ${itemTitle}`, hash: '' };
+              }
+              if (sub.activity_type === 'item_removed') {
+                return { icon: '−', color: '#ef4444', text: language === 'es' ? `Eliminó ${itemTitle}` : `Removed ${itemTitle}`, hash: '' };
+              }
+              if (sub.activity_type === 'item_moved') {
+                return { icon: '↕', color: 'var(--accent-primary)', text: language === 'es' ? `Movió ${itemTitle}` : `Moved ${itemTitle}`, hash: '' };
+              }
+              if (sub.activity_type === 'guide_created') {
+                return { icon: '★', color: 'var(--accent-primary)', text: language === 'es' ? 'Creó la guía' : 'Created the guide', hash: '' };
+              }
+              if (sub.activity_type === 'guide_published') {
+                return { icon: '★', color: 'var(--accent-primary)', text: language === 'es' ? 'Publicó la guía' : 'Published the guide', hash: '' };
+              }
+              if (sub.activity_type === 'block_edited') {
+                let hash = '';
+                let text = language === 'es' ? `Editó un bloque` : `Edited a block`;
+                if (itemTitle && itemTitle.startsWith('type:')) {
+                  const typeMatch = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                  if (typeMatch) {
+                    const elType = typeMatch[1];
+                    if (typeMatch[2]) hash = `#${typeMatch[2]}`;
+                    const elTitle = typeMatch[3];
+                    const typeNameEs = elType === 'section' ? 'la sección' : elType === 'subblock' ? 'el subbloque' : 'el bloque';
+                    const typeNameEn = elType === 'section' ? 'section' : elType === 'subblock' ? 'subblock' : 'block';
+                    text = elTitle
+                      ? (language === 'es' ? `Editó ${typeNameEs} "${elTitle}"` : `Edited ${typeNameEn} "${elTitle}"`)
+                      : (language === 'es' ? `Editó ${typeNameEs} sin título` : `Edited untitled ${typeNameEn}`);
                   }
-                } else if (u) {
-                  normalizedUpdates.push({
-                    ...u,
-                    username: u.username || u.creator_name || (language === 'es' ? 'Usuario' : 'User'),
-                    photo_url: u.photo_url || u.creator_photo || null,
-                    list_title: u.list_title || u.guide_title || ''
-                  });
+                } else if (itemTitle && itemTitle !== listTitle && itemTitle !== 'un bloque') {
+                  text = language === 'es' ? `Editó el bloque "${itemTitle}"` : `Edited block "${itemTitle}"`;
+                }
+                return { icon: '✎', color: 'var(--accent-primary)', text, hash };
+              }
+              const editDetail = formatEditChanges(sub.details);
+              return {
+                icon: '✎',
+                color: 'var(--text-secondary)',
+                text: editDetail
+                  ? (language === 'es' ? `Actualizó ${editDetail}` : `Updated ${editDetail}`)
+                  : (language === 'es' ? 'Actualizó la guía' : 'Updated the guide'),
+                hash: ''
+              };
+            };
+
+            // Normalize both grouped payloads (new backend) and legacy flat payloads (stale cache)
+            const groupedUpdates: any[] = [];
+            if (Array.isArray(guideUpdates)) {
+              const legacyGroupMap = new Map<string, any>();
+              for (const u of guideUpdates) {
+                if (!u) continue;
+                if (Array.isArray(u.updates)) {
+                  groupedUpdates.push(u);
+                } else {
+                  const dayKey = u.created_at ? String(u.created_at).slice(0, 10) : 'unknown';
+                  const gKey = `legacy_${u.user_id || u.username}_${u.list_id}_${dayKey}`;
+                  if (!legacyGroupMap.has(gKey)) {
+                    const grp = {
+                      id: gKey,
+                      user_id: u.user_id,
+                      username: u.username || u.creator_name || (language === 'es' ? 'Usuario' : 'User'),
+                      photo_url: u.photo_url || u.creator_photo || null,
+                      list_id: u.list_id,
+                      list_title: u.list_title || u.guide_title || '',
+                      created_at: u.created_at,
+                      updates: [] as any[],
+                    };
+                    legacyGroupMap.set(gKey, grp);
+                    groupedUpdates.push(grp);
+                  }
+                  const grp = legacyGroupMap.get(gKey);
+                  if (u.activity_type === 'guide_edited' && grp.updates.some((x: any) => x.activity_type === 'guide_edited')) {
+                    continue;
+                  }
+                  grp.updates.push(u);
                 }
               }
             }
 
-            if (normalizedUpdates.length === 0) {
+            if (groupedUpdates.length === 0) {
               return (
                 <div style={{ color: "var(--text-secondary)" }}>{language === 'es' ? 'No hay novedades recientes.' : 'No recent updates.'}</div>
               );
             }
 
-            return normalizedUpdates.map(update => {
-              const userName = update.username || update.creator_name || (language === 'es' ? 'Usuario' : 'User');
+            return groupedUpdates.map(group => {
+              const groupId = String(group.id);
+              const userName = group.username || group.creator_name || (language === 'es' ? 'Usuario' : 'User');
               const userInitial = (userName.charAt(0) || 'U').toUpperCase();
-              const photoUrl = update.photo_url || update.creator_photo;
-              const listTitle = update.list_title || update.guide_title || '';
-              const itemTitle = update.item_title || listTitle;
+              const photoUrl = group.photo_url || group.creator_photo;
+              const listTitle = group.list_title || group.guide_title || '';
+              const subUpdates: any[] = Array.isArray(group.updates) ? group.updates : [];
+              const isMulti = subUpdates.length > 1;
+              const isExpanded = Boolean(expandedGuideUpdateIds[groupId]);
 
-              let text = "";
-              if (update.activity_type === "item_added") text = language === 'es' ? `agregó ${itemTitle} a` : `added ${itemTitle} to`;
-              else if (update.activity_type === "item_removed") text = language === 'es' ? `eliminó ${itemTitle} de` : `removed ${itemTitle} from`;
-              else if (update.activity_type === "item_moved") text = language === 'es' ? `movió ${itemTitle} en` : `moved ${itemTitle} in`;
-              else if (update.activity_type === "guide_created") text = language === 'es' ? `creó la guía` : `created the guide`;
-              else if (update.activity_type === "guide_edited") text = language === 'es' ? `actualizó la guía` : `updated the guide`;
-              else if (update.activity_type === "guide_published") text = language === 'es' ? `publicó la guía` : `published the guide`;
-              else if (update.activity_type === "block_edited") {
-                if (itemTitle === listTitle || itemTitle === "un bloque" || !itemTitle) {
-                  text = language === 'es' ? `editó un bloque de` : `edited a block in`;
-                } else if (itemTitle.startsWith("type:")) {
-                  const typeMatch = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                  if (typeMatch) {
-                    const elType = typeMatch[1];
-                    const elTitle = typeMatch[3];
-                    let typeName = language === 'es' ? 'un bloque' : 'a block';
-                    if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
-                    else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
-                    if (elTitle) {
-                      text = language === 'es' ? `editó ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' de` : `edited the ${elType} '${elTitle}' in`;
-                    } else {
-                      text = language === 'es' ? `editó ${typeName} sin título en` : `edited an untitled ${elType} in`;
-                    }
-                  } else {
-                    text = language === 'es' ? `editó un bloque de` : `edited a block in`;
-                  }
-                } else {
-                  text = language === 'es' ? `editó el bloque '${itemTitle}' de` : `edited the block '${itemTitle}' in`;
-                }
-              } else {
-                text = language === 'es' ? `actualizó la guía` : `updated the guide`;
+              const addedCnt = group.summary?.added ?? subUpdates.filter(s => s.activity_type === 'item_added').length;
+              const removedCnt = group.summary?.removed ?? subUpdates.filter(s => s.activity_type === 'item_removed').length;
+              const movedCnt = group.summary?.moved ?? subUpdates.filter(s => s.activity_type === 'item_moved').length;
+              const blocksCnt = group.summary?.blocks_edited ?? subUpdates.filter(s => s.activity_type === 'block_edited').length;
+              const editChanges: string[] = group.summary?.edit_changes || [];
+
+              const summaryChips: { label: string; color: string }[] = [];
+              if (addedCnt > 0) {
+                summaryChips.push({
+                  label: language === 'es'
+                    ? `+${addedCnt} ${addedCnt === 1 ? 'obra agregada' : 'obras agregadas'}`
+                    : `+${addedCnt} ${addedCnt === 1 ? 'item added' : 'items added'}`,
+                  color: '#22c55e'
+                });
               }
-              
+              if (removedCnt > 0) {
+                summaryChips.push({
+                  label: language === 'es'
+                    ? `−${removedCnt} ${removedCnt === 1 ? 'eliminada' : 'eliminadas'}`
+                    : `−${removedCnt} removed`,
+                  color: '#ef4444'
+                });
+              }
+              if (movedCnt > 0) {
+                summaryChips.push({
+                  label: language === 'es'
+                    ? `${movedCnt} ${movedCnt === 1 ? 'movida' : 'movidas'}`
+                    : `${movedCnt} moved`,
+                  color: 'var(--accent-primary)'
+                });
+              }
+              if (blocksCnt > 0) {
+                summaryChips.push({
+                  label: language === 'es'
+                    ? `${blocksCnt} ${blocksCnt === 1 ? 'bloque editado' : 'bloques editados'}`
+                    : `${blocksCnt} ${blocksCnt === 1 ? 'block edited' : 'blocks edited'}`,
+                  color: 'var(--accent-primary)'
+                });
+              }
+              if (editChanges.length > 0) {
+                const changeText = formatEditChanges('edited:' + editChanges.join(','));
+                if (changeText) {
+                  summaryChips.push({ label: changeText, color: 'var(--text-secondary)' });
+                }
+              }
+
+              // Single concise sentence for single-event groups
+              let headerAction = language === 'es' ? 'actualizó la guía' : 'updated the guide';
+              if (!isMulti && subUpdates.length === 1) {
+                const only = subUpdates[0];
+                const onlyTitle = only.item_title || listTitle;
+                if (only.activity_type === 'item_added') headerAction = language === 'es' ? `agregó ${onlyTitle} a` : `added ${onlyTitle} to`;
+                else if (only.activity_type === 'item_removed') headerAction = language === 'es' ? `eliminó ${onlyTitle} de` : `removed ${onlyTitle} from`;
+                else if (only.activity_type === 'item_moved') headerAction = language === 'es' ? `movió ${onlyTitle} en` : `moved ${onlyTitle} in`;
+                else if (only.activity_type === 'guide_created') headerAction = language === 'es' ? 'creó la guía' : 'created the guide';
+                else if (only.activity_type === 'guide_published') headerAction = language === 'es' ? 'publicó la guía' : 'published the guide';
+                else if (only.activity_type === 'block_edited') {
+                  const desc = describeSubUpdate(only, listTitle);
+                  headerAction = `${desc.text.charAt(0).toLowerCase()}${desc.text.slice(1)} ${language === 'es' ? 'en' : 'in'}`;
+                } else if (only.activity_type === 'guide_edited') {
+                  const editDetail = formatEditChanges(only.details);
+                  headerAction = editDetail
+                    ? (language === 'es' ? `actualizó (${editDetail}) en` : `updated (${editDetail}) in`)
+                    : (language === 'es' ? 'actualizó la guía' : 'updated the guide');
+                }
+              }
+
+              const groupTheme = group.accent_color ? getProfileTheme(group.accent_color, isLight) : null;
+              const guideHoverColor = groupTheme ? groupTheme.accent : 'var(--color-guide)';
+              const userHoverColor = getProfileTheme(group.user_profile_color || 'default', isLight).accent;
+
               return (
-                <div 
-                  key={update.id} 
+                <div
+                  key={groupId}
                   className="feed-update-card"
                   onClick={() => {
-                    let hash = "";
-                    if (update.activity_type === "block_edited" && itemTitle.startsWith("type:")) {
-                      const m = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                      if (m && m[2]) hash = `#${m[2]}`;
+                    if (isMulti) {
+                      setExpandedGuideUpdateIds(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+                    } else {
+                      const only = subUpdates[0];
+                      const hash = only ? describeSubUpdate(only, listTitle).hash : '';
+                      navigate(`/guide/${group.list_id}${hash}`);
                     }
-                    navigate(`/guide/${update.list_id}${hash}`);
                   }}
-                  style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
+                  style={{
+                    background: "var(--bg-secondary)",
+                    padding: "0.95rem 1rem",
+                    borderRadius: "10px",
+                    border: "1px solid var(--border-color)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.65rem",
+                    cursor: "pointer",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                    "--guide-hover-color": guideHoverColor,
+                    "--user-hover-color": userHoverColor
+                  } as React.CSSProperties}
                 >
-                  <div
-                    onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
-                    style={{ cursor: "pointer" }}
-                    className="feed-update-user-link"
-                  >
-                    {photoUrl ? (
-                      <img src={photoUrl} alt={userName} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{userInitial}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                      style={{ cursor: "pointer", flexShrink: 0 }}
+                      className="feed-update-user-link"
+                    >
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={userName} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{userInitial}</div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.94rem", lineHeight: 1.35 }}>
+                        <span
+                          className="feed-update-user-link"
+                          onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                          style={{ fontWeight: 700, cursor: "pointer", transition: "color 0.2s ease" }}
+                        >{userName}</span>{' '}
+                        {headerAction}{' '}
+                        <span
+                          className="feed-update-guide"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/guide/${group.list_id}`); }}
+                          style={{ fontStyle: "italic", fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
+                        >{listTitle}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.4rem", marginTop: "0.3rem" }}>
+                        <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                          {group.created_at ? new Date(group.created_at).toLocaleDateString() : ''}
+                        </span>
+                        {isMulti && summaryChips.map((chip, cIdx) => (
+                          <span
+                            key={cIdx}
+                            style={{
+                              fontSize: "0.72rem",
+                              fontWeight: 600,
+                              padding: "0.1rem 0.45rem",
+                              borderRadius: "999px",
+                              background: "var(--bg-tertiary)",
+                              color: chip.color,
+                              border: "1px solid var(--border-color)"
+                            }}
+                          >
+                            {chip.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {isMulti && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedGuideUpdateIds(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+                        }}
+                        aria-label={isExpanded ? (language === 'es' ? 'Ocultar cambios' : 'Hide changes') : (language === 'es' ? 'Ver cambios' : 'Show changes')}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          padding: "0.3rem 0.55rem",
+                          borderRadius: "6px",
+                          background: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-secondary)",
+                          fontSize: "0.76rem",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          flexShrink: 0
+                        }}
+                      >
+                        <span>{subUpdates.length}</span>
+                        <ChevronDown size={15} style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' }} />
+                      </button>
                     )}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "0.95rem" }}>
-                      <span 
-                        className="feed-update-user-link"
-                        onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
-                        style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
-                      >{userName}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{listTitle}</span>
+
+                  {isMulti && isExpanded && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        borderTop: "1px solid var(--border-color)",
+                        paddingTop: "0.55rem",
+                        paddingLeft: "0.35rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem"
+                      }}
+                    >
+                      {subUpdates.map((sub, sIdx) => {
+                        const info = describeSubUpdate(sub, listTitle);
+                        return (
+                          <div
+                            key={sub.id || sIdx}
+                            onClick={() => navigate(`/guide/${group.list_id}${info.hash}`)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              fontSize: "0.84rem",
+                              color: "var(--text-primary)",
+                              padding: "0.22rem 0.4rem",
+                              borderRadius: "6px",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <span style={{ width: "16px", textAlign: "center", fontWeight: 800, color: info.color, flexShrink: 0 }}>{info.icon}</span>
+                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info.text}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                      {update.created_at ? new Date(update.created_at).toLocaleDateString() : ''}
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             });

@@ -872,10 +872,10 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Feed Updates Hover Effects */
 .feed-update-card:hover:not(:has(.feed-update-user-link:hover)) .feed-update-guide {
-  color: var(--accent-primary);
+  color: var(--guide-hover-color, var(--color-guide));
 }
 .feed-update-user-link:hover {
-  color: var(--accent-primary);
+  color: var(--user-hover-color, var(--accent-primary));
 }
 
 @keyframes highlightFade {

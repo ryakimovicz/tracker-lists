@@ -1560,7 +1560,7 @@ def get_guides_updates(
             UserActivityLog.list_id.in_(followed_list_ids),
             UserActivityLog.details.in_(details_patterns)
         )
-    ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
+    ).order_by(UserActivityLog.created_at.desc()).limit(250).all()
 
     # Pre-fetch reading lists and creators
     reading_lists = {
@@ -1573,7 +1573,10 @@ def get_guides_updates(
         u.id: u for u in db.query(User).filter(User.id.in_(all_user_ids)).all()
     }
 
-    results = []
+    # Group activities by (user_id, list_id, calendar_day) so bursts of edits collapse into one expandable card
+    grouped_map = {}
+    grouped_order = []
+
     for a in activities:
         lid = a.list_id
         if not lid and a.details and "list_id:" in a.details:
@@ -1586,29 +1589,122 @@ def get_guides_updates(
         if not rl:
             continue
 
-        user = users_by_id.get(a.user_id) or users_by_id.get(rl.creator_id)
+        uid = a.user_id or rl.creator_id
+        user = users_by_id.get(uid)
         username = user.username if user else "Usuario"
         photo_url = user.photo_url if user else None
+        day_key = a.created_at.strftime("%Y-%m-%d") if a.created_at else "unknown"
+        group_key = (uid, rl.id, day_key)
 
-        results.append({
+        if group_key not in grouped_map:
+            if len(grouped_order) >= limit:
+                continue
+            grouped_order.append(group_key)
+            creator_obj = users_by_id.get(rl.creator_id)
+            creator_is_pro = check_user_is_pro(creator_obj) if creator_obj else False
+            sec_desc = rl.section_descriptions if isinstance(rl.section_descriptions, dict) else {}
+            guide_accent_color = sec_desc.get("accent_color") if creator_is_pro else None
+            actor_profile_color = user.profile_color if (user and check_user_is_pro(user)) else None
+            grouped_map[group_key] = {
+                'id': f"group_{uid}_{rl.id}_{day_key}",
+                'user_id': uid,
+                'username': username,
+                'photo_url': photo_url,
+                'user_profile_color': actor_profile_color,
+                'creator_name': username,
+                'creator_photo': photo_url,
+                'list_id': rl.id,
+                'list_title': rl.title,
+                'guide_title': rl.title,
+                'accent_color': guide_accent_color,
+                'created_at': a.created_at.isoformat() if a.created_at else None,
+                'updates': [],
+                '_edit_changes': set(),
+                '_has_generic_edit': False,
+            }
+
+        grp = grouped_map[group_key]
+
+        # Parse specific edit tags if present ("edited:title,structure")
+        if a.activity_type == "guide_edited":
+            grp['_has_generic_edit'] = True
+            if a.details and a.details.startswith("edited:"):
+                for part in a.details.split("edited:", 1)[1].split(","):
+                    cleaned = part.strip()
+                    if cleaned:
+                        grp['_edit_changes'].add(cleaned)
+            continue
+
+        grp['updates'].append({
             'id': a.id,
-            'user_id': a.user_id or rl.creator_id,
+            'user_id': uid,
             'username': username,
             'photo_url': photo_url,
-            'creator_name': username,
-            'creator_photo': photo_url,
             'activity_type': a.activity_type,
             'item_title': a.item_title or rl.title,
             'item_type': a.item_type or "guide",
             'list_id': rl.id,
             'list_title': rl.title,
-            'guide_title': rl.title,
             'details': a.details,
             'created_at': a.created_at.isoformat() if a.created_at else None
         })
 
-        if len(results) >= limit:
-            break
+    results = []
+    for gk in grouped_order:
+        grp = grouped_map[gk]
+        updates = grp['updates']
+        edit_changes = sorted(grp.pop('_edit_changes'))
+        has_generic_edit = grp.pop('_has_generic_edit')
+
+        # If there were edit changes (e.g. title/description/appearance) or only generic guide_edited with no item/block events
+        if edit_changes:
+            updates.append({
+                'id': f"{grp['id']}_edit",
+                'user_id': grp['user_id'],
+                'username': grp['username'],
+                'photo_url': grp['photo_url'],
+                'activity_type': 'guide_edited',
+                'item_title': grp['list_title'],
+                'item_type': 'guide',
+                'list_id': grp['list_id'],
+                'list_title': grp['list_title'],
+                'details': 'edited:' + ','.join(edit_changes),
+                'created_at': grp['created_at']
+            })
+        elif has_generic_edit and not updates:
+            updates.append({
+                'id': f"{grp['id']}_edit",
+                'user_id': grp['user_id'],
+                'username': grp['username'],
+                'photo_url': grp['photo_url'],
+                'activity_type': 'guide_edited',
+                'item_title': grp['list_title'],
+                'item_type': 'guide',
+                'list_id': grp['list_id'],
+                'list_title': grp['list_title'],
+                'details': 'edited',
+                'created_at': grp['created_at']
+            })
+
+        # Compute summary counts for the collapsed header
+        added_cnt = sum(1 for u in updates if u['activity_type'] == 'item_added')
+        removed_cnt = sum(1 for u in updates if u['activity_type'] == 'item_removed')
+        moved_cnt = sum(1 for u in updates if u['activity_type'] == 'item_moved')
+        blocks_cnt = sum(1 for u in updates if u['activity_type'] == 'block_edited')
+        published = any(u['activity_type'] == 'guide_published' for u in updates)
+        created = any(u['activity_type'] == 'guide_created' for u in updates)
+
+        grp['summary'] = {
+            'added': added_cnt,
+            'removed': removed_cnt,
+            'moved': moved_cnt,
+            'blocks_edited': blocks_cnt,
+            'published': published,
+            'created': created,
+            'edit_changes': edit_changes,
+            'total': len(updates)
+        }
+        results.append(grp)
 
     return results
 
