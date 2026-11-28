@@ -96,6 +96,80 @@ export const Social: React.FC = () => {
     reviews: (feedCacheRef.current.reviews || []).length === 0,
     me: (feedCacheRef.current.me || []).length === 0,
   }));
+  const [tabHasMore, setTabHasMore] = useState<Record<SocialTab, boolean>>({
+    following: true,
+    discover: true,
+    reviews: true,
+    me: true,
+  });
+  const [tabLoadingMore, setTabLoadingMore] = useState<Record<SocialTab, boolean>>({
+    following: false,
+    discover: false,
+    reviews: false,
+    me: false,
+  });
+  const [gridCols, setGridCols] = useState<number>(3);
+  const gridContainerRefs = useRef<Partial<Record<SocialTab, HTMLDivElement | null>>>({});
+  const tabRawItemsRef = useRef<Record<SocialTab, ActivityCardData[]>>({
+    following: [],
+    discover: [],
+    reviews: [],
+    me: [],
+  });
+  const tabLoadingMoreRef = useRef<Record<SocialTab, boolean>>({
+    following: false,
+    discover: false,
+    reviews: false,
+    me: false,
+  });
+  const tabHasMoreRef = useRef<Record<SocialTab, boolean>>({
+    following: true,
+    discover: true,
+    reviews: true,
+    me: true,
+  });
+  const PAGE_LIMITS: Record<SocialTab, number> = {
+    following: 20,
+    discover: 25,
+    reviews: 20,
+    me: 30,
+  };
+  const getEndpointForTab = (tab: SocialTab) => {
+    if (tab === 'discover') return '/social/feed/discover';
+    if (tab === 'reviews') return '/social/feed/reviews';
+    if (tab === 'me') return '/social/feed/me';
+    return '/social/feed/following';
+  };
+
+  // Dynamically measure actual CSS grid column count for any screen width / zoom / sidebar state
+  useEffect(() => {
+    const measureCols = () => {
+      const el = gridContainerRefs.current[activeSocialTab]
+        || gridContainerRefs.current.following
+        || gridContainerRefs.current.discover
+        || gridContainerRefs.current.reviews
+        || gridContainerRefs.current.me;
+      if (!el) return;
+      const tpl = window.getComputedStyle(el).gridTemplateColumns;
+      if (!tpl || tpl === 'none') return;
+      const count = tpl.trim().split(/\s+/).filter(Boolean).length;
+      if (count >= 1) {
+        setGridCols(prev => (prev !== count ? count : prev));
+      }
+    };
+
+    measureCols();
+    const rafId = window.requestAnimationFrame(measureCols);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureCols) : null;
+    const el = gridContainerRefs.current[activeSocialTab];
+    if (ro && el) ro.observe(el);
+    window.addEventListener('resize', measureCols);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      ro?.disconnect();
+      window.removeEventListener('resize', measureCols);
+    };
+  }, [activeSocialTab, tabFeeds, tabLoading]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
@@ -116,6 +190,201 @@ export const Social: React.FC = () => {
     }
   };
 
+  const consolidateFeedItems = (rawData: ActivityCardData[]): ActivityCardData[] => {
+    const consolidated: ActivityCardData[] = [];
+    const seenReviewRating = new Map<string, number>();
+    const recordMerged = (keeper: ActivityCardData, absorbed: ActivityCardData) => {
+      const set = new Set<number>(keeper.merged_ids || []);
+      if (absorbed.id && absorbed.id !== keeper.id) set.add(absorbed.id);
+      (absorbed.merged_ids || []).forEach(mid => {
+        if (mid && mid !== keeper.id) set.add(mid);
+      });
+      keeper.merged_ids = Array.from(set);
+    };
+
+    const getWorkIdent = (item: ActivityCardData) => {
+      const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+      const workTitle = (meta.series_title || meta.volume_title || meta.show_name || meta.work_title || '').trim().toLowerCase();
+      const seriesExtId = (meta.series_external_id || meta.parent_external_id || meta.volume_id || '').trim().toLowerCase();
+      const cleanItemTitle = (item.item_title || '').trim().toLowerCase();
+      return { workTitle, seriesExtId, cleanItemTitle, meta };
+    };
+
+    for (const rawItem of rawData) {
+      const item: ActivityCardData = { ...rawItem, merged_ids: rawItem.merged_ids ? [...rawItem.merged_ids] : undefined };
+      const itemMeta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+      if ((item.details || '').toLowerCase() === 'dropped' || (itemMeta.status || '').toLowerCase() === 'dropped') {
+        continue;
+      }
+
+      const isReview = item.activity_type === 'item_reviewed';
+      const isRating = item.activity_type === 'item_rated';
+      const reviewKey = (isReview || isRating) && (item.external_id || item.item_title)
+        ? `${item.user_id}_${item.external_id || item.item_title}`
+        : null;
+
+      if (reviewKey && seenReviewRating.has(reviewKey)) {
+        const idx = seenReviewRating.get(reviewKey)!;
+        const existing = consolidated[idx];
+        if (existing.activity_type === 'item_reviewed' && isRating) {
+          try {
+            const meta = existing.metadata_json ? (typeof existing.metadata_json === 'string' ? JSON.parse(existing.metadata_json) : existing.metadata_json) : {};
+            if (!meta.rating && item.details) {
+              meta.rating = Number(item.details);
+              existing.metadata_json = JSON.stringify(meta);
+            }
+          } catch (_) {}
+          recordMerged(existing, item);
+          continue;
+        } else if (existing.activity_type === 'item_rated' && isReview) {
+          try {
+            const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+            if (!meta.rating && existing.details) {
+              meta.rating = Number(existing.details);
+              item.metadata_json = JSON.stringify(meta);
+            }
+          } catch (_) {}
+          recordMerged(item, existing);
+          consolidated[idx] = item;
+          continue;
+        }
+      }
+
+      if (reviewKey) {
+        seenReviewRating.set(reviewKey, consolidated.length);
+      }
+
+      const isFavorite = item.activity_type === 'item_favorited' || item.activity_type === 'shelf_favorite';
+      if (isFavorite) {
+        const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+        const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+        const dupTarget = consolidated.find(c =>
+          c.user_id === item.user_id &&
+          (c.activity_type === 'item_favorited' || c.activity_type === 'shelf_favorite') &&
+          ((itemWorkExt && c.external_id && (c.external_id || '').trim().toLowerCase() === itemWorkExt) ||
+           (itemWorkTitle && c.item_title && (c.item_title || '').trim().toLowerCase() === itemWorkTitle))
+        );
+        if (dupTarget) {
+          recordMerged(dupTarget, item);
+          continue;
+        }
+      }
+
+      const isWorkCompletion = (item.activity_type === 'item_completed' || item.activity_type === 'item_status_changed') &&
+        (itemMeta.status === 'completed' || itemMeta.status === 'read' || (item.details || '').toLowerCase() === 'completed' || (item.details || '').toLowerCase() === 'read');
+
+      const isUnitConsumption = (item.activity_type === 'episode_watched' || item.activity_type === 'issue_read' || item.activity_type === 'item_progress_updated' || item.activity_type === 'item_status_changed') &&
+        ((item.external_id && (String(item.external_id).startsWith('tvm-ep-') || String(item.external_id).startsWith('cv_issue_'))) || item.item_type === 'episode');
+
+      const isShelfAdd = item.activity_type === 'shelf_add' || item.activity_type === 'item_added_to_library';
+      const isStatusChanged = item.activity_type === 'item_status_changed' || item.activity_type === 'item_completed';
+
+      let mergedWithExisting = false;
+
+      if (isShelfAdd) {
+        const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+        const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+        for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+          const target = consolidated[i];
+          if (target.user_id !== item.user_id) continue;
+          const targetIsStatus = target.activity_type === 'item_status_changed' || target.activity_type === 'item_completed';
+          if (!targetIsStatus) continue;
+
+          const targetExt = (target.external_id || '').trim().toLowerCase();
+          const targetTitle = (target.item_title || '').trim().toLowerCase();
+          const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
+            (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
+
+          if (matchesWork) {
+            const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+            targetMeta.also_added = true;
+            target.metadata_json = JSON.stringify(targetMeta);
+            recordMerged(target, item);
+            mergedWithExisting = true;
+            break;
+          }
+        }
+      } else if (isStatusChanged) {
+        const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+        const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+        for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+          const target = consolidated[i];
+          if (target.user_id !== item.user_id) continue;
+          const targetIsAdd = target.activity_type === 'shelf_add' || target.activity_type === 'item_added_to_library';
+          if (!targetIsAdd) continue;
+
+          const targetExt = (target.external_id || '').trim().toLowerCase();
+          const targetTitle = (target.item_title || '').trim().toLowerCase();
+          const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
+            (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
+
+          if (matchesWork) {
+            itemMeta.also_added = true;
+            item.metadata_json = JSON.stringify(itemMeta);
+            recordMerged(item, target);
+            consolidated[i] = item;
+            mergedWithExisting = true;
+            break;
+          }
+        }
+      }
+
+      if (!mergedWithExisting && isWorkCompletion) {
+        const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+        const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+        for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+          const target = consolidated[i];
+          if (target.user_id !== item.user_id) continue;
+          const targetIdent = getWorkIdent(target);
+          const matchesWork = (itemWorkExt && targetIdent.seriesExtId && itemWorkExt === targetIdent.seriesExtId) ||
+            (itemWorkTitle && targetIdent.workTitle && itemWorkTitle === targetIdent.workTitle) ||
+            (itemWorkTitle && target.item_title && target.item_title.toLowerCase().startsWith(itemWorkTitle));
+
+          if (matchesWork) {
+            const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+            targetMeta.finished_work = true;
+            target.metadata_json = JSON.stringify(targetMeta);
+            recordMerged(target, item);
+            mergedWithExisting = true;
+            break;
+          }
+        }
+      } else if (!mergedWithExisting && isUnitConsumption) {
+        const unitIdent = getWorkIdent(item);
+        for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+          const target = consolidated[i];
+          if (target.user_id !== item.user_id) continue;
+          const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+          const targetIsCompletion = (target.activity_type === 'item_completed' || target.activity_type === 'item_status_changed') &&
+            (targetMeta.status === 'completed' || targetMeta.status === 'read' || (target.details || '').toLowerCase() === 'completed' || (target.details || '').toLowerCase() === 'read');
+
+          if (targetIsCompletion) {
+            const targetTitle = (target.item_title || '').trim().toLowerCase();
+            const targetExt = (target.external_id || '').trim().toLowerCase();
+            const matchesWork = (targetExt && unitIdent.seriesExtId && targetExt === unitIdent.seriesExtId) ||
+              (targetTitle && unitIdent.workTitle && targetTitle === unitIdent.workTitle) ||
+              (targetTitle && item.item_title && item.item_title.toLowerCase().startsWith(targetTitle));
+
+            if (matchesWork) {
+              itemMeta.finished_work = true;
+              item.metadata_json = JSON.stringify(itemMeta);
+              recordMerged(item, target);
+              consolidated[i] = item;
+              mergedWithExisting = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!mergedWithExisting) {
+        consolidated.push(item);
+      }
+    }
+
+    return consolidated;
+  };
+
   const fetchTabFeed = async (tab: SocialTab, isRefresh = false, signal?: AbortSignal) => {
     if (signal?.aborted || activeTabRef.current !== tab) {
       return;
@@ -127,12 +396,9 @@ export const Social: React.FC = () => {
     }
 
     try {
-      let endpoint = '/social/feed/following';
-      if (tab === 'discover') endpoint = '/social/feed/discover';
-      else if (tab === 'reviews') endpoint = '/social/feed/reviews';
-      else if (tab === 'me') endpoint = '/social/feed/me';
-
-      const res = await apiClient.get(endpoint, { signal });
+      const endpoint = getEndpointForTab(tab);
+      const limit = PAGE_LIMITS[tab];
+      const res = await apiClient.get(`${endpoint}?skip=0&limit=${limit}`, { signal });
 
       // Discard stale response if user switched tabs during network request
       if (signal?.aborted || activeTabRef.current !== tab) {
@@ -140,188 +406,12 @@ export const Social: React.FC = () => {
       }
 
       if (Array.isArray(res.data)) {
-        // Consolidate legacy dual activities:
-        // 1. One item_rated + one item_reviewed for same entity/item
-        // 2. An episode/issue watch/read event + a work completed event for the same user & series/comic
-        const consolidated: ActivityCardData[] = [];
-        const seenReviewRating = new Map<string, number>();
+        tabRawItemsRef.current[tab] = res.data;
+        const hasMore = res.data.length >= limit;
+        tabHasMoreRef.current[tab] = hasMore;
+        setTabHasMore(prev => ({ ...prev, [tab]: hasMore }));
 
-        // Helper to extract series / work title & id for grouping
-        const getWorkIdent = (item: ActivityCardData) => {
-          const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
-          const workTitle = (meta.series_title || meta.volume_title || meta.show_name || meta.work_title || '').trim().toLowerCase();
-          const seriesExtId = (meta.series_external_id || meta.parent_external_id || meta.volume_id || '').trim().toLowerCase();
-          const cleanItemTitle = (item.item_title || '').trim().toLowerCase();
-          return { workTitle, seriesExtId, cleanItemTitle, meta };
-        };
-
-        for (const item of res.data) {
-          const itemMeta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
-          if ((item.details || '').toLowerCase() === 'dropped' || (itemMeta.status || '').toLowerCase() === 'dropped') {
-            continue;
-          }
-
-          const isReview = item.activity_type === 'item_reviewed';
-          const isRating = item.activity_type === 'item_rated';
-          const reviewKey = (isReview || isRating) && (item.external_id || item.item_title)
-            ? `${item.user_id}_${item.external_id || item.item_title}`
-            : null;
-
-          if (reviewKey && seenReviewRating.has(reviewKey)) {
-            const idx = seenReviewRating.get(reviewKey)!;
-            const existing = consolidated[idx];
-            if (existing.activity_type === 'item_reviewed' && isRating) {
-              try {
-                const meta = existing.metadata_json ? (typeof existing.metadata_json === 'string' ? JSON.parse(existing.metadata_json) : existing.metadata_json) : {};
-                if (!meta.rating && item.details) {
-                  meta.rating = Number(item.details);
-                  existing.metadata_json = JSON.stringify(meta);
-                }
-              } catch (_) {}
-              continue;
-            } else if (existing.activity_type === 'item_rated' && isReview) {
-              try {
-                const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
-                if (!meta.rating && existing.details) {
-                  meta.rating = Number(existing.details);
-                  item.metadata_json = JSON.stringify(meta);
-                }
-              } catch (_) {}
-              consolidated[idx] = item;
-              continue;
-            }
-          }
-
-          if (reviewKey) {
-            seenReviewRating.set(reviewKey, consolidated.length);
-          }
-
-          // Deduplicate identical/consecutive item_favorited or shelf_favorite activities for the same work & user
-          const isFavorite = item.activity_type === 'item_favorited' || item.activity_type === 'shelf_favorite';
-          if (isFavorite) {
-            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
-            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
-            const isDuplicate = consolidated.some(c => 
-              c.user_id === item.user_id &&
-              (c.activity_type === 'item_favorited' || c.activity_type === 'shelf_favorite') &&
-              ((itemWorkExt && c.external_id && (c.external_id || '').trim().toLowerCase() === itemWorkExt) ||
-               (itemWorkTitle && c.item_title && (c.item_title || '').trim().toLowerCase() === itemWorkTitle))
-            );
-            if (isDuplicate) {
-              continue;
-            }
-          }
-
-          // Check for work completion unification:
-          // An episode/issue event and a work completed event (item_completed or status=completed/read)
-          const isWorkCompletion = (item.activity_type === 'item_completed' || item.activity_type === 'item_status_changed') &&
-            (itemMeta.status === 'completed' || itemMeta.status === 'read' || (item.details || '').toLowerCase() === 'completed' || (item.details || '').toLowerCase() === 'read');
-
-          const isUnitConsumption = (item.activity_type === 'episode_watched' || item.activity_type === 'issue_read' || item.activity_type === 'item_progress_updated' || item.activity_type === 'item_status_changed') &&
-            ((item.external_id && (String(item.external_id).startsWith('tvm-ep-') || String(item.external_id).startsWith('cv_issue_'))) || item.item_type === 'episode');
-
-          const isShelfAdd = item.activity_type === 'shelf_add' || item.activity_type === 'item_added_to_library';
-          const isStatusChanged = item.activity_type === 'item_status_changed' || item.activity_type === 'item_completed';
-
-          let mergedWithExisting = false;
-
-          // Unify Shelf Add + Status Changed for unadded works marked directly (e.g. Added and watched / finished)
-          if (isShelfAdd) {
-            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
-            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
-            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
-              const target = consolidated[i];
-              if (target.user_id !== item.user_id) continue;
-              const targetIsStatus = target.activity_type === 'item_status_changed' || target.activity_type === 'item_completed';
-              if (!targetIsStatus) continue;
-
-              const targetExt = (target.external_id || '').trim().toLowerCase();
-              const targetTitle = (target.item_title || '').trim().toLowerCase();
-              const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
-                (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
-
-              if (matchesWork) {
-                const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
-                targetMeta.also_added = true;
-                target.metadata_json = JSON.stringify(targetMeta);
-                mergedWithExisting = true;
-                break;
-              }
-            }
-          } else if (isStatusChanged) {
-            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
-            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
-            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
-              const target = consolidated[i];
-              if (target.user_id !== item.user_id) continue;
-              const targetIsAdd = target.activity_type === 'shelf_add' || target.activity_type === 'item_added_to_library';
-              if (!targetIsAdd) continue;
-
-              const targetExt = (target.external_id || '').trim().toLowerCase();
-              const targetTitle = (target.item_title || '').trim().toLowerCase();
-              const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
-                (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
-
-              if (matchesWork) {
-                itemMeta.also_added = true;
-                item.metadata_json = JSON.stringify(itemMeta);
-                consolidated[i] = item;
-                mergedWithExisting = true;
-                break;
-              }
-            }
-          }
-
-          if (!mergedWithExisting && isWorkCompletion) {
-            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
-            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
-            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
-              const target = consolidated[i];
-              if (target.user_id !== item.user_id) continue;
-              const targetIdent = getWorkIdent(target);
-              const matchesWork = (itemWorkExt && targetIdent.seriesExtId && itemWorkExt === targetIdent.seriesExtId) ||
-                (itemWorkTitle && targetIdent.workTitle && itemWorkTitle === targetIdent.workTitle) ||
-                (itemWorkTitle && target.item_title && target.item_title.toLowerCase().startsWith(itemWorkTitle));
-              
-              if (matchesWork) {
-                const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
-                targetMeta.finished_work = true;
-                target.metadata_json = JSON.stringify(targetMeta);
-                mergedWithExisting = true;
-                break;
-              }
-            }
-          } else if (!mergedWithExisting && isUnitConsumption) {
-            const unitIdent = getWorkIdent(item);
-            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
-              const target = consolidated[i];
-              if (target.user_id !== item.user_id) continue;
-              const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
-              const targetIsCompletion = (target.activity_type === 'item_completed' || target.activity_type === 'item_status_changed') &&
-                (targetMeta.status === 'completed' || targetMeta.status === 'read' || (target.details || '').toLowerCase() === 'completed' || (target.details || '').toLowerCase() === 'read');
-              
-              if (targetIsCompletion) {
-                const targetTitle = (target.item_title || '').trim().toLowerCase();
-                const targetExt = (target.external_id || '').trim().toLowerCase();
-                const matchesWork = (targetExt && unitIdent.seriesExtId && targetExt === unitIdent.seriesExtId) ||
-                  (targetTitle && unitIdent.workTitle && targetTitle === unitIdent.workTitle) ||
-                  (targetTitle && item.item_title && item.item_title.toLowerCase().startsWith(targetTitle));
-
-                if (matchesWork) {
-                  itemMeta.finished_work = true;
-                  item.metadata_json = JSON.stringify(itemMeta);
-                  consolidated[i] = item;
-                  mergedWithExisting = true;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (!mergedWithExisting) {
-            consolidated.push(item);
-          }
-        }
+        const consolidated = consolidateFeedItems(res.data);
 
         // Cache both in memory ref and storage
         feedCacheRef.current[tab] = consolidated;
@@ -512,18 +602,83 @@ export const Social: React.FC = () => {
     fetchTabFeed(activeSocialTab, true, controller.signal);
   };
 
+  const loadMoreForTab = async (tab: SocialTab, customLimit?: number) => {
+    if (tabLoadingMoreRef.current[tab] || !tabHasMoreRef.current[tab]) return;
+    tabLoadingMoreRef.current[tab] = true;
+    setTabLoadingMore(prev => ({ ...prev, [tab]: true }));
+
+    try {
+      const endpoint = getEndpointForTab(tab);
+      const limit = customLimit ?? PAGE_LIMITS[tab];
+      const currentRaw = tabRawItemsRef.current[tab] || [];
+      const skip = currentRaw.length;
+      const res = await apiClient.get(`${endpoint}?skip=${skip}&limit=${limit}`);
+
+      if (Array.isArray(res.data)) {
+        const hasMore = res.data.length >= limit;
+        tabHasMoreRef.current[tab] = hasMore;
+        setTabHasMore(prev => ({ ...prev, [tab]: hasMore }));
+
+        if (res.data.length > 0) {
+          const existingIds = new Set(currentRaw.map(x => x.id));
+          const freshItems = res.data.filter((x: ActivityCardData) => !existingIds.has(x.id));
+          const mergedRaw = [...currentRaw, ...freshItems];
+          tabRawItemsRef.current[tab] = mergedRaw;
+
+          const consolidated = consolidateFeedItems(mergedRaw);
+          feedCacheRef.current[tab] = consolidated;
+          try {
+            const serialized = JSON.stringify(consolidated);
+            sessionStorage.setItem(`pathd_social_feed_${tab}`, serialized);
+            localStorage.setItem(`pathd_social_feed_${tab}`, serialized);
+          } catch (_) {}
+          setTabFeeds(prev => ({ ...prev, [tab]: consolidated }));
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to load more for ${tab}:`, err);
+    } finally {
+      tabLoadingMoreRef.current[tab] = false;
+      setTabLoadingMore(prev => ({ ...prev, [tab]: false }));
+    }
+  };
+
   const handleDeleteActivity = (id: number) => {
-    setTabFeeds(prev => {
-      const current = prev[activeSocialTab] || [];
-      const updated = current.filter(a => a.id !== id);
-      feedCacheRef.current[activeSocialTab] = updated;
-      try {
-        const serialized = JSON.stringify(updated);
-        sessionStorage.setItem(`pathd_social_feed_${activeSocialTab}`, serialized);
-        localStorage.setItem(`pathd_social_feed_${activeSocialTab}`, serialized);
-      } catch (_) {}
-      return { ...prev, [activeSocialTab]: updated };
+    let deletedIdsSet = new Set<number>([id]);
+    const activeItems = tabFeeds[activeSocialTab] || [];
+    const targetCard = activeItems.find(a => a.id === id);
+    if (targetCard?.merged_ids) {
+      targetCard.merged_ids.forEach(mid => deletedIdsSet.add(mid));
+    }
+
+    (['following', 'discover', 'reviews', 'me'] as SocialTab[]).forEach(tabKey => {
+      if (tabRawItemsRef.current[tabKey]?.length) {
+        tabRawItemsRef.current[tabKey] = tabRawItemsRef.current[tabKey].filter(r => !deletedIdsSet.has(r.id));
+      }
     });
+
+    setTabFeeds(prev => {
+      const next = { ...prev };
+      (['following', 'discover', 'reviews', 'me'] as SocialTab[]).forEach(tabKey => {
+        const current = prev[tabKey] || [];
+        const updated = current.filter(a => !deletedIdsSet.has(a.id) && !(a.merged_ids || []).some(mid => deletedIdsSet.has(mid)));
+        if (updated.length !== current.length) {
+          next[tabKey] = updated;
+          feedCacheRef.current[tabKey] = updated;
+          try {
+            const serialized = JSON.stringify(updated);
+            sessionStorage.setItem(`pathd_social_feed_${tabKey}`, serialized);
+            localStorage.setItem(`pathd_social_feed_${tabKey}`, serialized);
+          } catch (_) {}
+        }
+      });
+      return next;
+    });
+
+    // Immediately pull the next older activity(ies) so deleting never leaves an empty page while older records exist
+    if (tabHasMoreRef.current[activeSocialTab]) {
+      loadMoreForTab(activeSocialTab, Math.max(1, deletedIdsSet.size));
+    }
   };
 
   const tabsConfig = [
@@ -593,25 +748,60 @@ export const Social: React.FC = () => {
       );
     }
 
+    // When more pages exist, keep the last row completely full for the current column count
+    const visibleItems = (tabHasMore[tab] && gridCols > 1 && items.length >= gridCols)
+      ? items.slice(0, Math.floor(items.length / gridCols) * gridCols)
+      : items;
+
     return (
-      <div
-        className="social-feed-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '1.25rem',
-          alignItems: 'stretch'
-        }}
-      >
-        {items.map(act => (
-          <SocialActivityCard
-            key={act.id}
-            activity={act}
-            isOwnActivity={Boolean(user && user.id === act.user_id)}
-            onDelete={handleDeleteActivity}
-            onOpenItem={(item) => handleOpenItem(item)}
-          />
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div
+          ref={el => { gridContainerRefs.current[tab] = el; }}
+          className="social-feed-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '1.25rem',
+            alignItems: 'stretch'
+          }}
+        >
+          {visibleItems.map(act => (
+            <SocialActivityCard
+              key={act.id}
+              activity={act}
+              isOwnActivity={Boolean(user && user.id === act.user_id)}
+              onDelete={handleDeleteActivity}
+              onOpenItem={(item) => handleOpenItem(item)}
+            />
+          ))}
+        </div>
+
+        {tabHasMore[tab] && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0 1.5rem 0' }}>
+            <button
+              type="button"
+              disabled={tabLoadingMore[tab]}
+              onClick={() => {
+                const base = PAGE_LIMITS[tab];
+                const alignedLimit = gridCols > 1 ? Math.ceil(base / gridCols) * gridCols : base;
+                loadMoreForTab(tab, alignedLimit);
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '0.65rem 1.75rem',
+                borderRadius: '25px',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: tabLoadingMore[tab] ? 'wait' : 'pointer',
+                opacity: tabLoadingMore[tab] ? 0.7 : 1
+              }}
+            >
+              {tabLoadingMore[tab]
+                ? (isEs ? 'Cargando...' : 'Loading...')
+                : (isEs ? 'Ver más' : 'Load more')}
+            </button>
+          </div>
+        )}
       </div>
     );
   };

@@ -1049,11 +1049,33 @@ def delete_activity_post(
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found or unauthorized")
 
-    # Delete related notifications for this activity
+    # Delete related notifications, likes, and comments explicitly (safe even on SQLite tables without CASCADE)
     db.query(Notification).filter(
         Notification.entity_type == "activity",
         Notification.entity_id == str(activity_id)
     ).delete(synchronize_session=False)
+    db.query(ActivityLike).filter(
+        ActivityLike.activity_id == activity_id
+    ).delete(synchronize_session=False)
+    comment_ids = [
+        r[0] for r in db.query(ActivityComment.id).filter(
+            ActivityComment.activity_id == activity_id
+        ).all()
+    ]
+    if comment_ids:
+        db.query(ActivityCommentVote).filter(
+            ActivityCommentVote.comment_id.in_(comment_ids)
+        ).delete(synchronize_session=False)
+        from app.models.social import ActivityCommentReport
+        db.query(ActivityCommentReport).filter(
+            ActivityCommentReport.comment_id.in_(comment_ids)
+        ).delete(synchronize_session=False)
+        db.query(ActivityComment).filter(
+            ActivityComment.id.in_(comment_ids)
+        ).update({"parent_id": None}, synchronize_session=False)
+        db.query(ActivityComment).filter(
+            ActivityComment.id.in_(comment_ids)
+        ).delete(synchronize_session=False)
 
     db.delete(act)
     db.commit()

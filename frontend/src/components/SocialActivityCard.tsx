@@ -27,6 +27,7 @@ export interface ActivityCardData {
   is_liked_by_me: boolean;
   comments_count: number;
   created_at: string;
+  merged_ids?: number[];
 }
 
 interface SocialActivityCardProps {
@@ -195,7 +196,14 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     if (isDeleting) return;
     try {
       setIsDeleting(true);
-      await apiClient.delete(`/social/feed/activity/${activity.id}`);
+      const idsToDelete = Array.from(new Set([activity.id, ...(activity.merged_ids || [])].filter(Boolean)));
+      await Promise.all(
+        idsToDelete.map(id =>
+          apiClient.delete(`/social/feed/activity/${id}`).catch((err: any) => {
+            if (err?.response?.status !== 404) throw err;
+          })
+        )
+      );
       closeDeleteConfirm(false);
       if (onDelete) {
         onDelete(activity.id);
